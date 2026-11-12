@@ -219,14 +219,15 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
 
 /* giao diện kính trong suốt (glassmorphism) */
 :root{
-  --panel: linear-gradient(160deg,rgba(255,255,255,.28),rgba(255,255,255,.06)), rgba(24,52,92,.38);
-  --panel-solid: linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.03)), rgba(22,46,82,.74);
-  --edge: rgba(255,255,255,.55);
+  --panel: linear-gradient(160deg,rgba(255,255,255,.38),rgba(255,255,255,.10)), rgba(40,90,150,.14);
+  --panel-solid: linear-gradient(160deg,rgba(255,255,255,.30),rgba(255,255,255,.06)), rgba(40,90,150,.30);
+  --edge: rgba(255,255,255,.75);
 }
 .pill,.quest,.event,.hunt,.ctx,.toast,.rotate,.sheet,.pinfo,.qbox,.row,.act,.minimap canvas{
-  -webkit-backdrop-filter: blur(14px) saturate(170%);
-  backdrop-filter: blur(14px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
+  backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
 }
+.quest,.event,.hunt,.ctx,.pill,.toast,.pinfo{text-shadow:0 1px 2px rgba(10,30,60,.55)}
 .pill,.quest,.event,.hunt,.ctx,.toast,.rotate,.sheet,.act{
   box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 .4rem 1.1rem rgba(20,70,130,.28);
 }
