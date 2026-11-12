@@ -474,6 +474,32 @@ function fbLogin(){
   });
 }
 function fbLogout(){ if (fbAuth) fbAuth.signOut(); toast('Đã đăng xuất. Tiến trình vẫn lưu trên máy này.'); }
+function fbCreds(){ return { e: (($('optEmail') || {}).value || '').trim(), p: ($('optPass') || {}).value || '' }; }
+function fbErr(err){
+  const c = (err && err.code) || '';
+  if (c.includes('email-already-in-use')) return 'Email này đã có tài khoản. Hãy bấm Đăng nhập.';
+  if (c.includes('invalid-email')) return 'Email không hợp lệ.';
+  if (c.includes('wrong-password') || c.includes('invalid-credential')) return 'Sai email hoặc mật khẩu.';
+  if (c.includes('user-not-found')) return 'Chưa có tài khoản với email này.';
+  if (c.includes('weak-password')) return 'Mật khẩu quá yếu (ít nhất 6 ký tự).';
+  if (c.includes('too-many-requests')) return 'Thử quá nhiều lần. Đợi một lát rồi thử lại.';
+  return 'Có lỗi, thử lại sau.';
+}
+function fbSignUp(){
+  if (!fbAuth) return; const { e, p } = fbCreds();
+  if (!e || p.length < 6){ toast('Nhập email và mật khẩu ít nhất 6 ký tự.', 'bad'); return; }
+  fbAuth.createUserWithEmailAndPassword(e, p).then(() => toast('Đã đăng ký. Tiến trình sẽ được lưu theo tài khoản này.', 'gold')).catch(err => toast(fbErr(err), 'bad'));
+}
+function fbSignIn(){
+  if (!fbAuth) return; const { e, p } = fbCreds();
+  if (!e || !p){ toast('Nhập email và mật khẩu.', 'bad'); return; }
+  fbAuth.signInWithEmailAndPassword(e, p).then(() => toast('Đã đăng nhập.', 'gold')).catch(err => toast(fbErr(err), 'bad'));
+}
+function fbReset(){
+  if (!fbAuth) return; const { e } = fbCreds();
+  if (!e){ toast('Nhập email trước rồi bấm Quên mật khẩu.', 'bad'); return; }
+  fbAuth.sendPasswordResetEmail(e).then(() => toast('Đã gửi email đặt lại mật khẩu.', 'gold')).catch(err => toast(fbErr(err), 'bad'));
+}
 
 async function cloudInit(){
   if (!(window.claude && window.claude.use) && typeof firebase !== 'undefined') return fbInit();
@@ -2007,7 +2033,8 @@ function renderModal(){
     }
   } else if (modalType === 'settings'){
     h += `<div class="field"><label for="optName"><b>Tên nhân vật</b></label><input id="optName" maxlength="16" value="${S.name.replace(/"/g, '&quot;')}"></div>`;
-    if (fbAuth) h += row('Tài khoản Google', CLOUD.status, fbAuth.currentUser ? `<button class="gbtn blue" data-act="glogout">Đăng xuất</button>` : `<button class="gbtn" data-act="glogin">Đăng nhập</button>`);
+    if (fbAuth && fbAuth.currentUser) h += row('Tài khoản', CLOUD.status, `<button class="gbtn blue" data-act="glogout">Đăng xuất</button>`);
+    else if (fbAuth) h += `<h3>Tài khoản</h3><p class="qtext">${CLOUD.status}</p><div class="field"><label for="optEmail"><b>Email</b></label><input id="optEmail" type="email" autocomplete="email"></div><div class="field"><label for="optPass"><b>Mật khẩu (ít nhất 6 ký tự)</b></label><input id="optPass" type="password" autocomplete="current-password"></div><div class="ctx-btns"><button class="gbtn green" data-act="emailsignup">Đăng ký</button><button class="gbtn" data-act="emaillogin">Đăng nhập</button><button class="gbtn blue" data-act="emailreset">Quên mật khẩu</button></div><div class="ctx-btns" style="margin-top:.5rem"><button class="gbtn" data-act="glogin">Đăng nhập bằng Google</button></div>`;
     h += row('Âm thanh', S.sound ? 'Đang bật' : 'Đang tắt',`<button class="gbtn blue" data-act="sound">${S.sound ? 'Tắt' : 'Bật'}</button>`);
     h += row('Đồ họa', S.gfx !== 'low' ? 'Cao: có đổ bóng, nét hơn' : 'Thấp: mượt hơn trên máy yếu', `<button class="gbtn blue" data-act="gfx">${S.gfx !== 'low' ? 'Chuyển Thấp' : 'Chuyển Cao'}</button>`);
     h += `<h3>Điều khiển</h3><div class="keys">Điện thoại: kéo cần điều khiển để đi, vuốt trên màn hình để xoay góc nhìn, chạm vào mặt đất để tự đi tới đó.<br>Máy tính: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> để đi, kéo chuột để xoay góc nhìn, lăn chuột để phóng to thu nhỏ, <kbd>Shift</kbd> chạy, <kbd>Space</kbd> nhảy, <kbd>E</kbd> phục vụ hoặc mở quầy, <kbd>B</kbd> mở túi, <kbd>P</kbd> chụp ảnh bưu thiếp.</div>`;
@@ -2066,6 +2093,9 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'craft'){ craftRecipe(id); }
   else if (a === 'glogin'){ fbLogin(); }
   else if (a === 'glogout'){ fbLogout(); }
+  else if (a === 'emailsignup'){ fbSignUp(); }
+  else if (a === 'emaillogin'){ fbSignIn(); }
+  else if (a === 'emailreset'){ fbReset(); }
   else if (a === 'shop'){ const it = SHOP.find(s => s.id === id); if (it.can && !it.can()){ toast('Bạn cần có ít nhất một quầy.', 'bad'); } else if (S.gems < it.g){ toast(`Cần ${it.g} kim cương. Nhận thêm ở Phúc Lợi và Thành Tựu.`, 'bad'); sfx('bad'); } else { S.gems -= it.g; it.buy(); toast('Đã dùng ' + it.t, 'gold'); sfx('buy'); } }
   else if (a === 'outfit'){ const o = OUTFITS.find(x => x.id === id); if (S.gems < o.price){ toast(`Cần ${o.price} kim cương.`, 'bad'); sfx('bad'); } else { S.gems -= o.price; S.outfits.push(o.id); S.outfit = o.id; setAvatar(); toast('Đã mua ' + o.name, 'gold'); sfx('buy'); } }
   else if (a === 'wear'){ S.outfit = id; setAvatar(); }
