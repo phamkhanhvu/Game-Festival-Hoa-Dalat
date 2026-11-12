@@ -256,6 +256,10 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
       <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h20v10a10 10 0 0 1-20 0z" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><path d="M14 9H7c0 7 4 11 9 11M34 9h7c0 7-4 11-9 11" fill="none" stroke="#e6a516" stroke-width="3"/><path d="M21 26h6v7h-6z" fill="#e6a516"/><rect x="14" y="33" width="20" height="6" rx="2" fill="#c47a0a"/><rect x="11" y="39" width="26" height="5" rx="2" fill="#7a4a06"/><path d="M19 11l2 4 4 .5-3 3 .8 4-3.8-2-3.8 2 .8-4-3-3 4-.5z" transform="translate(5 -2) scale(.8)" fill="#fff6c4"/></svg>
       Thành Tựu<span class="dot" id="dotAchv" hidden></span>
     </button>
+    <button class="mbtn outline" data-open="board">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="26" width="10" height="14" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><rect x="19" y="10" width="10" height="30" fill="#ffd84a" stroke="#8a5a00" stroke-width="2"/><rect x="30" y="20" width="10" height="20" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><path d="M6 42h36" stroke="#7a4a06" stroke-width="3"/></svg>
+      Bảng Xếp Hạng
+    </button>
     <button class="mbtn outline" data-open="welfare">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="9" width="36" height="33" rx="5" fill="#fff" stroke="#9aa6b8" stroke-width="2"/><path d="M6 14a5 5 0 0 1 5-5h26a5 5 0 0 1 5 5v5H6z" fill="#e2453b"/><rect x="13" y="4" width="4" height="10" rx="2" fill="#5b6576"/><rect x="31" y="4" width="4" height="10" rx="2" fill="#5b6576"/><g fill="#c7ced9"><rect x="11" y="24" width="6" height="5" rx="1"/><rect x="21" y="24" width="6" height="5" rx="1"/><rect x="31" y="24" width="6" height="5" rx="1"/><rect x="11" y="32" width="6" height="5" rx="1"/><rect x="31" y="32" width="6" height="5" rx="1"/></g><rect x="21" y="32" width="6" height="5" rx="1" fill="#e2453b"/></svg>
       Phúc Lợi<span class="dot" id="dotWelfare" hidden></span>
@@ -476,6 +480,35 @@ function fbLogin(){
   });
 }
 function fbLogout(){ if (fbAuth) fbAuth.signOut(); toast('Đã đăng xuất. Tiến trình vẫn lưu trên máy này.'); }
+/* Bảng xếp hạng: mỗi người đăng nhập ghi điểm công khai vào collection board, tối đa một lần mỗi phút */
+let BD = { rows:null, at:0, loading:false, err:null };
+let boardT = 0, boardTimer = null;
+function boardPush(){
+  if (!fbDb || !fbAuth || !fbAuth.currentUser) return;
+  if (now() - boardT < 60000){ if (!boardTimer) boardTimer = setTimeout(() => { boardTimer = null; boardPush(); }, 60000 - (now() - boardT)); return; }
+  boardT = now();
+  fbDb.collection('board').doc(fbAuth.currentUser.uid).set({ uid: fbAuth.currentUser.uid, name: S.name, level: S.level, score: S.stats.earned || 0, updated: now() }, { merge:true }).catch(() => {});
+}
+async function boardLoad(){
+  BD.loading = true;
+  try { const snap = await withTimeout(fbDb.collection('board').orderBy('score', 'desc').limit(20).get(), 10000); BD.rows = snap.docs.map(d => d.data()); BD.err = null; }
+  catch(e){ BD.rows = BD.rows || []; BD.err = (e && (e.code || e.message)) || 'lỗi'; }
+  BD.at = now(); BD.loading = false;
+}
+function boardRender(){
+  const el = $('bdList'); if (!el) return;
+  if (BD.rows === null){ el.textContent = 'Đang tải…'; return; }
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  if (!BD.rows.length){ el.textContent = BD.err ? 'Không tải được bảng xếp hạng (' + BD.err + ').' : 'Chưa có ai trên bảng.'; el.dataset.v = BD.at; return; }
+  const me = fbAuth && fbAuth.currentUser ? fbAuth.currentUser.uid : '';
+  el.innerHTML = BD.rows.map((r, i) => `<div style="padding:.35rem 0;border-bottom:1px solid rgba(255,255,255,.12);${r.uid === me ? 'color:#d7ff6b;font-weight:800' : ''}">${i + 1}. ${esc(r.name || 'Chủ quầy')} · Lv.${r.level || 1} · <b>${fmt(r.score || 0)}</b> xu</div>`).join('');
+  el.dataset.v = BD.at;
+}
+function boardTick(){
+  if (!fbDb){ const el = $('bdList'); if (el && !el.dataset.v){ el.textContent = 'Bảng xếp hạng chỉ hoạt động khi chơi trên dalatevent.com.'; el.dataset.v = 'x'; } return; }
+  if (!BD.loading && (BD.rows === null || now() - BD.at > 60000)) boardLoad();
+  const el = $('bdList'); if (el && el.dataset.v !== String(BD.at)) boardRender();
+}
 function fbCreds(){ return { e: (($('optEmail') || {}).value || '').trim(), p: ($('optPass') || {}).value || '' }; }
 function fbErr(err){
   const c = (err && err.code) || '';
@@ -545,7 +578,7 @@ function cloudPush(){
 function save(){
   if (CLOUD.adopting) return;
   try { S.savedAt = now(); S.player = { x:P.x, z:P.z }; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
-  cloudPush();
+  cloudPush(); boardPush();
 }
 try { const hot = window.claude && window.claude.hot; if (hot && hot.snapshot) hot.snapshot(() => { S.player = { x:P.x, z:P.z }; return { S }; }); } catch(e){}
 
@@ -2008,7 +2041,7 @@ $('qGo').addEventListener('click', () => {
 
 /* ================= Hộp thoại ================= */
 let modalType = null, resetAsk = false;
-const TITLES = { hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
+const TITLES = { board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
 function openModal(type){ modalType = type; resetAsk = false; $('mTitle').textContent = TITLES[type]; $('modal').hidden = false; renderModal(); }
 function closeModal(){ $('modal').hidden = true; modalType = null; modalTick = null; quizRes = null; save(); if (pendingQuiz.length) setTimeout(() => { if (!modalType && pendingQuiz.length) openQuiz(pendingQuiz.shift()); }, 350); }
 function row(title, sub, btn, extra){ return `<div class="row">${extra || ''}<div class="rt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${btn || ''}</div>`; }
@@ -2021,6 +2054,9 @@ function renderModal(){
       const btn = got ? `<button class="gbtn" disabled>Đã nhận</button>` : done ? `<button class="gbtn" data-act="achv:${a.id}">Nhận ${a.g}<small>kim cương</small></button>` : `<button class="gbtn" disabled>${fmt(p)}/${fmt(a.goal)}</button>`;
       h += row(a.t, `<span class="pbar"><i style="width:${p / a.goal * 100}%"></i></span>`, btn);
     });
+  } else if (modalType === 'board'){
+    modalTick = boardTick;
+    h += '<p>Xếp hạng theo tổng xu đã kiếm được. Bảng cập nhật khi bạn chơi và đăng nhập.</p><div id="bdList">Đang tải…</div>';
   } else if (modalType === 'welfare'){
     const dailyDone = S.lastDaily === dateKey();
     h += row('Quà mỗi ngày', `${fmt(1000 * S.level)} xu và 10 kim cương. Quay lại mỗi ngày để nhận.`, dailyDone ? `<button class="gbtn" disabled>Đã nhận</button>` : `<button class="gbtn" data-act="daily">Nhận</button>`);
