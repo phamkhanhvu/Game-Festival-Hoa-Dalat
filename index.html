@@ -1539,6 +1539,18 @@ if (festOn()){
       f.position.set(x + (j - 1) * 0.35, y + 1.0 + (j % 2) * 0.25, z + (j === 1 ? 0.15 : -0.1)); scene.add(f);
     }
   }
+  /* cổng hoa ở phía bắc quảng trường */
+  { const ax = 0, az = -24;
+    if (!blocked(ax, az)){
+      const y = Math.max(0, hAt(ax, az)), pm = std('#f3efe6', { roughness:0.5 });
+      [-2.6, 2.6].forEach(dx => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 4.2, 8), pm); c.position.set(ax + dx, y + 2.1, az); scene.add(c); });
+      for (let i = 0; i <= 10; i++){
+        const a = Math.PI * i / 10;
+        const f = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color:cols[i % cols.length], roughness:0.6 }));
+        f.position.set(ax + Math.cos(a) * 2.6, y + 4.1 + Math.sin(a) * 1.2, az); scene.add(f);
+      }
+    }
+  }
 }
 /* đèn đường khu phía bắc quảng trường: chỉ đặt ở chỗ trống */
 { const pole = std('#3b3f47', { metalness:0.5, roughness:0.5 }), bulbM = new THREE.MeshBasicMaterial({ color:0xffe2a0 });
