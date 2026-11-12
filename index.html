@@ -2085,7 +2085,6 @@ function updateHud(){
   const chips = [clockChip(), seasonInfo().name, WX_NAME[WX.k]]; if (combo >= 2 && now() - comboT < 8000) chips.push('Chuỗi phục vụ x' + combo); if (nightOpenNow()) chips.push('Chợ đêm đến 23:00'); if (eventOn()) chips.push('Giờ vàng ' + mmss(S.eventEnd - t)); if (rushOn()) chips.push('Khách đông ' + mmss(S.rushEnd - t));
   if (S.order) chips.push('Đơn đoàn ' + S.order.n + '/' + S.order.need + ' · ' + mmss(S.order.end - t));
   if (CLOUD.status) chips.push(CLOUD.status);
-  if (nearSeller) chips.push('<b data-open="veso" class="chip" style="background:#d7ff6b;color:#052b78;cursor:pointer">Mua vé số từ người bán</b>');
   if (fbAuth && !fbAuth.currentUser) chips.push('<b data-open="settings" class="chip" style="background:#d7ff6b;color:#052b78;cursor:pointer">Đăng ký / Đăng nhập</b>');
   const ch = chips.join('|'); if (hudCache.buffs !== ch){ hudCache.buffs = ch; $('buffs').innerHTML = chips.map(c => `<span class="chip">${c}</span>`).join(''); }
   refreshLabels(); drawMinimap();
@@ -2093,6 +2092,15 @@ function updateHud(){
 }
 function updateCtx(){
   const el = $('ctx');
+  if (!nearId && nearSeller){
+    /* bảng mua vé kiểu cửa hàng khi đứng gần người bán vé số */
+    el.hidden = false;
+    if (ctxKey !== 'seller'){ ctxKey = 'seller'; $('cName').textContent = 'Người bán vé số'; $('cBtns').innerHTML = `<button class="gbtn green" data-act="lottobuy" id="cBuy"></button><button class="gbtn blue" data-act="openveso">Vé của tôi<small>xem kết quả</small></button>`; hudCache.sv = ''; }
+    lottoSettle(); const TK = S.tickets && S.tickets.date === lkey() ? S.tickets : null, cnt = TK ? TK.nums.length : 0, drawn = lottoDrawn(lkey());
+    const sv = cnt + ':' + drawn;
+    if (hudCache.sv !== sv){ hudCache.sv = sv; $('cLv').textContent = 'Vé số kiến thiết'; $('cStats').innerHTML = `Giá <b>${fmt(LOTTO_PRICE)}</b> xu/vé · Hôm nay <b>${cnt}/${LOTTO_MAX}</b> vé · ${drawn ? 'Đã quay số hôm nay' : 'Quay số lúc <b>' + LOTTO_HOUR + ':00</b>'}`; const bb = $('cBuy'); bb.innerHTML = `Mua vé số<small>${fmt(LOTTO_PRICE)} xu</small>`; bb.disabled = drawn || cnt >= LOTTO_MAX; }
+    return;
+  }
   if (!nearId){ if (!el.hidden){ el.hidden = true; ctxKey = ''; } return; }
   const d = byId[nearId], s = st(nearId), key = nearId + ':' + s.owned; el.hidden = false;
   if (key !== ctxKey){
@@ -2128,7 +2136,8 @@ function updateCtx(){
   }
 }
 $('cBtns').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b || !nearId) return; const a = b.dataset.act;
+  const b = e.target.closest('button'); if (!b) return; const a = b.dataset.act;
+  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); updateHud(); updateCtx(); return; }
   if (a === 'serve') serveNow(nearId); else if (a === 'restock') restock(nearId); else if (a === 'upgrade') upgrade(nearId); else if (a === 'buy') buyStall(nearId); else if (a === 'staff') hireStaff(nearId); else if (a === 'deco') addDeco(nearId);
   updateHud(); updateCtx();
 });
