@@ -454,7 +454,7 @@ async function fbAttach(user){
   const ref = fbDb.collection('saves').doc(user.uid);
   let snap = null;
   try { snap = await withTimeout(ref.get(), 10000); }
-  catch(e){ CLOUD.status = 'Không kết nối được tài khoản: tiến trình chỉ lưu trên máy này'; updateHud(); return; }
+  catch(e){ CLOUD.status = 'Không kết nối được tài khoản (' + ((e && (e.code || e.message)) || 'lỗi') + ')'; updateHud(); return; }
   CLOUD.ref = ref;
   const cloud = snap && snap.exists ? snap.data() : null;
   if (cloud && cloud.state && cloud.state.stalls && (cloud.savedAt || 0) > (LOCAL_HAD_SAVE ? (S.savedAt || 0) + 5000 : 0)){
