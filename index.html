@@ -672,6 +672,8 @@ const SEASON_DEF = [
   { m:[10], name:'Mùa thu se lạnh', sale:1.05, cust:1.15 },
 ];
 function seasonInfo(){ const m = new Date().getMonth() + 1; return SEASON_DEF.find(s => s.m.includes(m)) || SEASON_DEF[4]; }
+/* Festival Hoa Đà Lạt: từ tháng 11 đến tháng 1, quảng trường đầy chậu hoa và quầy được bán giá cao hơn 15% */
+function festOn(){ const m = new Date().getMonth() + 1; return m === 11 || m === 12 || m === 1; }
 /* Thời tiết đổi mỗi 150 giây */
 const WX_NAME = { sun:'Nắng đẹp', rain:'Mưa phùn', fog:'Sương mù' };
 const WX_HOT = ['cafe', 'banhtrang', 'suadau', 'banhcan'];
@@ -688,7 +690,7 @@ const RECIPES = [
 ];
 const STAFF_COST = 25, DECO_COST = 8, DECO_MAX = 3;
 const decoCount = id => st(id).deco || 0;
-const salePrice = d => Math.round(lvlPrice(d) * (eventOn() ? 1.2 : 1) * (1 + 0.05 * decoCount(d.id)) * seasonInfo().sale * wxSale(d.id));
+const salePrice = d => Math.round(lvlPrice(d) * (eventOn() ? 1.2 : 1) * (1 + 0.05 * decoCount(d.id)) * seasonInfo().sale * wxSale(d.id) * (festOn() ? 1.15 : 1));
 const serveTime = d => d.serve * Math.pow(0.9, st(d.id).level - 1);
 const maxStock = d => 20 + 10 * st(d.id).level;
 const upgCost = d => Math.round(Math.max(d.cost, 800) * 0.7 * Math.pow(st(d.id).level, 1.8));
@@ -729,6 +731,7 @@ const QUESTS = [
   { t:'Kiếm tổng 500,000 xu từ bán hàng', goal:500000, p:() => S.stats.earned, tgt:null, hint:'Nâng các quầy lên cấp cao và dùng Giờ vàng chợ đêm.', r:{ gems:100 } },
 ];
 const ACHV = [
+  { id:'festsell', t:'Bán 50 phần hàng trong Festival Hoa', goal:50, p:() => S.stats.festSold || 0, g:15 },
   { id:'s50',   t:'Bán 50 phần hàng',             goal:50,     p:() => S.sold, g:10 },
   { id:'s500',  t:'Bán 500 phần hàng',            goal:500,    p:() => S.sold, g:30 },
   { id:'s2000', t:'Bán 2,000 phần hàng',          goal:2000,   p:() => S.sold, g:80 },
@@ -1523,6 +1526,20 @@ function setExit(p){
 }
 function leaveQueue(p, msg){ const q = RT[p.stall].queue, i = q.indexOf(p); if (i >= 0) q.splice(i, 1); if (msg) floatText(p.x, 2.2, p.z, msg, '#ff8a80'); setExit(p); }
 for (let i = 0; i < 22; i++){ const p = makePerson('wander'); p.zone = i % 5 < 3 ? 'low' : 'up'; const s = randomSpot(p.zone); p.x = s.x; p.z = s.z; const t = randomSpot(p.zone); p.tx = t.x; p.tz = t.z; people.push(p); }
+/* Festival Hoa: chậu hoa rực rỡ rải quanh quảng trường, chỉ có trong mùa festival */
+if (festOn()){
+  const cols = [0xff6fa8, 0xffd23f, 0xb07cff, 0xff8a3d, 0x6fd3ff]; let k = 0;
+  for (let x = -60; x <= 60 && k < 8; x += 24) for (let z = -20; z <= 24 && k < 8; z += 22){
+    if (blocked(x, z)) continue; k++;
+    const y = Math.max(0, hAt(x, z));
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 0.6, 10), std('#8a5a3c', { roughness:0.8 }));
+    pot.position.set(x, y + 0.3, z); scene.add(pot);
+    for (let j = 0; j < 3; j++){
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color:cols[(k + j) % cols.length], roughness:0.6 }));
+      f.position.set(x + (j - 1) * 0.35, y + 1.0 + (j % 2) * 0.25, z + (j === 1 ? 0.15 : -0.1)); scene.add(f);
+    }
+  }
+}
 /* đèn đường khu phía bắc quảng trường: chỉ đặt ở chỗ trống */
 { const pole = std('#3b3f47', { metalness:0.5, roughness:0.5 }), bulbM = new THREE.MeshBasicMaterial({ color:0xffe2a0 });
   let n = 0;
@@ -1553,7 +1570,7 @@ function spawnCustomer(list){
 let nearId = null, T = 0, ctxKey = '', nearSeller = false;
 function sell(d, manual){
   const s = st(d.id), r = RT[d.id]; const c = r.queue.shift(); if (!c) return;
-  s.stock--; let price = salePrice(d); if (manual) price = price * 1.2 * comboMul();
+  s.stock--; if (festOn()) S.stats.festSold = (S.stats.festSold || 0) + 1; let price = salePrice(d); if (manual) price = price * 1.2 * comboMul();
   if (c.vip){ price *= 3; S.gems += 2; S.stats.vip = (S.stats.vip || 0) + 1; toast('Khách sộp ghé quầy: giá gấp 3, thưởng 2 kim cương!', 'gold'); }
   price = Math.round(price);
   S.coins += price; S.stats.earned += price; S.sold++; if (manual) S.stats.served++;
@@ -2082,7 +2099,7 @@ function updateHud(){
   $('dotWelfare').hidden = !welfareReady();
   const t = now();
   setText('evTimer', eventOn() ? 'Đang diễn ra ' + mmss(S.eventEnd - t) : t < S.eventReady ? 'Hồi ' + mmss(S.eventReady - t) : 'Sẵn sàng');
-  const chips = [clockChip(), seasonInfo().name, WX_NAME[WX.k]]; if (combo >= 2 && now() - comboT < 8000) chips.push('Chuỗi phục vụ x' + combo); if (nightOpenNow()) chips.push('Chợ đêm đến 23:00'); if (eventOn()) chips.push('Giờ vàng ' + mmss(S.eventEnd - t)); if (rushOn()) chips.push('Khách đông ' + mmss(S.rushEnd - t));
+  const chips = [clockChip(), seasonInfo().name, WX_NAME[WX.k]]; if (festOn()) chips.push('Festival Hoa Đà Lạt +15%'); if (combo >= 2 && now() - comboT < 8000) chips.push('Chuỗi phục vụ x' + combo); if (nightOpenNow()) chips.push('Chợ đêm đến 23:00'); if (eventOn()) chips.push('Giờ vàng ' + mmss(S.eventEnd - t)); if (rushOn()) chips.push('Khách đông ' + mmss(S.rushEnd - t));
   if (S.order) chips.push('Đơn đoàn ' + S.order.n + '/' + S.order.need + ' · ' + mmss(S.order.end - t));
   if (CLOUD.status) chips.push(CLOUD.status);
   if (fbAuth && !fbAuth.currentUser) chips.push('<b data-open="settings" class="chip" style="background:#d7ff6b;color:#052b78;cursor:pointer">Đăng ký / Đăng nhập</b>');
