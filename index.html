@@ -843,7 +843,7 @@ function applyDayNight(){
   renderer.toneMappingExposure = 0.5 + 0.24 * k;
   const sk = scene.getObjectByName('sky'); if (sk) sk.material.color.copy(NIGHT_C.sky).lerp(DAY_C.sky, k);
   const stars = scene.getObjectByName('stars'); if (stars) stars.material.opacity = clamp((0.7 - k) / 0.4, 0, 1) * 0.9;
-  if (typeof lamps !== 'undefined'){ lamps.forEach(l => { l.intensity = (1 - k) * 22; }); STREET_LAMPS.forEach(l => { l.intensity = (1 - k) * 34 * (S.gfx === 'low' ? 0 : 1); }); }
+  if (typeof lamps !== 'undefined'){ lamps.forEach(l => { l.intensity = (1 - k) * 22; }); STREET_LAMPS.forEach(l => { l.intensity = (1 - k) * 18 *(S.gfx === 'low' ? 0 : 1); }); }
 }
 
 /* bầu trời */
