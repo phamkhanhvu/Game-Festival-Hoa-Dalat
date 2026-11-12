@@ -2331,24 +2331,3 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => STAL
 })();
 </script>
 
-<script>
-/* Safari: khi trang bị phóng to, giữ bảng HUD khớp đúng vùng nhìn thấy */
-(function(){
-  const hud = document.getElementById('hud');
-  const v = window.visualViewport;
-  if (!hud || !v) return;
-  function fitHud(){
-    const s = v.scale || 1;
-    hud.style.transformOrigin = '0 0';
-    hud.style.left = v.offsetLeft + 'px';
-    hud.style.top = v.offsetTop + 'px';
-    hud.style.width = (v.width * s) + 'px';
-    hud.style.height = (v.height * s) + 'px';
-    hud.style.inset = 'auto';
-    hud.style.transform = 'scale(' + (1 / s) + ')';
-  }
-  v.addEventListener('resize', fitHud);
-  v.addEventListener('scroll', fitHud);
-  fitHud();
-})();
-</script>
