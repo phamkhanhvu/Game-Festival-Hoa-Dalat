@@ -446,7 +446,7 @@ function fbInit(){
   CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này';
   fbAuth.onAuthStateChanged(user => {
     if (user) fbAttach(user);
-    else { CLOUD.ref = null; CLOUD.lastKey = ''; CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này'; updateHud(); }
+    else { CLOUD.ref = null; CLOUD.lastKey = ''; CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này'; updateHud(); if (!$('modal').hidden && modalType === 'settings') renderModal(); }
   });
   updateHud();
 }
@@ -465,6 +465,7 @@ async function fbAttach(user){
   CLOUD.status = 'Đã đăng nhập: ' + (user.displayName || 'tài khoản Google');
   CLOUD.lastKey = '';
   cloudPush(); updateHud();
+  if (!$('modal').hidden && modalType === 'settings') renderModal();
 }
 function fbLogin(){
   if (!fbAuth) return;
