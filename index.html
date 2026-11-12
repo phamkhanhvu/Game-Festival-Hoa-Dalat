@@ -911,9 +911,9 @@ function loadModel(){
     scene.add(model); el.hidden = true;
     /* người chơi trước, rồi tải song song 10 nhân vật; báo lên màn hình nếu có nhân vật không tải được */
     const bad = [];
-    tplChar('boy').then(() => upgradePlayer('boy')).catch(e => { console.warn('nv boy', e); TPL.boy = null; })
-      .then(() => Promise.all(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'].map(k => tplChar(k).catch(e => { console.warn('nv', k, e); bad.push(k + ': ' + (e && e.message || e)); }))))
-      .then(() => { if (!TPL.boy && TPL['01']){ CROWD.splice(0, 1); upgradePlayer('01'); } upgradeCrowd(); if (bad.length) toast('Không tải được nhân vật ' + bad.join(' · ').slice(0, 160));  })
+    tplChar('04').then(() => upgradePlayer('04')).catch(e => { console.warn('nv 04', e); TPL['04'] = null; })
+      .then(() => Promise.all(['01', '02', '03', '06', '07', '08', '09', '10'].map(k => tplChar(k).catch(e => { console.warn('nv', k, e); bad.push(k + ': ' + (e && e.message || e)); }))))
+      .then(() => { if (!TPL['04'] && TPL['01']){ upgradePlayer('01'); } upgradeCrowd(); if (bad.length) toast('Không tải được nhân vật ' + bad.join(' · ').slice(0, 160));  })
       .then(() => loadDecor()).catch(e => { console.warn('decor', e); toast('Không tải được cây cối, xe cộ: ' + (e && e.message || e)); });
     loadOpera().catch(e => { console.warn('opera', e); toast('Không tải được Nhà hát Hoa Dã Quỳ: ' + (e && e.message || e)); });
   }).catch(e => { el.querySelector('p').textContent = 'Không tải được mô hình quảng trường. Hãy kiểm tra mạng rồi tải lại trang.'; });
@@ -1062,8 +1062,8 @@ const RT = {}; STALLS.forEach(d => RT[d.id] = { queue:[], prog:0, flash:0, group
 const charCache = {};
 function loadChar(nv){
   if (!THREE.GLTFLoader) return Promise.reject();
-  return charCache[nv] || (charCache[nv] = fetch((nv === 'boy' ? 'nv' : 'rig') + nv + '.json').then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
-    .then(t => new Promise((res, rej) => new THREE.GLTFLoader().parse(t, '', res, rej)))
+  return charCache[nv] || (charCache[nv] = fetch('cast/' + nv + '.glb').then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then(buf => new Promise((res, rej) => new THREE.GLTFLoader().parse(buf, '', res, rej)))
     .then(g => { g.scene.traverse(o => { if (o.isMesh){ o.castShadow = true; if (o.material){ o.material.envMapIntensity = 0.3; if (o.material.metalness > 0.3 && !o.material.metalnessMap){ o.material.metalness = 0; o.material.roughness = Math.max(o.material.roughness, 0.7); } if (o.material.transparent){ o.material.alphaTest = 0.35; o.material.transparent = false; o.material.depthWrite = true; o.castShadow = false; } } } }); return g.scene; }));
 }
 const TPLP = {};
@@ -1071,7 +1071,7 @@ function tplChar(k){
   return TPLP[k] || (TPLP[k] = loadChar(k).then(sc => { TPL[k] = k === 'boy' ? makeTemplate(sc, BOY_OPT) : makeRigTemplate(sc); return TPL[k]; }));
 }
 /* Mô hình GLB tĩnh không có khung xương: tách tam giác phần chân thành hai nhóm quay quanh hông để nhân vật bước được */
-const TPL = {}, CROWD = ['01', '02', '03', '04', '05', '06'];
+const TPL = {}, CROWD = ['01', '02', '03', '06', '07', '08', '09', '10'];
 const BOY_OPT = { cut:0.4, piv:0.43, legW:0.13, arm:{ x:0.135, y0:0.6, y1:0.77, py:0.69, down:1.32 } };
 function deq(a){
   if (!a) return null;
@@ -1123,14 +1123,14 @@ function makeTemplate(sc, opt){
 }
 /* Mô hình có khung xương (A-pose): chia lưới theo trọng số xương để tách chân, tay, thân; dựng khung giống makeTemplate */
 /* GLTFLoader bỏ dấu chấm trong tên xương: 'thigh.L' thành 'thighL' */
-const BONE_ROLE = [[/^(thigh|shin|foot|toe)L$|^Bip01_L_(Thigh|Calf|Foot|Toe\d*)$/, 'L'], [/^(thigh|shin|foot|toe)R$|^Bip01_R_(Thigh|Calf|Foot|Toe\d*)$/, 'R'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*L$|^Bip01_L_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aL'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*R$|^Bip01_R_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aR']];
+const BONE_ROLE = [[/^(Thigh|Shin|Foot|Toe)\.L$/, 'L'], [/^(Thigh|Shin|Foot|Toe)\.R$/, 'R'], [/^(UpperArm|Forearm|Hand)\.L$/, 'aL'], [/^(UpperArm|Forearm|Hand)\.R$/, 'aR'], [/^(thigh|shin|foot|toe)L$|^Bip01_L_(Thigh|Calf|Foot|Toe\d*)$/, 'L'], [/^(thigh|shin|foot|toe)R$|^Bip01_R_(Thigh|Calf|Foot|Toe\d*)$/, 'R'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*L$|^Bip01_L_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aL'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*R$|^Bip01_R_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aR']];
 const jw = (at, i, c) => c === 0 ? at.getX(i) : c === 1 ? at.getY(i) : c === 2 ? at.getZ(i) : at.getW(i);
 const boneRole = n => { for (const [re, r] of BONE_ROLE) if (re.test(n || '')) return r; return 'body'; };
 function makeRigTemplate(sc){
   sc.updateMatrixWorld(true);
   const bo = {}, v = new THREE.Vector3(), parts = [], RC = { body:0, L:1, R:2, aL:3, aR:4 }, KEYS = ['body', 'L', 'R', 'aL', 'aR'];
   sc.traverse(o => { if (o.isBone) bo[o.name] = o; });
-  const B = { thL:bo.thighL || bo.Bip01_L_Thigh, thR:bo.thighR || bo.Bip01_R_Thigh, caL:bo.shinL || bo.Bip01_L_Calf, caR:bo.shinR || bo.Bip01_R_Calf, uaL:bo.upper_armL || bo.Bip01_L_UpperArm, uaR:bo.upper_armR || bo.Bip01_R_UpperArm, faL:bo.forearmL || bo.Bip01_L_Forearm, faR:bo.forearmR || bo.Bip01_R_Forearm };
+  const B = { thL:bo.thighL || bo.Bip01_L_Thigh || bo['Thigh.L'], thR:bo.thighR || bo.Bip01_R_Thigh || bo['Thigh.R'], caL:bo.shinL || bo.Bip01_L_Calf || bo['Shin.L'], caR:bo.shinR || bo.Bip01_R_Calf || bo['Shin.R'], uaL:bo.upper_armL || bo.Bip01_L_UpperArm || bo['UpperArm.L'], uaR:bo.upper_armR || bo.Bip01_R_UpperArm || bo['UpperArm.R'], faL:bo.forearmL || bo.Bip01_L_Forearm || bo['Forearm.L'], faR:bo.forearmR || bo.Bip01_R_Forearm || bo['Forearm.R'] };
   for (const k in B) if (!B[k]) throw new Error('thiếu xương');
   const wp = o => o.getWorldPosition(new THREE.Vector3());
   // đặt tư thế nghỉ: xoay xương cánh tay quanh vai để tay buông xuống, rồi nướng lưới theo trọng số xương (vai liền mạch)
