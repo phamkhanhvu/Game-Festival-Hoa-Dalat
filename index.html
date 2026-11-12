@@ -1949,6 +1949,7 @@ function updateHud(){
   const chips = [clockChip(), seasonInfo().name, WX_NAME[WX.k]]; if (combo >= 2 && now() - comboT < 8000) chips.push('Chuỗi phục vụ x' + combo); if (nightOpenNow()) chips.push('Chợ đêm đến 23:00'); if (eventOn()) chips.push('Giờ vàng ' + mmss(S.eventEnd - t)); if (rushOn()) chips.push('Khách đông ' + mmss(S.rushEnd - t));
   if (S.order) chips.push('Đơn đoàn ' + S.order.n + '/' + S.order.need + ' · ' + mmss(S.order.end - t));
   if (CLOUD.status) chips.push(CLOUD.status);
+  if (fbAuth && !fbAuth.currentUser) chips.push('<b data-open="settings" class="chip" style="background:#d7ff6b;color:#052b78;cursor:pointer">Đăng ký / Đăng nhập</b>');
   const ch = chips.join('|'); if (hudCache.buffs !== ch){ hudCache.buffs = ch; $('buffs').innerHTML = chips.map(c => `<span class="chip">${c}</span>`).join(''); }
   refreshLabels(); drawMinimap();
   if (!$('modal').hidden && modalTick) modalTick();
@@ -2173,6 +2174,7 @@ function offlineEarnings(){
 }
 P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0, true); updateHud();
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
+$('buffs').addEventListener('click', e => { if (e.target.closest('[data-open="settings"]')) openModal('settings'); });
 cloudInit();
 window.__game = { items, TPL, S:() => S, P, ready:() => !!model, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 let last = performance.now(), hudAcc = 0, saveAcc = 0;
