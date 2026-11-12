@@ -644,6 +644,10 @@ const SHOP = [
 ];
 
 /* ================= Âm thanh & toast ================= */
+/* Nhạc nền: trình duyệt chỉ cho phát sau lần chạm đầu tiên, nên thử phát ở mỗi lần chạm đến khi được */
+const BGM = new Audio('bgm.mp3'); BGM.loop = true; BGM.volume = 0.3; BGM.preload = 'auto';
+function bgmSync(){ if (!S.sound){ BGM.pause(); return; } if (BGM.paused) BGM.play().catch(() => {}); }
+window.addEventListener('pointerdown', bgmSync);
 let AC = null;
 function sfx(type){
   if (!S.sound) return;
@@ -2099,7 +2103,7 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'shop'){ const it = SHOP.find(s => s.id === id); if (it.can && !it.can()){ toast('Bạn cần có ít nhất một quầy.', 'bad'); } else if (S.gems < it.g){ toast(`Cần ${it.g} kim cương. Nhận thêm ở Phúc Lợi và Thành Tựu.`, 'bad'); sfx('bad'); } else { S.gems -= it.g; it.buy(); toast('Đã dùng ' + it.t, 'gold'); sfx('buy'); } }
   else if (a === 'outfit'){ const o = OUTFITS.find(x => x.id === id); if (S.gems < o.price){ toast(`Cần ${o.price} kim cương.`, 'bad'); sfx('bad'); } else { S.gems -= o.price; S.outfits.push(o.id); S.outfit = o.id; setAvatar(); toast('Đã mua ' + o.name, 'gold'); sfx('buy'); } }
   else if (a === 'wear'){ S.outfit = id; setAvatar(); }
-  else if (a === 'sound'){ S.sound = !S.sound; if (S.sound) sfx('coin'); }
+  else if (a === 'sound'){ S.sound = !S.sound; if (S.sound) sfx('coin'); bgmSync(); }
   else if (a === 'gfx'){ S.gfx = S.gfx !== 'low' ? 'low' : 'high'; applyGfx(); }
   else if (a === 'reset'){ resetAsk = true; }
   else if (a === 'resetNo'){ resetAsk = false; }
