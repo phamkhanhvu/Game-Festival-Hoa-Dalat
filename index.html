@@ -807,7 +807,7 @@ function applyDayNight(){
   renderer.toneMappingExposure = 0.5 + 0.24 * k;
   const sk = scene.getObjectByName('sky'); if (sk) sk.material.color.copy(NIGHT_C.sky).lerp(DAY_C.sky, k);
   const stars = scene.getObjectByName('stars'); if (stars) stars.material.opacity = clamp((0.7 - k) / 0.4, 0, 1) * 0.9;
-  if (typeof lamps !== 'undefined'){ lamps.forEach(l => { l.intensity = (1 - k) * 22; }); STREET_LAMPS.forEach(l => { l.intensity = (1 - k) * 16 * (S.gfx === 'low' ? 0 : 1); }); }
+  if (typeof lamps !== 'undefined'){ lamps.forEach(l => { l.intensity = (1 - k) * 22; }); STREET_LAMPS.forEach(l => { l.intensity = (1 - k) * 34 * (S.gfx === 'low' ? 0 : 1); }); }
 }
 
 /* bầu trời */
@@ -1261,9 +1261,9 @@ const STREET_LAMPS = [];
 { const pole = std('#3b3f47', { metalness:0.5, roughness:0.5 });
   [-64, -32, 0, 32, 64].forEach(x => {
     const z = 57, y = Math.max(0, hAt(x, z));
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.6, 8), pole); m.position.set(x, y + 1.8, z); scene.add(m);
-    const b = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshBasicMaterial({ color:0xffe2a0 })); b.position.set(x, y + 3.7, z); scene.add(b);
-    const l = new THREE.PointLight(0xffd08a, 0, 16, 1.5); l.position.set(x, y + 3.4, z); scene.add(l); STREET_LAMPS.push(l);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 4.2, 8), pole); m.position.set(x, y + 1.8, z); scene.add(m);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), new THREE.MeshBasicMaterial({ color:0xffe2a0 })); b.position.set(x, y + 3.7, z); scene.add(b);
+    const l = new THREE.PointLight(0xffd08a, 0, 26, 1.1); l.position.set(x, y + 3.4, z); scene.add(l); STREET_LAMPS.push(l);
   });
 }
 STALLS.forEach(buildStall);
@@ -1493,9 +1493,9 @@ for (let i = 0; i < 22; i++){ const p = makePerson('wander'); p.zone = i % 5 < 3
   for (let x = -70; x <= 62 && n < 4; x += 22) for (let z = -26; z <= 10 && n < 4; z += 18){
     if (blocked(x, z)) continue; n++;
     const y = Math.max(0, hAt(x, z));
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.6, 8), pole); m.position.set(x, y + 1.8, z); scene.add(m);
-    const b = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), bulbM); b.position.set(x, y + 3.7, z); scene.add(b);
-    const l = new THREE.PointLight(0xffd08a, 0, 16, 1.5); l.position.set(x, y + 3.4, z); scene.add(l); STREET_LAMPS.push(l);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 4.2, 8), pole); m.position.set(x, y + 1.8, z); scene.add(m);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), bulbM); b.position.set(x, y + 3.7, z); scene.add(b);
+    const l = new THREE.PointLight(0xffd08a, 0, 26, 1.1); l.position.set(x, y + 3.4, z); scene.add(l); STREET_LAMPS.push(l);
   }
 }
 /* người bán vé số đi rong trên quảng trường, thỉnh thoảng rao */
