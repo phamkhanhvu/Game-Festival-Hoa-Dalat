@@ -1439,6 +1439,8 @@ function setExit(p){
 }
 function leaveQueue(p, msg){ const q = RT[p.stall].queue, i = q.indexOf(p); if (i >= 0) q.splice(i, 1); if (msg) floatText(p.x, 2.2, p.z, msg, '#ff8a80'); setExit(p); }
 for (let i = 0; i < 22; i++){ const p = makePerson('wander'); p.zone = i % 5 < 3 ? 'low' : 'up'; const s = randomSpot(p.zone); p.x = s.x; p.z = s.z; const t = randomSpot(p.zone); p.tx = t.x; p.tz = t.z; people.push(p); }
+/* người bán vé số đi rong trên quảng trường, thỉnh thoảng rao */
+for (let i = 0; i < 3; i++){ const p = makePerson('wander'); p.seller = true; p.call = rand(2, 6); p.zone = 'low'; const s = randomSpot('low'); p.x = s.x; p.z = s.z; const t = randomSpot('low'); p.tx = t.x; p.tz = t.z; p.sp = rand(1.0, 1.4); people.push(p); }
 let spawnAcc = 0;
 function spawnCustomer(list){
   const cands = list.filter(d => RT[d.id].queue.length < 6); if (!cands.length) return;
@@ -1629,6 +1631,7 @@ function update(dt){
   }
 
   for (const p of people){
+    if (p.seller){ p.call -= dt; if (p.call <= 0){ p.call = rand(9, 15); floatText(p.x, 2.4, p.z, 'Vé số đây! Trúng to!', '#ffffff'); } }
     const inQ = p.state === 'queue' || (p.state === 'toStall' && !p.path);
     if (inQ){ const i = RT[p.stall].queue.indexOf(p), sl = slot(byId[p.stall], Math.max(0, i)); p.tx = sl.x; p.tz = sl.z; }
     const dx = p.tx - p.x, dz = p.tz - p.z, d = Math.hypot(dx, dz);
