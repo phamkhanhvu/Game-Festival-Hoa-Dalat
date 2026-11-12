@@ -807,7 +807,7 @@ function applyDayNight(){
   renderer.toneMappingExposure = 0.5 + 0.24 * k;
   const sk = scene.getObjectByName('sky'); if (sk) sk.material.color.copy(NIGHT_C.sky).lerp(DAY_C.sky, k);
   const stars = scene.getObjectByName('stars'); if (stars) stars.material.opacity = clamp((0.7 - k) / 0.4, 0, 1) * 0.9;
-  if (typeof lamps !== 'undefined') lamps.forEach(l => { l.intensity = (1 - k) * 22; });
+  if (typeof lamps !== 'undefined'){ lamps.forEach(l => { l.intensity = (1 - k) * 22; }); STREET_LAMPS.forEach(l => { l.intensity = (1 - k) * 16; }); }
 }
 
 /* bầu trời */
@@ -1256,6 +1256,16 @@ function buildStall(d){
   if (!rt.ring){ const r = new THREE.Mesh(new THREE.RingGeometry(3.0, 3.35, 48), new THREE.MeshBasicMaterial({ color:0xffd23f, transparent:true, opacity:0.6, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4 })); r.rotation.x = -Math.PI / 2; r.position.set(d.x, 0.05, d.z + 0.7); r.renderOrder = 3; scene.add(r); rt.ring = r; }
 }
 const lamps = STALLS.map(d => { const l = new THREE.PointLight(0xffb35c, 0, 13, 1.5); l.position.set(d.x, 3.1, d.z + 0.7); scene.add(l); return l; });
+/* đèn đường: cột đèn dọc lối đi ở khu quảng trường, bật dần khi trời tối */
+const STREET_LAMPS = [];
+{ const pole = std('#3b3f47', { metalness:0.5, roughness:0.5 });
+  [-64, -32, 0, 32, 64].forEach(x => {
+    const z = 57, y = Math.max(0, hAt(x, z));
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.6, 8), pole); m.position.set(x, y + 1.8, z); scene.add(m);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshBasicMaterial({ color:0xffe2a0 })); b.position.set(x, y + 3.7, z); scene.add(b);
+    const l = new THREE.PointLight(0xffd08a, 0, 16, 1.5); l.position.set(x, y + 3.4, z); scene.add(l); STREET_LAMPS.push(l);
+  });
+}
 STALLS.forEach(buildStall);
 /* người bán bóng bay */
 const balloons = [];
