@@ -1691,7 +1691,7 @@ function update(dt){
   }
 
   for (const p of people){
-    if (p.seller){ p.call -= dt; if (p.call <= 0){ p.call = rand(9, 15); floatText(p.x, 2.4, p.z, 'Vé số đây! Trúng to!', '#ffffff'); } }
+    if (p.seller){ p.call -= dt; if (p.call <= 0){ p.call = rand(9, 15); const RAO = ['Vé số đây! Trúng to!', 'Vé số Đà Lạt, mua đi anh chị ơi!', 'Vé số nè, may mắn đầu năm!', 'Ai mua vé số không? Giá 2.000 thôi!', 'Vé số kiến thiết, trúng là có ngay!']; floatText(p.x, 2.4, p.z, RAO[Math.floor(Math.random() * RAO.length)], '#ffffff'); } }
     const inQ = p.state === 'queue' || (p.state === 'toStall' && !p.path);
     if (inQ){ const i = RT[p.stall].queue.indexOf(p), sl = slot(byId[p.stall], Math.max(0, i)); p.tx = sl.x; p.tz = sl.z; }
     const dx = p.tx - p.x, dz = p.tz - p.z, d = Math.hypot(dx, dz);
