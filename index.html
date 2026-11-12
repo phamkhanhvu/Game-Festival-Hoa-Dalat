@@ -260,6 +260,10 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="26" width="10" height="14" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><rect x="19" y="10" width="10" height="30" fill="#ffd84a" stroke="#8a5a00" stroke-width="2"/><rect x="30" y="20" width="10" height="20" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><path d="M6 42h36" stroke="#7a4a06" stroke-width="3"/></svg>
       Bảng Xếp Hạng
     </button>
+    <button class="mbtn outline" data-open="veso">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="13" width="38" height="22" rx="3" fill="#ffd84a" stroke="#8a5a00" stroke-width="2"/><path d="M5 24h38" stroke="#8a5a00" stroke-width="1.5" stroke-dasharray="3 3"/><circle cx="14" cy="24" r="3" fill="#e2453b"/><text x="26" y="29" font-size="11" font-weight="700" text-anchor="middle" fill="#8a5a00">88</text></svg>
+      Vé Số
+    </button>
     <button class="mbtn outline" data-open="welfare">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="9" width="36" height="33" rx="5" fill="#fff" stroke="#9aa6b8" stroke-width="2"/><path d="M6 14a5 5 0 0 1 5-5h26a5 5 0 0 1 5 5v5H6z" fill="#e2453b"/><rect x="13" y="4" width="4" height="10" rx="2" fill="#5b6576"/><rect x="31" y="4" width="4" height="10" rx="2" fill="#5b6576"/><g fill="#c7ced9"><rect x="11" y="24" width="6" height="5" rx="1"/><rect x="21" y="24" width="6" height="5" rx="1"/><rect x="31" y="24" width="6" height="5" rx="1"/><rect x="11" y="32" width="6" height="5" rx="1"/><rect x="31" y="32" width="6" height="5" rx="1"/></g><rect x="21" y="32" width="6" height="5" rx="1" fill="#e2453b"/></svg>
       Phúc Lợi<span class="dot" id="dotWelfare" hidden></span>
@@ -508,6 +512,40 @@ function boardTick(){
   if (!fbDb){ const el = $('bdList'); if (el && !el.dataset.v){ el.textContent = 'Bảng xếp hạng chỉ hoạt động khi chơi trên dalatevent.com.'; el.dataset.v = 'x'; } return; }
   if (!BD.loading && (BD.rows === null || now() - BD.at > 60000)) boardLoad();
   const el = $('bdList'); if (el && el.dataset.v !== String(BD.at)) boardRender();
+}
+/* Vé số: mua trong ngày (tối đa 5 vé), quay số lúc 21:00, trúng thưởng được trả khi game chạy sau giờ quay */
+const LOTTO_PRICE = 2000, LOTTO_MAX = 5, LOTTO_HOUR = 21;
+const lkey = (dt) => { const d = dt || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+function lottoNum(key){ let h = 2166136261; for (const c of key){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return String((h >>> 0) % 100000).padStart(5, '0'); }
+function lottoDrawn(d){ return d < lkey() || (d === lkey() && hourNow() >= LOTTO_HOUR); }
+function lottoPrize(nums, win){
+  let coins = 0, gems = 0;
+  nums.forEach(n => {
+    if (n === win){ coins += 200000; gems += 20; }
+    else if (n.slice(-3) === win.slice(-3)) coins += 20000;
+    else if (n.slice(-2) === win.slice(-2)) coins += 2000;
+  });
+  return { coins, gems };
+}
+function lottoSettle(){
+  const T = S.tickets; if (!T || T.paid || !lottoDrawn(T.date)) return;
+  const win = lottoNum('lotto-' + T.date), r = lottoPrize(T.nums, win);
+  T.paid = true; T.win = win;
+  if (T.nums.length){
+    give(r);
+    if (r.coins || r.gems){ toast(`Vé số ${T.date} quay được ${win}: trúng ${fmt(r.coins)} xu${r.gems ? ' và ' + r.gems + ' kim cương' : ''}!`, 'gold'); sfx('level'); }
+    else toast(`Vé số ${T.date} quay được ${win}: chưa trúng lần này.`, 'bad');
+  }
+  save();
+}
+function lottoBuy(){
+  lottoSettle();
+  if (lottoDrawn(lkey())){ toast('Hôm nay đã quay số. Mai mua tiếp nhé.', 'bad'); return; }
+  if (!S.tickets || S.tickets.date !== lkey()) S.tickets = { date: lkey(), nums: [], paid: false };
+  if (S.tickets.nums.length >= LOTTO_MAX){ toast(`Mỗi ngày mua tối đa ${LOTTO_MAX} vé.`, 'bad'); return; }
+  if (S.coins < LOTTO_PRICE){ toast(`Cần ${fmt(LOTTO_PRICE)} xu để mua vé.`, 'bad'); sfx('bad'); return; }
+  S.coins -= LOTTO_PRICE; const n = String(Math.floor(Math.random() * 100000)).padStart(5, '0');
+  S.tickets.nums.push(n); toast('Đã mua vé số ' + n, 'gold'); sfx('buy'); save(); renderModal();
 }
 function fbCreds(){ return { e: (($('optEmail') || {}).value || '').trim(), p: ($('optPass') || {}).value || '' }; }
 function fbErr(err){
@@ -1967,6 +2005,7 @@ function setWidth(id, pct){ const v = Math.round(pct * 1000) / 10 + '%'; if (hud
 function welfareReady(){ return S.lastDaily !== dateKey() || S.onlineAcc >= 300; }
 let modalTick = null;
 function updateHud(){
+  lottoSettle();
   setText('hLv', 'Lv.' + S.level); setText('hName', S.name);
   setWidth('hSta', P.sta / 100); setWidth('hXp', S.exp / expNeed(S.level));
   setText('hCoins', fmt(S.coins)); setText('hGems', fmt(S.gems));
@@ -2044,7 +2083,7 @@ $('qGo').addEventListener('click', () => {
 
 /* ================= Hộp thoại ================= */
 let modalType = null, resetAsk = false;
-const TITLES = { board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
+const TITLES = { veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
 function openModal(type){ modalType = type; resetAsk = false; $('mTitle').textContent = TITLES[type]; $('modal').hidden = false; renderModal(); }
 function closeModal(){ $('modal').hidden = true; modalType = null; modalTick = null; quizRes = null; save(); if (pendingQuiz.length) setTimeout(() => { if (!modalType && pendingQuiz.length) openQuiz(pendingQuiz.shift()); }, 350); }
 function row(title, sub, btn, extra){ return `<div class="row">${extra || ''}<div class="rt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${btn || ''}</div>`; }
@@ -2057,6 +2096,14 @@ function renderModal(){
       const btn = got ? `<button class="gbtn" disabled>Đã nhận</button>` : done ? `<button class="gbtn" data-act="achv:${a.id}">Nhận ${a.g}<small>kim cương</small></button>` : `<button class="gbtn" disabled>${fmt(p)}/${fmt(a.goal)}</button>`;
       h += row(a.t, `<span class="pbar"><i style="width:${p / a.goal * 100}%"></i></span>`, btn);
     });
+  } else if (modalType === 'veso'){
+    lottoSettle();
+    const T = S.tickets && S.tickets.date === lkey() ? S.tickets : null, drawn = lottoDrawn(lkey()), cnt = T ? T.nums.length : 0;
+    modalTick = () => { if (lottoDrawn(lkey()) !== drawn) renderModal(); };
+    h += `<p>Mỗi vé ${fmt(LOTTO_PRICE)} xu, mua tối đa ${LOTTO_MAX} vé mỗi ngày. Quay số lúc ${LOTTO_HOUR}:00 mỗi tối.</p>`;
+    h += row('Vé hôm nay', cnt ? T.nums.join(' · ') : 'Chưa mua vé', drawn ? '' : `<button class="gbtn green" data-act="lottobuy" ${cnt >= LOTTO_MAX ? 'disabled' : ''}>Mua vé<small>${fmt(LOTTO_PRICE)} xu</small></button>`);
+    h += row('Kết quả hôm nay', drawn ? 'Số trúng: <b>' + lottoNum('lotto-' + lkey()) + '</b>' : `Chưa quay. Đợi đến ${LOTTO_HOUR}:00.`, '');
+    if (drawn && cnt){ const r = lottoPrize(T.nums, lottoNum('lotto-' + lkey())); h += row('Vé của bạn', r.coins || r.gems ? `Trúng ${fmt(r.coins)} xu${r.gems ? ' và ' + r.gems + ' kim cương' : ''}` : 'Chưa trúng lần này', ''); }
   } else if (modalType === 'board'){
     modalTick = boardTick;
     h += '<p>Xếp hạng theo tổng xu đã kiếm được. Bảng cập nhật khi bạn chơi và đăng nhập.</p><div id="bdList">Đang tải…</div>';
@@ -2137,6 +2184,7 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'daily'){ if (S.lastDaily !== dateKey()){ S.lastDaily = dateKey(); give({ coins:1000 * S.level, gems:10 }); toast(`Quà mỗi ngày: +${fmt(1000 * S.level)} xu, +10 kim cương`, 'gold'); sfx('buy'); } }
   else if (a === 'online'){ if (S.onlineAcc >= 300){ S.onlineAcc = 0; give({ coins:400 * S.level }); toast(`+${fmt(400 * S.level)} xu`, 'gold'); sfx('coin'); } }
   else if (a === 'craft'){ craftRecipe(id); }
+  else if (a === 'lottobuy'){ lottoBuy(); }
   else if (a === 'glogin'){ fbLogin(); }
   else if (a === 'glogout'){ fbLogout(); }
   else if (a === 'emailsignup'){ fbSignUp(); }
