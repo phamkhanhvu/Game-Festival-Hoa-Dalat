@@ -1499,7 +1499,7 @@ for (let i = 0; i < 22; i++){ const p = makePerson('wander'); p.zone = i % 5 < 3
   }
 }
 /* người bán vé số đi rong trên quảng trường, thỉnh thoảng rao */
-for (let i = 0; i < 3; i++){ const p = makePerson('wander'); p.seller = true; p.call = rand(2, 6); p.zone = 'low'; const s = randomSpot('low'); p.x = s.x; p.z = s.z; const t = randomSpot('low'); p.tx = t.x; p.tz = t.z; p.sp = rand(1.0, 1.4); people.push(p); }
+for (let i = 0; i < 3; i++){ const p = makePerson('wander'); p.seller = true; p.call = rand(2, 6); p.zone = 'low'; const s = randomSpot('low'); p.x = s.x; p.z = s.z; const t = randomSpot('low'); p.tx = t.x; p.tz = t.z; p.sp = rand(1.0, 1.4); p.lbl = mkLabel('tag', '<b>Bán vé số</b>'); people.push(p); }
 let spawnAcc = 0;
 function spawnCustomer(list){
   const cands = list.filter(d => RT[d.id].queue.length < 6); if (!cands.length) return;
@@ -1770,6 +1770,7 @@ function placeLabels(){
     const txt = qt.stall ? '' : qt.label; if (lblCache.bang !== txt){ lblCache.bang = txt; bangLbl.lastChild.textContent = txt; bangLbl.lastChild.style.display = txt ? '' : 'none'; }
     if (qt.stall) place(bangLbl, qt.x, 6.1, qt.z, 400); else place(bangLbl, qt.x, hAt(qt.x, qt.z) + 2.6, qt.z, 400);
   } else if (bangLbl.style.display !== 'none') bangLbl.style.display = 'none';
+  for (const p of people){ if (p.seller && p.lbl) place(p.lbl, p.x, 2.5, p.z, 45); }
   place(nameLbl, P.x, P.y + 2.05, P.z, 60);
   for (const f of floats){ if (place(f.el, f.x, f.y, f.z, 70)) f.el.style.opacity = clamp(f.life, 0, 1); }
 }
