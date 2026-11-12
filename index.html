@@ -339,6 +339,9 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
@@ -426,7 +429,54 @@ const P = { x:S.player.x, z:S.player.z, y:0, h:Math.max(0, hAt(S.player.x, S.pla
 const CLOUD = { ref:null, lastKey:'', pushing:false, dirty:false, adopting:false, status:'Đang kết nối tài khoản…' };
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 function cloudKey(state){ return JSON.stringify(Object.assign({}, state, { savedAt:0, player:null })); }
+/* ===== Đăng nhập Google (Firebase) khi chạy ngoài khung Artifact, ví dụ trên dalatevent.com ===== */
+const FB_CONFIG = {
+  apiKey: "AIzaSyD8DOLKoWWARoxtVmAh1tpkGcET8rCAngs",
+  authDomain: "quay-hang-da-lat.firebaseapp.com",
+  projectId: "quay-hang-da-lat",
+  storageBucket: "quay-hang-da-lat.firebasestorage.app",
+  messagingSenderId: "844175137729",
+  appId: "1:844175137729:web:6ce0d932a26fe056d9ed40"
+};
+let fbAuth = null, fbDb = null;
+function fbInit(){
+  try { firebase.initializeApp(FB_CONFIG); fbAuth = firebase.auth(); fbDb = firebase.firestore(); }
+  catch(e){ CLOUD.status = 'Không tải được Firebase: tiến trình chỉ lưu trên máy này'; updateHud(); return; }
+  CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này';
+  fbAuth.onAuthStateChanged(user => {
+    if (user) fbAttach(user);
+    else { CLOUD.ref = null; CLOUD.lastKey = ''; CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này'; updateHud(); }
+  });
+  updateHud();
+}
+async function fbAttach(user){
+  const ref = fbDb.collection('saves').doc(user.uid);
+  let snap = null;
+  try { snap = await withTimeout(ref.get(), 10000); }
+  catch(e){ CLOUD.status = 'Không kết nối được tài khoản: tiến trình chỉ lưu trên máy này'; updateHud(); return; }
+  CLOUD.ref = ref;
+  const cloud = snap && snap.exists ? snap.data() : null;
+  if (cloud && cloud.state && cloud.state.stalls && (cloud.savedAt || 0) > (LOCAL_HAD_SAVE ? (S.savedAt || 0) + 5000 : 0)){
+    CLOUD.adopting = true;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(cloud.state)); } catch(e){}
+    location.reload(); return;
+  }
+  CLOUD.status = 'Đã đăng nhập: ' + (user.displayName || 'tài khoản Google');
+  CLOUD.lastKey = '';
+  cloudPush(); updateHud();
+}
+function fbLogin(){
+  if (!fbAuth) return;
+  const p = new firebase.auth.GoogleAuthProvider();
+  fbAuth.signInWithPopup(p).catch(e => {
+    if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) return fbAuth.signInWithRedirect(p);
+    toast('Đăng nhập không thành công. Thử lại sau.', 'bad');
+  });
+}
+function fbLogout(){ if (fbAuth) fbAuth.signOut(); toast('Đã đăng xuất. Tiến trình vẫn lưu trên máy này.'); }
+
 async function cloudInit(){
+  if (!(window.claude && window.claude.use) && typeof firebase !== 'undefined') return fbInit();
   let db = null, user = null;
   try { const c = window.claude; if (c && c.use){ user = await c.use('user'); db = await c.use('db'); } } catch(e){}
   const offline = () => { CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này'; updateHud(); };
@@ -1957,7 +2007,8 @@ function renderModal(){
     }
   } else if (modalType === 'settings'){
     h += `<div class="field"><label for="optName"><b>Tên nhân vật</b></label><input id="optName" maxlength="16" value="${S.name.replace(/"/g, '&quot;')}"></div>`;
-    h += row('Âm thanh', S.sound ? 'Đang bật' : 'Đang tắt', `<button class="gbtn blue" data-act="sound">${S.sound ? 'Tắt' : 'Bật'}</button>`);
+    if (fbAuth) h += row('Tài khoản Google', CLOUD.status, fbAuth.currentUser ? `<button class="gbtn blue" data-act="glogout">Đăng xuất</button>` : `<button class="gbtn" data-act="glogin">Đăng nhập</button>`);
+    h += row('Âm thanh', S.sound ? 'Đang bật' : 'Đang tắt',`<button class="gbtn blue" data-act="sound">${S.sound ? 'Tắt' : 'Bật'}</button>`);
     h += row('Đồ họa', S.gfx !== 'low' ? 'Cao: có đổ bóng, nét hơn' : 'Thấp: mượt hơn trên máy yếu', `<button class="gbtn blue" data-act="gfx">${S.gfx !== 'low' ? 'Chuyển Thấp' : 'Chuyển Cao'}</button>`);
     h += `<h3>Điều khiển</h3><div class="keys">Điện thoại: kéo cần điều khiển để đi, vuốt trên màn hình để xoay góc nhìn, chạm vào mặt đất để tự đi tới đó.<br>Máy tính: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> để đi, kéo chuột để xoay góc nhìn, lăn chuột để phóng to thu nhỏ, <kbd>Shift</kbd> chạy, <kbd>Space</kbd> nhảy, <kbd>E</kbd> phục vụ hoặc mở quầy, <kbd>B</kbd> mở túi, <kbd>P</kbd> chụp ảnh bưu thiếp.</div>`;
     h += '<h3>Ghi công</h3><p>Nhân vật chính: “Cartoon Boy Character” của blendthecube trên Sketchfab, giấy phép CC BY 4.0.</p>';
@@ -2013,6 +2064,8 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'daily'){ if (S.lastDaily !== dateKey()){ S.lastDaily = dateKey(); give({ coins:1000 * S.level, gems:10 }); toast(`Quà mỗi ngày: +${fmt(1000 * S.level)} xu, +10 kim cương`, 'gold'); sfx('buy'); } }
   else if (a === 'online'){ if (S.onlineAcc >= 300){ S.onlineAcc = 0; give({ coins:400 * S.level }); toast(`+${fmt(400 * S.level)} xu`, 'gold'); sfx('coin'); } }
   else if (a === 'craft'){ craftRecipe(id); }
+  else if (a === 'glogin'){ fbLogin(); }
+  else if (a === 'glogout'){ fbLogout(); }
   else if (a === 'shop'){ const it = SHOP.find(s => s.id === id); if (it.can && !it.can()){ toast('Bạn cần có ít nhất một quầy.', 'bad'); } else if (S.gems < it.g){ toast(`Cần ${it.g} kim cương. Nhận thêm ở Phúc Lợi và Thành Tựu.`, 'bad'); sfx('bad'); } else { S.gems -= it.g; it.buy(); toast('Đã dùng ' + it.t, 'gold'); sfx('buy'); } }
   else if (a === 'outfit'){ const o = OUTFITS.find(x => x.id === id); if (S.gems < o.price){ toast(`Cần ${o.price} kim cương.`, 'bad'); sfx('bad'); } else { S.gems -= o.price; S.outfits.push(o.id); S.outfit = o.id; setAvatar(); toast('Đã mua ' + o.name, 'gold'); sfx('buy'); } }
   else if (a === 'wear'){ S.outfit = id; setAvatar(); }
