@@ -1072,7 +1072,7 @@ function loadChar(nv){
 }
 const TPLP = {};
 function tplChar(k){
-  return TPLP[k] || (TPLP[k] = loadChar(k).then(sc => { TPL[k] = k === 'boy' ? makeTemplate(sc, BOY_OPT) : makeRigTemplate(sc); return TPL[k]; }));
+  return TPLP[k] || (TPLP[k] = loadChar(k).then(sc => { TPL[k] = k === 'boy' ? makeTemplate(sc, BOY_OPT) : makeRigTemplate(sc, k === 'base2' ? tintBase2 : null); return TPL[k]; }));
 }
 /* Mô hình GLB tĩnh không có khung xương: tách tam giác phần chân thành hai nhóm quay quanh hông để nhân vật bước được */
 const TPL = {}, CROWD = ['01', '02', '03', '06', '07', '08', '09', '10'];
@@ -1130,7 +1130,11 @@ function makeTemplate(sc, opt){
 const BONE_ROLE = [[/^(LeftUpLeg|LeftLeg|LeftFoot|LeftToeBase)$/, 'L'], [/^(RightUpLeg|RightLeg|RightFoot|RightToeBase)$/, 'R'], [/^Left(Arm|ForeArm|Hand)/, 'aL'], [/^Right(Arm|ForeArm|Hand)/, 'aR'], [/^(Thigh|Shin|Foot|Toe)L$/, 'L'], [/^(Thigh|Shin|Foot|Toe)R$/, 'R'], [/^(UpperArm|Forearm|Hand)L$/, 'aL'], [/^(UpperArm|Forearm|Hand)R$/, 'aR'],[/^(thigh|shin|foot|toe)L$|^Bip01_L_(Thigh|Calf|Foot|Toe\d*)$/, 'L'], [/^(thigh|shin|foot|toe)R$|^Bip01_R_(Thigh|Calf|Foot|Toe\d*)$/, 'R'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*L$|^Bip01_L_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aL'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*R$|^Bip01_R_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aR']];
 const jw = (at, i, c) => c === 0 ? at.getX(i) : c === 1 ? at.getY(i) : c === 2 ? at.getZ(i) : at.getW(i);
 const boneRole = n => { for (const [re, r] of BONE_ROLE) if (re.test(n || '')) return r; return 'body'; };
-function makeRigTemplate(sc){
+// màu trang phục cho nhân vật base2: tô theo xương (đầu, tay = da; áo đỏ; quần xanh đen)
+const hexF = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+const TINT_SKIN = hexF('#e0ac7e'), TINT_SHIRT = hexF('#c0392b'), TINT_PANTS = hexF('#2c3e50');
+const tintBase2 = n => /^(Head|Neck|LeftHand|RightHand)/.test(n) ? TINT_SKIN : /^(LeftUpLeg|LeftLeg|LeftFoot|LeftToeBase|RightUpLeg|RightLeg|RightFoot|RightToeBase|Hips)$/.test(n) ? TINT_PANTS : TINT_SHIRT;
+function makeRigTemplate(sc, tint){
   sc.updateMatrixWorld(true);
   const bo = {}, v = new THREE.Vector3(), parts = [], RC = { body:0, L:1, R:2, aL:3, aR:4 }, KEYS = ['body', 'L', 'R', 'aL', 'aR'];
   sc.traverse(o => { if (o.isBone) bo[o.name] = o; });
@@ -1154,18 +1158,21 @@ function makeRigTemplate(sc){
     if (!o.isMesh) return;
     const ga = o.geometry.attributes, pos = deq(ga.position), nor = deq(ga.normal), uv = deq(ga.uv), n = ga.position.count;
     const nm = new THREE.Matrix3().getNormalMatrix(o.matrixWorld), vr = new Uint8Array(n);
+    const col = tint && o.isSkinnedMesh && ga.skinIndex ? new Float32Array(n * 3) : null;
     if (o.isSkinnedMesh && ga.skinIndex){
       const bones = o.skeleton.bones, names = bones.map(b => b.name), si = ga.skinIndex, sw = ga.skinWeight, nmB = [];
       const nmOf = bi => nmB[bi] || (nmB[bi] = new THREE.Matrix3().getNormalMatrix(new THREE.Matrix4().copy(o.matrixWorld).multiply(o.bindMatrixInverse).multiply(bones[bi].matrixWorld).multiply(o.skeleton.boneInverses[bi]).multiply(o.bindMatrix)));
       for (let i = 0; i < n; i++){
         let bi = 0, bw = -1; for (let c = 0; c < 4; c++){ const w = jw(sw, i, c); if (w > bw){ bw = w; bi = jw(si, i, c); } }
         vr[i] = RC[boneRole(names[bi])];
+        if (col){ const tc = tint(names[bi]); col[i * 3] = tc[0]; col[i * 3 + 1] = tc[1]; col[i * 3 + 2] = tc[2]; }
         o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld).toArray(pos, i * 3);
         if (nor) v.fromArray(nor, i * 3).applyMatrix3(nmOf(bi)).normalize().toArray(nor, i * 3);
       }
     } else {
       for (let i = 0; i < n; i++){ v.fromArray(pos, i * 3).applyMatrix4(o.matrixWorld).toArray(pos, i * 3); if (nor) v.fromArray(nor, i * 3).applyMatrix3(nm).normalize().toArray(nor, i * 3); }
     }
+    if (col){ o.geometry.setAttribute('color', new THREE.BufferAttribute(col, 3)); o.material = o.material.clone(); o.material.vertexColors = true; o.material.color.set(0xffffff); o.material.needsUpdate = true; }
     const idx = o.geometry.index ? Array.from(o.geometry.index.array) : Array.from({ length:n }, (_, i) => i);
     parts.push({ pos, nor, uv, idx, vr, mat:cm(o.material) });
   });
