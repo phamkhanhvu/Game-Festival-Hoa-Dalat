@@ -915,9 +915,9 @@ function loadModel(){
     scene.add(model); el.hidden = true;
     /* người chơi trước, rồi tải song song 10 nhân vật; báo lên màn hình nếu có nhân vật không tải được */
     const bad = [];
-    tplChar('04').then(() => upgradePlayer('04')).catch(e => { console.warn('nv 04', e); TPL['04'] = null; })
+    tplChar('base2').then(() => upgradePlayer('base2')).catch(e => { console.warn('nv base2', e); TPL['base2'] = null; })
       .then(() => Promise.all(['01', '02', '03', '06', '07', '08', '09', '10'].map(k => tplChar(k).catch(e => { console.warn('nv', k, e); bad.push(k + ': ' + (e && e.message || e)); }))))
-      .then(() => { if (!TPL['04'] && TPL['01']){ upgradePlayer('01'); } upgradeCrowd(); if (bad.length) toast('Không tải được nhân vật ' + bad.join(' · ').slice(0, 160));  })
+      .then(() => { if (!TPL['base2'] && TPL['01']){ upgradePlayer('01'); } upgradeCrowd(); if (bad.length) toast('Không tải được nhân vật ' + bad.join(' · ').slice(0, 160));  })
       .then(() => loadDecor()).catch(e => { console.warn('decor', e); toast('Không tải được cây cối, xe cộ: ' + (e && e.message || e)); });
     loadOpera().catch(e => { console.warn('opera', e); toast('Không tải được Nhà hát Hoa Dã Quỳ: ' + (e && e.message || e)); });
   }).catch(e => { el.querySelector('p').textContent = 'Không tải được mô hình quảng trường. Hãy kiểm tra mạng rồi tải lại trang.'; });
@@ -1127,14 +1127,14 @@ function makeTemplate(sc, opt){
 }
 /* Mô hình có khung xương (A-pose): chia lưới theo trọng số xương để tách chân, tay, thân; dựng khung giống makeTemplate */
 /* GLTFLoader bỏ dấu chấm trong tên xương: 'thigh.L' thành 'thighL' */
-const BONE_ROLE = [[/^(Thigh|Shin|Foot|Toe)L$/, 'L'], [/^(Thigh|Shin|Foot|Toe)R$/, 'R'], [/^(UpperArm|Forearm|Hand)L$/, 'aL'], [/^(UpperArm|Forearm|Hand)R$/, 'aR'],[/^(thigh|shin|foot|toe)L$|^Bip01_L_(Thigh|Calf|Foot|Toe\d*)$/, 'L'], [/^(thigh|shin|foot|toe)R$|^Bip01_R_(Thigh|Calf|Foot|Toe\d*)$/, 'R'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*L$|^Bip01_L_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aL'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*R$|^Bip01_R_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aR']];
+const BONE_ROLE = [[/^(LeftUpLeg|LeftLeg|LeftFoot|LeftToeBase)$/, 'L'], [/^(RightUpLeg|RightLeg|RightFoot|RightToeBase)$/, 'R'], [/^Left(Arm|ForeArm|Hand)/, 'aL'], [/^Right(Arm|ForeArm|Hand)/, 'aR'], [/^(Thigh|Shin|Foot|Toe)L$/, 'L'], [/^(Thigh|Shin|Foot|Toe)R$/, 'R'], [/^(UpperArm|Forearm|Hand)L$/, 'aL'], [/^(UpperArm|Forearm|Hand)R$/, 'aR'],[/^(thigh|shin|foot|toe)L$|^Bip01_L_(Thigh|Calf|Foot|Toe\d*)$/, 'L'], [/^(thigh|shin|foot|toe)R$|^Bip01_R_(Thigh|Calf|Foot|Toe\d*)$/, 'R'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*L$|^Bip01_L_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aL'], [/^(upper_arm|forearm|hand|thumb|index|middle|ring|pinky)\d*R$|^Bip01_R_(UpperArm|Forearm|Hand|Finger\d*)$/, 'aR']];
 const jw = (at, i, c) => c === 0 ? at.getX(i) : c === 1 ? at.getY(i) : c === 2 ? at.getZ(i) : at.getW(i);
 const boneRole = n => { for (const [re, r] of BONE_ROLE) if (re.test(n || '')) return r; return 'body'; };
 function makeRigTemplate(sc){
   sc.updateMatrixWorld(true);
   const bo = {}, v = new THREE.Vector3(), parts = [], RC = { body:0, L:1, R:2, aL:3, aR:4 }, KEYS = ['body', 'L', 'R', 'aL', 'aR'];
   sc.traverse(o => { if (o.isBone) bo[o.name] = o; });
-  const B = { thL:bo.thighL || bo.Bip01_L_Thigh || bo.ThighL, thR:bo.thighR || bo.Bip01_R_Thigh || bo.ThighR, caL:bo.shinL || bo.Bip01_L_Calf || bo.ShinL, caR:bo.shinR || bo.Bip01_R_Calf || bo.ShinR, uaL:bo.upper_armL || bo.Bip01_L_UpperArm || bo.UpperArmL, uaR:bo.upper_armR || bo.Bip01_R_UpperArm || bo.UpperArmR, faL:bo.forearmL || bo.Bip01_L_Forearm || bo.ForearmL, faR:bo.forearmR || bo.Bip01_R_Forearm || bo.ForearmR };
+  const B = { thL:bo.thighL || bo.Bip01_L_Thigh || bo.ThighL || bo.LeftUpLeg, thR:bo.thighR || bo.Bip01_R_Thigh || bo.ThighR || bo.RightUpLeg, caL:bo.shinL || bo.Bip01_L_Calf || bo.ShinL || bo.LeftLeg, caR:bo.shinR || bo.Bip01_R_Calf || bo.ShinR || bo.RightLeg, uaL:bo.upper_armL || bo.Bip01_L_UpperArm || bo.UpperArmL || bo.LeftArm, uaR:bo.upper_armR || bo.Bip01_R_UpperArm || bo.UpperArmR || bo.RightArm, faL:bo.forearmL || bo.Bip01_L_Forearm || bo.ForearmL || bo.LeftForeArm, faR:bo.forearmR || bo.Bip01_R_Forearm || bo.ForearmR || bo.RightForeArm };
   for (const k in B) if (!B[k]) throw new Error('thiếu xương');
   const wp = o => o.getWorldPosition(new THREE.Vector3());
   // đặt tư thế nghỉ: xoay xương cánh tay quanh vai để tay buông xuống, rồi nướng lưới theo trọng số xương (vai liền mạch)
