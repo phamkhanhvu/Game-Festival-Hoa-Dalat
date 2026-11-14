@@ -2074,7 +2074,7 @@ function decorVehicle(key, len, z, y, dir, speed, x0){
   scene.add(g); DECOR.traffic.push({ g, dir, speed });
 }
 function updateTraffic(dt){
-  for (const t of DECOR.traffic){ const g = t.g; g.position.x += t.dir * t.speed * dt; if (g.position.x > TRAFFIC_X1) g.position.x = TRAFFIC_X0; else if (g.position.x < TRAFFIC_X0) g.position.x = TRAFFIC_X1; }
+  for (const t of DECOR.traffic){ const g = t.g; g.position.x += t.dir * t.speed * dt; if (g.position.x > TRAFFIC_X1) g.position.x = TRAFFIC_X0; else if (g.position.x < TRAFFIC_X0) g.position.x = TRAFFIC_X1; const hy = hAt(g.position.x, g.position.z); if (hy > -50) g.position.y = hy; }
 }
 const DECOR_MAP = {
   pine_a:[[-91.77,-0.23,-19.07,3.19,8.09],[-93.64,-0.23,14.21,5.39,8.72],[-93.72,-0.23,8.49,2.82,9.37],[-87.95,-0.23,1.32,3.25,8.89],[92.88,-0.23,6.37,2.71,9.29],[81.71,-0.23,-25.35,4.6,9.38],[84.44,-0.23,-30.1,5.28,10.18],[-96.93,-0.23,50.68,3.29,9.26],[-98.7,-0.23,20.22,2.27,8.26],[-97.93,-0.23,29.48,5.94,8.53],[92.75,-0.23,51.73,5.82,9.78]],
