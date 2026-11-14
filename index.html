@@ -427,9 +427,9 @@ const STALLS = [
   { id:'suadau', name:'Sữa Đậu Nành', short:'SỮA ĐẬU', nv:'08', x:-40, z:49, cost:8000, lv:4, price:70, ing:20, serve:2.0, xp:3, umb:['#3f9a62','#fff4e6'], sign:'#2e7a4c', vendor:'#8a5bd6', night:true },
   { id:'banhcan', name:'Bánh Căn', short:'BÁNH CĂN', nv:'10', x:40, z:49, cost:12000, lv:6, price:110, ing:35, serve:2.8, xp:5, umb:['#f2b631','#3a2a1e'], sign:'#8a5a0e', vendor:'#c97a2a', night:true },
   /* hàng quầy cao cấp đặc sản kiểu hội chợ, phía bắc quảng trường */
-  { id:'mut',   name:'Mứt Đặc Sản',      short:'MỨT ĐẶC SẢN', nv:'06', x:-36, z:-30, cost:60000, lv:9,  price:500, ing:200, serve:2.8, xp:10, umb:['#8e44ad','#fff4e6'], sign:'#5b2a7a', vendor:'#8e44ad' },
-  { id:'rong',  name:'Rượu Vang Đà Lạt', short:'RƯỢU VANG',   nv:'03', x:0,   z:-30, cost:90000, lv:11, price:700, ing:260, serve:3.2, xp:12, umb:['#7b1e3a','#f7e7c6'], sign:'#4a0f22', vendor:'#8b2a45' },
-  { id:'tra',   name:'Trà Hoa Cao Cấp',  short:'TRÀ HOA',     nv:'04', x:36,  z:-30, cost:75000, lv:10, price:600, ing:220, serve:3.0, xp:11, umb:['#6fb58a','#fff4e6'], sign:'#2e6b4a', vendor:'#4f9a6e' },
+  { id:'mut',   name:'Mứt Đặc Sản',      short:'MỨT ĐẶC SẢN', nv:'06', x:-36, z:-42, cost:60000, lv:9,  price:500, ing:200, serve:2.8, xp:10, umb:['#8e44ad','#fff4e6'], sign:'#5b2a7a', vendor:'#8e44ad' },
+  { id:'rong',  name:'Rượu Vang Đà Lạt', short:'RƯỢU VANG',   nv:'03', x:0,   z:-42, cost:90000, lv:11, price:700, ing:260, serve:3.2, xp:12, umb:['#7b1e3a','#f7e7c6'], sign:'#4a0f22', vendor:'#8b2a45' },
+  { id:'tra',   name:'Trà Hoa Cao Cấp',  short:'TRÀ HOA',     nv:'04', x:36,  z:-42, cost:75000, lv:10, price:600, ing:220, serve:3.0, xp:11, umb:['#6fb58a','#fff4e6'], sign:'#2e6b4a', vendor:'#4f9a6e' },
 ];
 const byId = {}; STALLS.forEach(d => byId[d.id] = d);
 const OUTFITS = [
@@ -2382,7 +2382,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 cloudInit();
-window.__game = { items, TPL, S:() => S, P, ready:() => !!model, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
