@@ -2040,6 +2040,20 @@ function decorParse(pack, key){
   return new Promise((res, rej) => new THREE.GLTFLoader().parse(JSON.stringify(pack[src]), '', res, rej)).then(g => (DECOR.protos[key] = decorProto(g.scene, t && t[1])));
 }
 /* list: [x, y, z, gócQuay, cỡ]; cỡ là chiều cao (m), riêng xe là chiều dài (m) */
+/* rải lại trang trí theo bản đồ mới: vị trí ngẫu nhiên trên mặt đất đi được, tránh mặt nước và quầy */
+function decorScatter(k, n){
+  const src = DECOR_MAP[k] || [], out = [];
+  if (!src.length) return out;
+  const R = rng(1000 + k.length * 37 + k.charCodeAt(0));
+  for (let tries = 0; out.length < n && tries < n * 40; tries++){
+    const x = -92 + R() * 180, z = -40 + R() * 100, h = hAt(x, z);
+    if (!(h > 0.3)) continue;
+    if (STALLS.some(st => Math.hypot(st.x - x, st.z - z) < 6)) continue;
+    const t = src[Math.floor(R() * src.length)];
+    out.push([x, h, z, t[3], t[4]]);
+  }
+  return out;
+}
 function decorPlace(key, list, opt){
   const p = DECOR.protos[key], d = new THREE.Object3D(), byLen = opt && opt.len;
   let cx = 0, cz = 0, r = 0; list.forEach(a => { cx += a[0] / list.length; cz += a[2] / list.length; });
@@ -2097,7 +2111,7 @@ function loadDecor(){
   ).then(() => {
     keys.forEach(k => {
       const big = /pine|sakura|jacaranda|birch|tree|willow|lamp/.test(k);
-      let list = DECOR_MAP[k]; if (low && !big && k !== 'moto') list = list.filter((_, i) => i % 2 === 0); /* máy yếu: bớt một nửa hoa */
+      let list = decorScatter(k, DECOR_MAP[k].length); if (low && !big && k !== 'moto') list = list.filter((_, i) => i % 2 === 0); /* máy yếu: bớt một nửa hoa */
       if (list.length) decorPlace(k, list, { len:k === 'moto', shadow:big });
     });
     /* xe tĩnh có sẵn trong mô hình quảng trường nằm đúng làn xe chạy: ẩn đi để khỏi đâm xuyên */
