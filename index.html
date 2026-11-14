@@ -27,6 +27,7 @@
 <div id="card" class="glass"><b id="cName"></b><span id="cInfo"></span><div><button id="cBtn">Bán hàng</button></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (() => {
   const canvas = document.getElementById('c');
@@ -65,11 +66,61 @@
     scene.add(g); stallMeshes.push(g);
   }
 
-  // Nhân vật (hộp đơn giản)
+  // Nhân vật: mô hình base2 (GLB có xương), tô màu trang phục theo xương
   const player = new THREE.Group();
-  const bodyM = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.4, 1.2), new THREE.MeshLambertMaterial({ color: 0xc0392b }));
-  bodyM.position.y = 1.5; player.add(bodyM);
   player.position.set(0, 0, 25); scene.add(player);
+  const OUTFITS = [
+    { shirt: '#9e3d33', pants: '#3b3b40' },
+    { shirt: '#2f6fa8', pants: '#2c3e50' },
+    { shirt: '#e0b04a', pants: '#5a4a3a' },
+    { shirt: '#6b8e4e', pants: '#4a3f35' },
+  ];
+  const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const SKIN = hexRGB('#e6b98f'), HAIR = hexRGB('#2a1f1a'), SHOE = hexRGB('#efe9dc');
+  const comp = (a, i, c) => c === 0 ? a.getX(i) : c === 1 ? a.getY(i) : c === 2 ? a.getZ(i) : a.getW(i);
+  function paint(root, outfit){
+    const SHIRT = hexRGB(outfit.shirt), PANTS = hexRGB(outfit.pants);
+    root.traverse(o => {
+      if (!o.isSkinnedMesh) return;
+      const geo = o.geometry.clone(); o.geometry = geo;
+      const ga = geo.attributes, n = ga.position.count, bones = o.skeleton.bones;
+      let y0 = 1e9, y1 = -1e9;
+      for (let i = 0; i < n; i++){ const y = ga.position.getY(i); if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      const top = y0 + 0.85 * (y1 - y0), col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++){
+        let bw = -1, bi = 0;
+        for (let c = 0; c < 4; c++){ const w = comp(ga.skinWeight, i, c); if (w > bw){ bw = w; bi = comp(ga.skinIndex, i, c); } }
+        const nm = bones[bi] ? bones[bi].name : '', y = ga.position.getY(i);
+        let c;
+        if (y > top && !/^(LeftHand|RightHand)/.test(nm)) c = HAIR;
+        else if (/^(Head|Neck|LeftHand|RightHand)/.test(nm)) c = SKIN;
+        else if (/^(LeftFoot|LeftToeBase|RightFoot|RightToeBase)$/.test(nm)) c = SHOE;
+        else if (/^(LeftUpLeg|LeftLeg|RightUpLeg|RightLeg|Hips)$/.test(nm)) c = PANTS;
+        else c = SHIRT;
+        col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      o.material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    });
+  }
+  // Đặt mô hình đứng trên mặt đất, cao khoảng 2.4 đơn vị
+  function fit(model){
+    const box = new THREE.Box3().setFromObject(model), h = box.max.y - box.min.y || 1;
+    const s = 2.4 / h; model.scale.setScalar(s);
+    model.position.y = -box.min.y * s; model.userData.baseY = model.position.y; return model;
+  }
+  let playerModel = null; const npcs = [];
+  fetch('cast/base2.glb').then(r => r.arrayBuffer()).then(buf => {
+    const parse = () => new Promise((res, rej) => new THREE.GLTFLoader().parse(buf, '', res, rej));
+    return parse().then(gltf => {
+      playerModel = fit(gltf.scene); paint(playerModel, OUTFITS[0]); player.add(playerModel);
+      return Promise.all([1, 2, 3, 4].map(k => parse().then(g => {
+        const m = fit(g.scene); paint(m, OUTFITS[k % OUTFITS.length]);
+        const grp = new THREE.Group(); grp.add(m); grp.position.set(-60 + k * 30, 0, -10 + k * 8); scene.add(grp);
+        npcs.push({ g: grp, tx: grp.position.x, tz: grp.position.z, wait: 1 + k });
+      })));
+    });
+  }).catch(e => console.warn('Không tải được nhân vật', e));
 
   // Điều khiển: bàn phím + joystick ảo
   const keys = {}; let jx = 0, jz = 0, jActive = false;
@@ -117,6 +168,12 @@
       player.position.z = THREE.MathUtils.clamp(player.position.z + (mz / len) * sp * dt, -58, 58);
       player.rotation.y = Math.atan2(mx, mz);
     }
+    if (playerModel){ const moving = len > 0.05; playerModel.position.y = playerModel.userData.baseY + (moving ? Math.abs(Math.sin(now / 120)) * 0.08 : 0); }
+    for (const q of npcs){
+      const dx = q.tx - q.g.position.x, dz = q.tz - q.g.position.z, d = Math.hypot(dx, dz);
+      if (d < 0.3){ q.wait -= dt; if (q.wait <= 0){ q.tx = THREE.MathUtils.randFloat(-80, 80); q.tz = THREE.MathUtils.randFloat(-50, 50); q.wait = THREE.MathUtils.randFloat(2, 5); } }
+      else { q.g.position.x += dx / d * 2.2 * dt; q.g.position.z += dz / d * 2.2 * dt; q.g.rotation.y = Math.atan2(dx, dz); }
+    }
     // Quầy gần nhất trong 6 đơn vị
     near = null; let best = 6;
     for (const g of stallMeshes) {
@@ -130,7 +187,7 @@
       card.style.display = 'block';
     } else card.style.display = 'none';
 
-    camera.position.set(player.position.x, 12, player.position.z + 18);
+    camera.position.set(player.position.x, 6.5, player.position.z + 10);
     camera.lookAt(player.position.x, 1.5, player.position.z);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
