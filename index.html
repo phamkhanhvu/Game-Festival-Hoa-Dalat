@@ -772,7 +772,7 @@ const QUESTS = [
 ];
 const ACHV = [
   { id:'brands', t:'Tham quan đủ các gian trưng bày thương hiệu', goal:Math.max(1, (WORLD.booths || []).length), p:() => Object.keys(S.brands || {}).length, g:30 },
-  { id:'cheer10', t:'Cổ vũ 10 tiết mục ở Music Festival của Sense Acoustic Cafe', goal:10, p:() => S.stats.cheers || 0, g:15 },
+  { id:'cheer10', t:'Cổ vũ 10 bài hát ở Music Festival của Sense Acoustic Cafe', goal:10, p:() => S.stats.cheers || 0, g:15 },
   { id:'festsell', t:'Bán 50 phần hàng trong Festival Hoa', goal:50, p:() => S.stats.festSold || 0, g:15 },
   { id:'s50',   t:'Bán 50 phần hàng',             goal:50,     p:() => S.sold, g:10 },
   { id:'s500',  t:'Bán 500 phần hàng',            goal:500,    p:() => S.sold, g:30 },
@@ -799,10 +799,32 @@ const SHOP = [
 
 /* ================= Âm thanh & toast ================= */
 /* Nhạc nền: trình duyệt chỉ cho phát sau lần chạm đầu tiên, nên thử phát ở mỗi lần chạm đến khi được */
-const BGM = new Audio('bgm.mp3'); BGM.loop = true; BGM.volume = 0.3; BGM.preload = 'auto';
-function bgmSync(){ if (!S.sound){ BGM.pause(); return; } if (BGM.paused) BGM.play().catch(() => {}); }
+/* Nhạc sân khấu: các bài hát phát nối tiếp nhau ở Music Festival, không còn nhạc nền chung.
+   Âm lượng theo khoảng cách tới sân khấu; đi qua Web Audio (GainNode) vì iPhone không cho chỉnh audio.volume.
+   Trình duyệt chỉ cho phát sau lần chạm đầu tiên, nên thử phát ở mỗi lần chạm đến khi được. */
+const SONGS = [
+  { src:'music/1.mp3', title:'Anh Tin Mình Đã Cho Nhau Một Kỷ Niệm', artist:'Thu Thủy, Lương Bằng Quang' },
+  { src:'music/2.mp3', title:'Sao Em Vẫn Yêu', artist:'Thu Thủy' },
+  { src:'music/3.mp3', title:'Mong Anh Quay Về', artist:'Thu Thủy' },
+  { src:'music/4.mp3', title:'Lời Chia Tay Dễ Nói Thế Sao Anh', artist:'Thu Thủy' },
+];
+const BGM = new Audio(); BGM.preload = 'auto';
+let AC = null, songIdx = 0, songPlays = 0, bgmGain = null, bgmVol = 0.5, songErr = 0;
+function loadSong(i){ songIdx = ((i % SONGS.length) + SONGS.length) % SONGS.length; songPlays++; BGM.src = SONGS[songIdx].src; }   /* màn hình LED tự vẽ lại khi thấy bài đổi (updateExpo) */
+BGM.addEventListener('ended', () => { songErr = 0; loadSong(songIdx + 1); bgmSync(); });
+BGM.addEventListener('error', () => { if (++songErr <= SONGS.length) setTimeout(() => { loadSong(songIdx + 1); bgmSync(); }, 2500); });
+function setBgmVol(v){ bgmVol = v; if (bgmGain) bgmGain.gain.value = v; else BGM.volume = v; }
+function bgmSync(){
+  if (!S.sound){ BGM.pause(); return; }
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    if (!bgmGain){ const node = AC.createMediaElementSource(BGM); bgmGain = AC.createGain(); bgmGain.gain.value = bgmVol; node.connect(bgmGain); bgmGain.connect(AC.destination); BGM.volume = 1; }
+  } catch (e){ /* không có Web Audio: dùng audio.volume */ }
+  if (BGM.paused) BGM.play().catch(() => {});
+}
+loadSong(Math.floor(Date.now() / 240000));
 window.addEventListener('pointerdown', bgmSync);
-let AC = null;
 function sfx(type){
   if (!S.sound) return;
   try {
@@ -1782,11 +1804,10 @@ function visitBooth(){
 
 /* ----- sân khấu chính ----- */
 const STAGE = WORLD.stage || null;
-const STAGE_SHOWS = ['Ban nhạc acoustic', 'Đơn ca guitar mộc', 'Song ca acoustic', 'Hoà tấu mừng Festival Hoa', 'Đêm nhạc theo yêu cầu'];
 const STAGE_NAME = 'Music Festival', STAGE_HOST = 'Sense Acoustic Cafe';
-const SHOW_MS = 180000;
-const showSlot = () => Math.floor(now() / SHOW_MS);
-const showName = s => STAGE_SHOWS[((s % STAGE_SHOWS.length) + STAGE_SHOWS.length) % STAGE_SHOWS.length];
+/* tiết mục = bài hát đang phát; mỗi lượt phát một bài được cổ vũ một lần */
+const showSlot = () => songPlays;
+const curSong = () => SONGS[songIdx], nextSong = () => SONGS[(songIdx + 1) % SONGS.length];
 const stageFx = { beams:[], bulbs:[], performers:[], screen:null, slot:-1, noteT:0 };
 function drawStageScreen(){
   if (!STAGE || !stageFx.screen) return; const slot = showSlot(); stageFx.slot = slot;
@@ -1798,8 +1819,8 @@ function drawStageScreen(){
   c.textAlign = 'center'; c.textBaseline = 'middle';
   c.font = '800 150px "Baloo 2", "Trebuchet MS", sans-serif'; c.fillStyle = LIME; c.fillText('MUSIC FESTIVAL', w / 2 + 7, h * 0.27 + 7); c.fillStyle = '#ffffff'; c.fillText('MUSIC FESTIVAL', w / 2, h * 0.27);
   c.font = '700 56px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = LIME; c.fillText('Sense Acoustic Cafe', w / 2, h * 0.5);
-  c.font = '600 50px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = '#ffffff'; c.fillText('Đang diễn: ' + showName(slot), w / 2, h * 0.68);
-  c.font = '500 38px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText('Tiếp theo: ' + showName(slot + 1), w / 2, h * 0.84);
+  c.font = '600 50px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = '#ffffff'; { const t = 'Đang diễn: ' + curSong().title; let fs = 50; do { c.font = `600 ${fs}px "Be Vietnam Pro", system-ui, sans-serif`; fs -= 2; } while (c.measureText(t).width > w - 80 && fs > 24); c.fillText(t, w / 2, h * 0.68); }
+  c.font = '500 38px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText('Tiếp theo: ' + nextSong().title, w / 2, h * 0.84);
   stageFx.screen.needsUpdate = true;
 }
 if (STAGE){
@@ -1845,7 +1866,7 @@ function upgradeStage(){ stageFx.performers.forEach(pf => { const m = crowdMesh(
 function cheerStage(){
   if (!STAGE || S.stage.slot === showSlot()) return;
   S.stage.slot = showSlot(); const r = { coins:100 * S.level, exp:8 }; give(r); S.stats.cheers = (S.stats.cheers || 0) + 1;
-  toast('Cổ vũ tiết mục “' + showName(showSlot()) + '”: +' + rewardText(r), 'gold'); sfx('level'); floatText(P.x, P.y + 2.3, P.z, '♪ Hay quá!', '#ffe08a'); save();
+  toast('Cổ vũ bài “' + curSong().title + '”: +' + rewardText(r), 'gold'); sfx('level'); floatText(P.x, P.y + 2.3, P.z, '♪ Hay quá!', '#ffe08a'); save();
 }
 let nearBooth = null, nearStage = false;
 function updateExpo(dt){
@@ -1853,8 +1874,8 @@ function updateExpo(dt){
   if (!STAGE) return;
   const ds = Math.hypot(P.x - STAGE.x, P.z - STAGE.z);
   nearStage = Math.abs(P.x - STAGE.x) < STAGE.w / 2 + 5 && P.z > STAGE.z + STAGE.d / 2 - 0.5 && P.z < STAGE.z + STAGE.d / 2 + 11 && Math.abs(P.h - STAGE.y) < 1.5;
-  /* nhạc to dần khi lại gần sân khấu (iPhone không cho trang web chỉnh âm lượng nên ở đó âm lượng giữ nguyên) */
-  BGM.volume = clamp(0.62 - ds / 130, 0.14, 0.62);
+  /* nhạc phát ra từ sân khấu: càng xa càng nhỏ, quá 150 đơn vị thì không còn nghe thấy */
+  setBgmVol(0.9 * Math.pow(clamp(1 - ds / 150, 0, 1), 1.6));
   if (ds > 140) return;
   if (stageFx.slot !== showSlot()) drawStageScreen();
   const nk = 0.1 + 0.2 * nightK;
@@ -2369,7 +2390,7 @@ function updateCtx(){
         $('cBtns').innerHTML = seen ? '<button class="gbtn" disabled>Đã tham quan ✓<small>Cảm ơn bạn đã ghé</small></button>' : '<button class="gbtn green" data-act="boothvisit">Tham quan<small>+200 xu · +10 EXP</small></button>'; }
     } else {
       const slot = showSlot(), done = S.stage.slot === slot, key = 'stage:' + slot + ':' + done;
-      if (ctxKey !== key){ ctxKey = key; $('cName').textContent = STAGE_NAME; $('cLv').textContent = STAGE_HOST; $('cStats').innerHTML = 'Tiết mục: <b>' + escH(showName(slot)) + '</b> · Tiếp theo: ' + escH(showName(slot + 1));
+      if (ctxKey !== key){ ctxKey = key; $('cName').textContent = STAGE_NAME; $('cLv').textContent = STAGE_HOST; $('cStats').innerHTML = 'Đang diễn: <b>' + escH(curSong().title) + '</b> (' + escH(curSong().artist) + ')<br>Tiếp theo: ' + escH(nextSong().title);
         $('cBtns').innerHTML = done ? '<button class="gbtn" disabled>Đã cổ vũ ✓<small>Chờ tiết mục sau</small></button>' : '<button class="gbtn green" data-act="cheer">Cổ vũ<small>+' + fmt(100 * S.level) + ' xu · +8 EXP</small></button>'; }
     }
     return;
@@ -2489,7 +2510,7 @@ function renderModal(){
       : row('Chơi lại từ đầu', 'Xóa cấp, xu, quầy và nhiệm vụ.', `<button class="gbtn" data-act="reset">Chơi lại</button>`);
   } else if (modalType === 'hunt'){
     h += row('Khu trưng bày thương hiệu Đà Lạt', `Sân phía đông, cạnh đài phun nước. Đã tham quan ${brandsSeen()}/${BRANDS.length} gian.<span class="pbar"><i style="width:${brandsSeen() / Math.max(1, BRANDS.length) * 100}%"></i></span>`, '');
-    h += row(STAGE_NAME + ' · ' + STAGE_HOST, `Sân khấu chính giữa sân dưới, trước cầu thang lớn. Đang diễn: ${showName(showSlot())}. Đã cổ vũ ${S.stats.cheers || 0} tiết mục.`, '');
+    h += row(STAGE_NAME + ' · ' + STAGE_HOST, `Sân khấu chính giữa sân dưới, trước cầu thang lớn. Đang diễn: ${curSong().title}. Đã cổ vũ ${S.stats.cheers || 0} tiết mục.`, '');
     h += '<p>Đi khắp quảng trường để nhặt vật phẩm phát sáng. Chúng hiện thành chấm màu trên bản đồ nhỏ, vòng trắng chỉ vật phẩm gần nhất của nhiệm vụ đang theo. Hoa, quả thông, atiso và hộp quà sẽ mọc lại sau một lúc.</p>';
     HUNTS.forEach(q => {
       const pr = huntP(q), done = pr >= q.goal, got = S.hunts[q.id];
@@ -2618,7 +2639,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
