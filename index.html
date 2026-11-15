@@ -1656,9 +1656,13 @@ function setPath(p, path){ if (!path || !path.length) return false; p.path = pat
 /* đi dạo: chọn một đường ngẫu nhiên đã kiểm tra đi được, dài chừng 16–44 đơn vị */
 function pickWaypoint(p){ setPath(p, NAV.wander(p.x, p.z, 8, 22, false)); }
 function slot(d, i){ return { x:d.x + (i === 0 ? 0 : (i % 2 ? 0.35 : -0.35)), z:d.z + 1.75 + i * 0.95 }; }
+/* cửa hầm gần nhất (hai cửa hầm ở hai bên chân cầu thang lớn) */
+function nearDoor(x, z){ let best = null, bd = 1e9; (WORLD.doors || []).forEach(d => { const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd){ bd = dd; best = d; } }); return best; }
 function setExit(p){
   p.state = 'exit'; p.sp *= 1.1;
-  if (!setPath(p, NAV.wander(p.x, p.z, 14, 20, false))) p.dead = true;
+  /* khách ra về: đi vào cửa hầm gần nhất rồi khuất; không tìm được đường thì đi dạo ra xa như cũ */
+  const dr = nearDoor(p.x, p.z), path = dr ? NAV.path(p.x, p.z, dr.x + rand(-0.6, 0.6), dr.z) : null;
+  if (!setPath(p, path) && !setPath(p, NAV.wander(p.x, p.z, 14, 20, false))) p.dead = true;
 }
 function leaveQueue(p, msg){ const q = RT[p.stall].queue, i = q.indexOf(p); if (i >= 0) q.splice(i, 1); if (msg) floatText(p.x, p.y + 2.2, p.z, msg, '#ff8a80'); setExit(p); }
 for (let i = 0; i < 22; i++){ const p = makePerson('wander'); p.zone = i % 5 < 3 ? 'low' : 'up'; placePerson(p, randomSpot(p.zone)); people.push(p); }
@@ -1691,7 +1695,10 @@ function spawnCustomer(list){
   let r = Math.random() * tot, d = cands[0]; for (let i = 0; i < cands.length; i++){ r -= w[i]; if (r <= 0){ d = cands[i]; break; } }
   /* khách xuất hiện cách quầy chừng 30–40 đơn vị rồi đi bộ tới theo đường đã kiểm tra; ưu tiên chỗ xa người chơi */
   const ax = d.x, az = d.z + 4.5; let best = null, bd = -1;
-  for (let t = 0; t < 3; t++){ const path = NAV.wander(ax, az, 14, 20, true); if (!path || path.length < 2) continue; const dd = Math.hypot(path[0].x - P.x, path[0].z - P.z); if (dd > bd){ bd = dd; best = path; } }
+  /* khách bước ra từ cửa hầm gần quầy nhất */
+  const dr = nearDoor(ax, az);
+  if (dr){ const sx = dr.x + rand(-0.6, 0.6), path = NAV.path(sx, dr.z, ax, az); if (path && path.length){ path.pop(); path.unshift({ x:sx, z:dr.z }); best = path; } }
+  if (!best) for (let t = 0; t < 3; t++){ const path = NAV.wander(ax, az, 14, 20, true); if (!path || path.length < 2) continue; const dd = Math.hypot(path[0].x - P.x, path[0].z - P.z); if (dd > bd){ bd = dd; best = path; } }
   if (!best) return;
   const p = makePerson('toStall'); p.stall = d.id; p.sp = rand(2.7, 3.3);
   if (Math.random() < 0.07){ p.vip = true; p.mesh.scale.multiplyScalar(1.12); }
