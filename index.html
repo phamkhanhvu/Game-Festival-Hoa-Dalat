@@ -949,29 +949,53 @@ function buildFlags(){
   L.forEach((f, i) => { m.makeTranslation((f.x0 + f.x1) / 2, f.y1 - 0.55, (f.z0 + f.z1) / 2); im.setMatrixAt(i, m); });
   im.instanceMatrix.needsUpdate = true; scene.add(im);
 }
-/* nhân vật chính: mô hình có khung xương thật, tô màu trang phục theo vùng cơ thể, chân tay cử động theo xương */
-const PLAYER_COL = { skin:'#e6b98f', hair:'#2a1f1a', jacket:'#9e3d33', pants:'#3b3b40', shoes:'#efe9dc' };
-function upgradePlayerSkinned(sc){
+/* nhân vật chính: mô hình có khung xương thật. Màu lấy từ ảnh mẫu của nhân vật (character.jpg): nửa trái ảnh chiếu lên mặt trước,
+   nửa phải (tóc, lưng áo, ba lô) chiếu lên mặt sau; chân tay cử động theo xương */
+const JACKET_BASE = '#86362a';
+const loadImg = url => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('không tải được ' + url)); im.src = url; });
+function upgradePlayerSkinned(sc, img){
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body); body.add(sc);
-  const col = {}; for (const k in PLAYER_COL) col[k] = C(PLAYER_COL[k]);
+  const pc = document.createElement('canvas'); pc.width = img.naturalWidth; pc.height = img.naturalHeight; const px2 = pc.getContext('2d'); px2.drawImage(img, 0, 0);
+  const pix = px2.getImageData(0, 0, pc.width, pc.height).data;
+  const tex = new THREE.Texture(img); tex.encoding = THREE.sRGBEncoding; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
   const jackets = [];
   sc.traverse(o => {
     if (!o.isSkinnedMesh) return;
     o.frustumCulled = false; o.castShadow = true;
-    const ge = o.geometry, pos = ge.attributes.position, si = ge.attributes.skinIndex, sw = ge.attributes.skinWeight, names = o.skeleton.bones.map(b => b.name);
-    let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9;
-    for (let v = 0; v < pos.count; v++){ const y = pos.getY(v), x = pos.getX(v); if (y < y0) y0 = y; if (y > y1) y1 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; }
-    const Hh = y1 - y0, cx = (x0 + x1) / 2, ca = new Float32Array(pos.count * 3), jk = [];
-    for (let v = 0; v < pos.count; v++){
-      let bi = 0, bw = -1; for (let k = 0; k < 4; k++){ const w = sw.array[v * sw.itemSize + k]; if (w > bw){ bw = w; bi = si.array[v * si.itemSize + k]; } }
-      const n = names[bi] || '', t = (pos.getY(v) - y0) / Hh, ax = Math.abs(pos.getX(v) - cx) / Hh;
-      let c;
-      if (/^(LeftHand|RightHand)/.test(n)) c = col.skin; else if (t < 0.045) c = col.shoes; else if (t >= 0.935) c = col.hair; else if (t >= 0.82) c = col.skin;
-      else if (t >= 0.5 || /Arm/.test(n) || ax >= 0.2){ c = col.jacket; jk.push(v); } else c = col.pants;
-      ca[v * 3] = c.r; ca[v * 3 + 1] = c.g; ca[v * 3 + 2] = c.b;
+    o.geometry.computeVertexNormals();                      /* pháp tuyến mượt trước khi tách đỉnh theo từng tam giác */
+    /* tách đỉnh theo từng tam giác (tự làm, giữ nguyên kiểu dữ liệu và cờ normalized của trọng số xương) */
+    const src = o.geometry, ix = src.index, N = ix ? ix.count : src.attributes.position.count, ge = new THREE.BufferGeometry(), GET = ['getX', 'getY', 'getZ', 'getW'];
+    for (const k in src.attributes){
+      const a = src.attributes[k], sz = a.itemSize, A = a.isInterleavedBufferAttribute ? a.data.array : a.array, out = new A.constructor(N * sz);
+      for (let i = 0; i < N; i++){ const v = ix ? ix.getX(i) : i; for (let c = 0; c < sz; c++) out[i * sz + c] = a[GET[c]](v); }
+      ge.setAttribute(k, new THREE.BufferAttribute(out, sz, a.normalized));
     }
-    ge.setAttribute('color', new THREE.BufferAttribute(ca, 3)); ge.computeVertexNormals(); o.normalizeSkinWeights();
-    o.material = new THREE.MeshLambertMaterial({ vertexColors:true, skinning:true });
+    o.geometry = ge;
+    const pos = ge.attributes.position, n = pos.count;
+    let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9;
+    for (let v = 0; v < n; v++){ const y = pos.getY(v), x = pos.getX(v); if (y < y0) y0 = y; if (y > y1) y1 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+    /* mặt phẳng lưng: giữa bề dày của chân (thân người) và điểm lùi sau nhất (ba lô) */
+    let zb = 1e9, zl0 = 1e9, zl1 = -1e9;
+    for (let v = 0; v < n; v++){ const z = pos.getZ(v); if (z < zb) zb = z; if ((pos.getY(v) - y0) / (y1 - y0) < 0.4){ if (z < zl0) zl0 = z; if (z > zl1) zl1 = z; } }
+    const zPack = zl0 + (zb - zl0) * 0.35, clampN = (v, a, b) => v < a ? a : v > b ? b : v;
+    const uv = new Float32Array(n * 2), ca = new Float32Array(n * 3).fill(1), jk = [];
+    for (let t = 0; t < n; t += 3){
+      /* tam giác quay mặt về phía trước (+z) dùng nửa ảnh mặt trước, còn lại dùng nửa ảnh mặt sau */
+      const ax = pos.getX(t + 1) - pos.getX(t), ay = pos.getY(t + 1) - pos.getY(t), bx = pos.getX(t + 2) - pos.getX(t), by = pos.getY(t + 2) - pos.getY(t);
+      const front = ax * by - ay * bx > 0;
+      /* khối ba lô nhô ra sau lưng: cả mặt bên cũng lấy màu ba lô thay vì màu áo */
+      const cz = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3, cty = ((pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3 - y0) / (y1 - y0), pack = cz < zPack && cty > 0.5 && cty < 0.82;
+      for (let v = t; v < t + 3; v++){
+        let fu = (pos.getX(v) - x0) / (x1 - x0), w = 0.003 + 0.994 * (pos.getY(v) - y0) / (y1 - y0);
+        if (pack){ fu = clampN(fu, 0.35, 0.73); w = clampN(w, 0.555, 0.765); }
+        const u = 0.006 + 0.488 * fu + (front && !pack ? 0 : 0.5);
+        uv[v * 2] = u; uv[v * 2 + 1] = w;
+        const pi = (Math.min(pc.height - 1, Math.floor((1 - w) * pc.height)) * pc.width + Math.min(pc.width - 1, Math.floor(u * pc.width))) * 4;
+        if (pix[pi] > 85 && pix[pi + 1] < 95 && pix[pi] > pix[pi + 1] * 1.6) jk.push(v);   /* điểm ảnh màu đỏ gạch = áo khoác */
+      }
+    }
+    ge.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); ge.setAttribute('color', new THREE.BufferAttribute(ca, 3)); o.normalizeSkinWeights();
+    o.material = new THREE.MeshLambertMaterial({ map:tex, vertexColors:true, skinning:true });
     jackets.push({ attr:ge.attributes.color, idx:jk });
   });
   sc.updateMatrixWorld(true);
@@ -988,8 +1012,10 @@ function upgradePlayerSkinned(sc){
     swing('LeftUpLeg', l); swing('LeftLeg', Math.max(0, l) * 1.3 + Math.abs(l) * 0.12); swing('RightUpLeg', r); swing('RightLeg', Math.max(0, r) * 1.3 + Math.abs(r) * 0.12);
     swing('LeftArm', al * 0.7); swing('LeftForeArm', -0.15 - Math.max(0, -al) * 0.45); swing('RightArm', ar * 0.7); swing('RightForeArm', -0.15 - Math.max(0, -ar) * 0.45);
   };
-  /* đổi màu áo khoác theo trang phục đã mua; null = màu gốc */
-  u.recolor = hex => { const c = hex ? C(hex) : col.jacket; jackets.forEach(j => { const a = j.attr.array; for (const v of j.idx){ a[v * 3] = c.r; a[v * 3 + 1] = c.g; a[v * 3 + 2] = c.b; } j.attr.needsUpdate = true; }); };
+  /* đổi màu áo khoác theo trang phục đã mua (nhân màu lên phần áo đỏ của ảnh); null = màu gốc */
+  const jb = C(JACKET_BASE);
+  u.recolor = hex => { const c = hex ? C(hex) : null, r = c ? Math.min(3, c.r / jb.r) : 1, gg = c ? Math.min(3, c.g / jb.g) : 1, bb = c ? Math.min(3, c.b / jb.b) : 1;
+    jackets.forEach(j => { const a = j.attr.array; for (const v of j.idx){ a[v * 3] = r; a[v * 3 + 1] = gg; a[v * 3 + 2] = bb; } j.attr.needsUpdate = true; }); };
   u.pose(); g.userData = u;
   g.position.copy(playerMesh.position); g.rotation.y = playerMesh.rotation.y;
   scene.remove(playerMesh); playerMesh = g; scene.add(g); setAvatar();
@@ -1007,7 +1033,7 @@ function loadModel(){
     });
     scene.add(model); buildFlags(); el.hidden = true; document.body.dataset.ready = '1';
     const bad = [];
-    loadBin('character.glb').then(parseGlb).then(c => upgradePlayerSkinned(c.scene)).catch(e => { console.warn('nv chính', e); bad.push('nhân vật chính'); })
+    Promise.all([loadBin('character.glb').then(parseGlb), loadImg('character.jpg')]).then(([c, img]) => upgradePlayerSkinned(c.scene, img)).catch(e => { console.warn('nv chính', e); bad.push('nhân vật chính'); })
       .then(() => Promise.all(CROWD.map(k => tplChar(k).catch(e => { console.warn('nv', k, e); bad.push(k); }))))
       .then(() => { upgradeCrowd(); if (bad.length) toast('Không tải được nhân vật ' + bad.join(' · ').slice(0, 160)); })
       .then(() => loadDecor()).catch(e => { console.warn('decor', e); toast('Không tải được cây cối, xe cộ: ' + (e && e.message || e)); })
@@ -2438,7 +2464,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
