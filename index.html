@@ -902,12 +902,12 @@ const DAY_C = { fog:new THREE.Color(0xc9dfee), hemi:new THREE.Color(0xdcecff), s
 let lastK = -1;
 function applyDayNight(){
   const k = dayK(); if (Math.abs(k - lastK) < 0.003) return; lastK = k;
-  sun.intensity = 0.05 + 1.15 * k;
-  hemi.intensity = 0.16 + 0.14 * k;
+  sun.intensity = 0.12 + 1.08 * k;
+  hemi.intensity = 0.25 + 0.05 * k;
   hemi.color.copy(NIGHT_C.hemi).lerp(DAY_C.hemi, k);
   sun.color.copy(NIGHT_C.sun).lerp(DAY_C.sun, k);
   scene.fog.color.copy(NIGHT_C.fog).lerp(DAY_C.fog, k);
-  renderer.toneMappingExposure = 0.5 + 0.24 * k;
+  renderer.toneMappingExposure = 0.52 + 0.22 * k;
   const sk = scene.getObjectByName('sky'); if (sk) sk.material.color.copy(NIGHT_C.sky).lerp(DAY_C.sky, k);
   const stars = scene.getObjectByName('stars'); if (stars) stars.material.opacity = clamp((0.7 - k) / 0.4, 0, 1) * 0.9;
   nightK = 1 - k;
@@ -1494,16 +1494,21 @@ function buildStall(d){
 }
 /* đèn đêm: chỉ 4 bóng đèn thật, luôn gán cho 4 nguồn sáng gần người chơi nhất (quầy và cột đèn) để máy yếu vẫn mượt */
 const LIGHT_SRC = STALLS.map(d => ({ x:d.x, y:d.y + 3.1, z:d.z + 0.7, c:0xffb35c })).concat(WORLD.lamps.map(p => ({ x:p.x, y:p.y + 4.9, z:p.z, c:0xffd08a }))).concat(WORLD.stage ? [{ x:WORLD.stage.x, y:WORLD.stage.y + 5.5, z:WORLD.stage.z + 3, c:0xff7ac8 }] : []);
+(WORLD.booths || []).forEach(b => LIGHT_SRC.push({ x:b.x, y:b.y + 3.0, z:b.z + 0.6, c:0xfff0d0, i:4 }));
+/* đèn rọi nhẹ đi theo người chơi ban đêm, để nhân vật không thành bóng đen khi ở xa các nguồn sáng */
+const PLAYER_FILL = new THREE.PointLight(0xfff2dc, 0, 13, 1.4); PLAYER_FILL.visible = false; scene.add(PLAYER_FILL);
 const NIGHT_POOL = [0, 1, 2, 3].map(() => { const l = new THREE.PointLight(0xffb35c, 0, 28, 1.3); l.visible = false; scene.add(l); return l; });
 let nightK = 0, nightT = 0;
 function nightLights(dt){
+  const fill = nightK > 0.03; if (PLAYER_FILL.visible !== fill) PLAYER_FILL.visible = fill;
+  if (fill){ PLAYER_FILL.position.set(P.x + Math.sin(yaw) * 1.6, P.y + 3.1, P.z + Math.cos(yaw) * 1.6); PLAYER_FILL.intensity = nightK * 0.32; }
   const on = nightK > 0.03 && S.gfx !== 'low';
   NIGHT_POOL.forEach(l => { if (l.visible !== on) l.visible = on; });
   if (!on) return;
-  nightT -= dt; if (nightT > 0){ NIGHT_POOL.forEach(l => { l.intensity = nightK * 20; }); return; }
+  nightT -= dt; if (nightT > 0){ NIGHT_POOL.forEach(l => { l.intensity = nightK * (l.userData.i || 16); }); return; }
   nightT = 0.4;
   const near = LIGHT_SRC.slice().sort((a, b) => ((a.x - P.x) ** 2 + (a.z - P.z) ** 2) - ((b.x - P.x) ** 2 + (b.z - P.z) ** 2));
-  NIGHT_POOL.forEach((l, i) => { const s = near[i]; l.position.set(s.x, s.y, s.z); l.color.setHex(s.c); l.intensity = nightK * 20; });
+  NIGHT_POOL.forEach((l, i) => { const s = near[i]; l.position.set(s.x, s.y, s.z); l.color.setHex(s.c); l.userData.i = s.i || 16; l.intensity = nightK * l.userData.i; });
 }
 /* bóng đèn phát sáng trên đầu cột đèn */
 { const bulbM = new THREE.MeshBasicMaterial({ color:0xffe2a0 }); WORLD.lamps.forEach(p => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), bulbM); b.position.set(p.x, p.y + 5.2, p.z); scene.add(b); }); }
@@ -1770,10 +1775,12 @@ const BRAND_COLORS = ['#2e7d5b', '#c2473a', '#2f6fc0', '#d9a322', '#7a55c0', '#d
 const BRANDS = (WORLD.booths || []).map((b, i) => Object.assign({ id:'b' + (i + 1), no:i + 1, name:'Thương hiệu ' + String(i + 1).padStart(2, '0'), tag:'Gian trưng bày đang chờ thương hiệu', desc:'Vị trí này dành cho một thương hiệu Đà Lạt. Tên, logo và lời giới thiệu sẽ hiện ở đây.', color:BRAND_COLORS[i % BRAND_COLORS.length] }, BRAND_INFO[i] || {}, { x:b.x, y:b.y, z:b.z, group:null }));
 const BG = { floor:new THREE.BoxGeometry(5.2, 0.06, 3), back:new THREE.BoxGeometry(5.2, 3, 0.12), side:new THREE.BoxGeometry(0.12, 3, 1.7), post:new THREE.BoxGeometry(0.12, 3.5, 0.12), fascia:new THREE.BoxGeometry(5.4, 0.72, 0.16), face:new THREE.PlaneGeometry(5.3, 0.66), panel:new THREE.PlaneGeometry(2.6, 1.7), desk:new THREE.BoxGeometry(1.7, 1.0, 0.6), deskF:new THREE.PlaneGeometry(1.6, 0.9), shelf:new THREE.BoxGeometry(1.6, 0.08, 0.4), box:new THREE.BoxGeometry(0.3, 0.34, 0.26) };
 const BM = { wall:lamb('#f4f2ec'), trim:lamb('#d8d4ca') };
+const BOOTH_GLOW = [BM.wall, BM.trim];   /* vật liệu gian hàng tự sáng nhẹ ban đêm (như có đèn trong gian) */
+BOOTH_GLOW.forEach(m => { m.emissive = m.color.clone(); m.emissiveIntensity = 0; });
 function buildBooth(b){
   if (b.group) scene.remove(b.group);
   const g = new THREE.Group(), put = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
-  const cm = lamb(b.color);
+  const cm = lamb(b.color); cm.emissive = cm.color.clone(); cm.emissiveIntensity = 0; BOOTH_GLOW.push(cm);
   put(BG.floor, cm, 0, 0.03, -0.2); put(BG.back, BM.wall, 0, 1.5, -1.7);
   [-2.6, 2.6].forEach(x => { put(BG.side, BM.wall, x, 1.5, -0.85); put(BG.post, BM.trim, x, 1.75, 1.2); });
   put(BG.fascia, cm, 0, 3.5, 1.2);
@@ -1870,6 +1877,7 @@ function cheerStage(){
 }
 let nearBooth = null, nearStage = false;
 function updateExpo(dt){
+  { const e = 0.3 * nightK; if (Math.abs(BM.wall.emissiveIntensity - e) > 0.01) BOOTH_GLOW.forEach(m => { m.emissiveIntensity = e; }); }
   nearBooth = null; let bd = 4.6; for (const b of BRANDS){ const dd = Math.hypot(P.x - b.x, P.z - (b.z + 2.6)); if (dd < bd && Math.abs(P.h - b.y) < 1.5){ bd = dd; nearBooth = b; } }
   if (!STAGE) return;
   const ds = Math.hypot(P.x - STAGE.x, P.z - STAGE.z);
