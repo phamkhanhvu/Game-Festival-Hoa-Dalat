@@ -204,6 +204,8 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .lbl.wait{background:#fff;color:#555;border-radius:.5rem;padding:0 .45rem;font-weight:800;font-size:.95rem;line-height:1.3}
 .lbl.wait.out{background:var(--danger);color:#fff}
 .lbl.name{background:rgba(14,28,52,.72);border-radius:1rem;padding:0 .6rem;font-size:.95rem;font-weight:700}
+.lbl.name.other{background:rgba(40,96,40,.78);border:1px solid #c8f03c}
+.pill.online{padding:0 .8rem;gap:.5rem;pointer-events:auto}.pill.online[hidden]{display:none}.pill.online b{min-width:0;font-size:1.05rem}.odot{width:.7rem;height:.7rem;border-radius:50%;background:#5fe36a;box-shadow:0 0 .5rem #5fe36a}
 .lbl.float{font-size:1.4rem;font-weight:800;text-shadow:0 2px 0 rgba(40,25,0,.8),0 0 4px rgba(0,0,0,.6)}
 .lbl.bang{display:flex;align-items:center;gap:.4rem}
 .lbl.bang i{font-style:normal;width:2.1rem;height:2.3rem;border-radius:50%;background:linear-gradient(#ffe27a,#f2a60c);border:.14rem solid #7a4a06;color:#3a2300;display:grid;place-items:center;font-weight:800;font-size:1.5rem;animation:bob .7s ease-in-out infinite alternate}
@@ -280,6 +282,7 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
 
   <div class="money">
     <button class="pill" id="btnCoins" aria-label="Xu, mở cửa hàng"><span class="ico coin"></span><b id="hCoins">0</b><span class="plus">+</span></button>
+    <button class="pill online" id="btnOnline" aria-label="Người chơi đang online" hidden><span class="odot"></span><b id="hOnline">1 online</b></button>
     <button class="pill" id="btnGems" aria-label="Kim cương, mở phúc lợi"><span class="ico gem"></span><b id="hGems">0</b><span class="plus">+</span></button>
   </div>
 
@@ -390,7 +393,7 @@ window.FB_READY = (function(){
   if (/claude|anthropic/i.test(location.hostname) || location.protocol === 'file:') return Promise.resolve(false);
   const load = s => new Promise(r => { const e = document.createElement('script'); e.src = s; e.onload = () => r(true); e.onerror = () => r(false); document.head.appendChild(e); });
   const b = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-';
-  return load(b + 'app-compat.js').then(ok => ok && load(b + 'auth-compat.js')).then(ok => ok && load(b + 'firestore-compat.js'));
+  return load(b + 'app-compat.js').then(ok => ok && load(b + 'auth-compat.js')).then(ok => ok && load(b + 'firestore-compat.js')).then(ok => ok && load(b + 'database-compat.js').then(() => true));
 })();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -521,7 +524,8 @@ const FB_CONFIG = {
   projectId: "quay-hang-da-lat",
   storageBucket: "quay-hang-da-lat.firebasestorage.app",
   messagingSenderId: "844175137729",
-  appId: "1:844175137729:web:6ce0d932a26fe056d9ed40"
+  appId: "1:844175137729:web:6ce0d932a26fe056d9ed40",
+  databaseURL: "https://quay-hang-da-lat-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 let fbAuth = null, fbDb = null;
 function fbInit(){
@@ -530,7 +534,7 @@ function fbInit(){
   CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này';
   fbAuth.onAuthStateChanged(user => {
     if (user) fbAttach(user);
-    else { CLOUD.ref = null; CLOUD.lastKey = ''; CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này'; updateHud(); if (!$('modal').hidden && modalType === 'settings') renderModal(); }
+    else { onlineStop(); CLOUD.ref = null; CLOUD.lastKey = ''; CLOUD.status = 'Chưa đăng nhập: tiến trình chỉ lưu trên máy này'; updateHud(); if (!$('modal').hidden && modalType === 'settings') renderModal(); }
   });
   updateHud();
 }
@@ -547,6 +551,7 @@ async function fbAttach(user){
     location.reload(); return;
   }
   CLOUD.status = 'Đã đăng nhập: ' + (user.displayName || 'tài khoản Google');
+  onlineStart(user);
   CLOUD.lastKey = '';
   cloudPush(); updateHud();
   if (!$('modal').hidden && modalType === 'settings') renderModal();
@@ -977,7 +982,7 @@ function buildFlags(){
    nửa phải (tóc, lưng áo, ba lô) chiếu lên mặt sau; chân tay cử động theo xương */
 const JACKET_BASE = '#86362a';
 const loadImg = url => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('không tải được ' + url)); im.src = url; });
-function upgradePlayerSkinned(sc, img){
+function buildSkinned(sc, img){
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body); body.add(sc);
   const pc = document.createElement('canvas'); pc.width = img.naturalWidth; pc.height = img.naturalHeight; const px2 = pc.getContext('2d'); px2.drawImage(img, 0, 0);
   const pix = px2.getImageData(0, 0, pc.width, pc.height).data;
@@ -1040,7 +1045,10 @@ function upgradePlayerSkinned(sc, img){
   const jb = C(JACKET_BASE);
   u.recolor = hex => { const c = hex ? C(hex) : null, r = c ? Math.min(3, c.r / jb.r) : 1, gg = c ? Math.min(3, c.g / jb.g) : 1, bb = c ? Math.min(3, c.b / jb.b) : 1;
     jackets.forEach(j => { const a = j.attr.array; for (const v of j.idx){ a[v * 3] = r; a[v * 3 + 1] = gg; a[v * 3 + 2] = bb; } j.attr.needsUpdate = true; }); };
-  u.pose(); g.userData = u;
+  u.pose(); g.userData = u; return g;
+}
+function upgradePlayerSkinned(sc, img){
+  const g = buildSkinned(sc, img);
   g.position.copy(playerMesh.position); g.rotation.y = playerMesh.rotation.y;
   scene.remove(playerMesh); playerMesh = g; scene.add(g); setAvatar();
 }
@@ -1057,7 +1065,7 @@ function loadModel(){
     });
     scene.add(model); buildFlags(); el.hidden = true; document.body.dataset.ready = '1';
     const bad = [];
-    Promise.all([loadBin('character.glb').then(parseGlb), loadImg('character.jpg')]).then(([c, img]) => upgradePlayerSkinned(c.scene, img)).catch(e => { console.warn('nv chính', e); bad.push('nhân vật chính'); })
+    Promise.all([loadBin('character.glb').then(b => { CHAR_BUF = b; return parseGlb(b); }), loadImg('character.jpg')]).then(([c, img]) => { CHAR_IMG = img; upgradePlayerSkinned(c.scene, img); }).catch(e => { console.warn('nv chính', e); bad.push('nhân vật chính'); })
       .then(() => Promise.all(CROWD.map(k => tplChar(k).catch(e => { console.warn('nv', k, e); bad.push(k); }))))
       .then(() => { upgradeCrowd(); upgradeStage(); if (bad.length) toast('Không tải được nhân vật ' + bad.join(' · ').slice(0, 160)); })
       .then(() => loadDecor()).catch(e => { console.warn('decor', e); toast('Không tải được cây cối, xe cộ: ' + (e && e.message || e)); })
@@ -1895,6 +1903,106 @@ function updateExpo(dt){
   });
   stageFx.noteT -= dt; if (stageFx.noteT <= 0 && ds < 45){ stageFx.noteT = rand(1.2, 2.6); floatText(STAGE.x + rand(-5, 5), STAGE.y + 3.2, STAGE.z + 2, pick(['♪', '♫', '♪ ♫']), pick(['#ffe08a', '#ffb3d1', '#b9e3ff'])); }
 }
+/* ===== Chơi cùng nhau: người chơi đã đăng nhập thấy nhau trên quảng trường (Firebase Realtime Database, nhánh presence/{uid}) =====
+   Mỗi máy ghi vị trí của mình khoảng 4 lần mỗi giây khi đang di chuyển, nhịp 20 giây khi đứng yên; rời trang hay mất mạng thì máy chủ tự xoá */
+const ON = { startAt:0, db:null, uid:null, me:null, list:null, con:null, off:0, others:new Map(), sentAt:0, last:null, hidden:false };
+const ON_SEND_MS = 250, ON_BEAT_MS = 20000, ON_STALE_MS = 75000, ON_MAX = 30;
+let CHAR_BUF = null, CHAR_IMG = null;
+function onlineStart(user){
+  if (typeof firebase === 'undefined' || !firebase.database) return;
+  try { ON.db = ON.db || firebase.database(); } catch(e){ console.warn('online', e); return; }
+  onlineStop(true);
+  ON.uid = user.uid; ON.me = ON.db.ref('presence/' + user.uid);
+  ON.db.ref('.info/serverTimeOffset').on('value', s => { ON.off = s.val() || 0; });
+  ON.con = ON.db.ref('.info/connected');
+  ON.con.on('value', s => { if (s.val() === true && ON.me){ ON.me.onDisconnect().remove(); ON.last = null; onlineSend(true); } });
+  ON.list = ON.db.ref('presence');
+  const err = e => console.warn('online đọc', e && e.code);
+  ON.startAt = now();
+  ON.list.on('child_added', onlineUpsert, err); ON.list.on('child_changed', onlineUpsert, err); ON.list.on('child_removed', s => onlineDrop(s.key), err);
+}
+function onlineStop(keepDb){
+  if (ON.me){ ON.me.onDisconnect().cancel(); ON.me.remove().catch(() => {}); }
+  if (ON.list) ON.list.off(); if (ON.con) ON.con.off();
+  ON.me = ON.list = ON.con = null; ON.uid = null; ON.last = null;
+  [...ON.others.keys()].forEach(onlineDrop); onlineHud();
+}
+function onlineSend(force){
+  if (!ON.me || ON.hidden) return;
+  const t = now(), o = OUTFITS.find(x => x.id === S.outfit) || OUTFITS[0];
+  const d = { n:String(S.name || 'Chủ Quầy').slice(0, 16), x:Math.round(P.x * 100) / 100, z:Math.round(P.z * 100) / 100, a:Math.round(P.ang * 100) / 100, m:P.moving ? 1 : 0, o:o.id === 'blue' ? '' : o.color, lv:S.level };
+  const L = ON.last, changed = !L || L.n !== d.n || L.o !== d.o || L.m !== d.m || L.lv !== d.lv || Math.hypot(L.x - d.x, L.z - d.z) > 0.04 || Math.abs(L.a - d.a) > 0.06;
+  if (!force && (t - ON.sentAt < ON_SEND_MS || (!changed && t - ON.sentAt < ON_BEAT_MS))) return;
+  ON.sentAt = t; ON.last = d;
+  ON.me.set(Object.assign({ t:firebase.database.ServerValue.TIMESTAMP }, d)).catch(e => { console.warn('online ghi', e && e.code); });
+}
+/* vỏ nhân vật cho người chơi khác: dùng đúng mô hình nhân vật chính khi đã tải xong, trước đó dùng hình người đơn giản */
+function onlineMesh(r){
+  const col = r.d.o || '#2f6f8f';
+  let m = null;
+  if (CHAR_BUF && CHAR_IMG){
+    m = personMesh({ shirt:col, pants:'#3d4f6e', hair:'#1f1a17' });
+    parseGlb(CHAR_BUF).then(g => {
+      if (!ON.others.has(r.id) || ON.others.get(r.id) !== r) return;
+      const k = buildSkinned(g.scene, CHAR_IMG); k.position.copy(r.mesh.position); k.rotation.y = r.mesh.rotation.y;
+      scene.remove(r.mesh); r.mesh = k; r.skinned = true; scene.add(k); r.col = null; onlineTint(r);
+    }).catch(e => console.warn('online nv', e));
+  } else m = personMesh({ shirt:col, pants:'#3d4f6e', hair:'#1f1a17' });
+  return m;
+}
+function onlineTint(r){ const u = r.mesh.userData, c = r.d.o || ''; if (r.col === c) return; r.col = c; if (u.recolor) u.recolor(c || null); }
+function onlineUpsert(snap){
+  const id = snap.key, d = snap.val(); if (!d || id === ON.uid || typeof d.x !== 'number' || typeof d.z !== 'number') return;
+  if (hAt(d.x, d.z) < -50) return;
+  let r = ON.others.get(id);
+  if (!r){
+    if (ON.others.size >= ON_MAX) return;
+    r = { id, d, x:d.x, z:d.z, y:Math.max(0, hAt(d.x, d.z)), ang:d.a || 0, walk:Math.random() * 6, moving:false, col:null, seen:now() };
+    r.mesh = onlineMesh(r); r.mesh.scale.setScalar(1.06); scene.add(r.mesh);
+    r.lbl = mkLabel('name other'); ON.others.set(id, r);
+    if (ON.uid && now() - ON.startAt > 4000 && !(typeof d.t === 'number' && now() + ON.off - d.t > ON_STALE_MS)) toast((String(d.n || 'Một người chơi').slice(0, 16)) + ' vừa vào quảng trường');
+  }
+  r.d = d; r.seen = now(); r.lbl.textContent = String(d.n || 'Người chơi').slice(0, 16) + (d.lv ? ' · Lv.' + d.lv : '');
+  if (Math.hypot(r.x - d.x, r.z - d.z) > 12){ r.x = d.x; r.z = d.z; }
+  onlineTint(r); onlineHud();
+}
+function onlineDrop(id){ const r = ON.others.get(id); if (!r) return; scene.remove(r.mesh); r.lbl.remove(); ON.others.delete(id); onlineHud(); }
+function onlineHud(){
+  const el = $('btnOnline'); if (!el) return;
+  const on = !!ON.me; el.hidden = !on; if (!on) return;
+  const n = 1 + [...ON.others.values()].filter(r => !r.stale).length;
+  const t = n + ' online'; if ($('hOnline').textContent !== t) $('hOnline').textContent = t;
+}
+function onlineList(){
+  const names = [...ON.others.values()].filter(r => !r.stale).map(r => String(r.d.n || 'Người chơi').slice(0, 16));
+  toast(names.length ? 'Đang ở quảng trường: ' + names.join(', ') : 'Chưa có ai khác online. Rủ bạn bè đăng nhập để gặp nhau nhé!');
+}
+function updateOnline(dt){
+  onlineSend(false);
+  if (!ON.others.size) return;
+  const t = now() + ON.off, k = Math.min(1, dt * 7);
+  ON.others.forEach(r => {
+    const d = r.d, stale = typeof d.t === 'number' && t - d.t > ON_STALE_MS;
+    if (stale !== !!r.stale){ r.stale = stale; r.mesh.visible = !stale; onlineHud(); }
+    if (stale){ r.lbl.style.display = 'none'; return; }
+    const dx = d.x - r.x, dz = d.z - r.z, dist = Math.hypot(dx, dz);
+    r.x += dx * k; r.z += dz * k;
+    r.moving = dist > 0.06 || (d.m && dist > 0.01);
+    if (r.moving) r.walk += dt * 9;
+    r.ang = lerpAng(r.ang, dist > 0.15 ? Math.atan2(dx, dz) : (d.a || 0), Math.min(1, dt * 10));
+    const gy = hAt(r.x, r.z); if (gy > -50) r.y += (Math.max(0, gy) - r.y) * Math.min(1, dt * 12);
+    r.mesh.position.set(r.x, r.y, r.z); r.mesh.rotation.y = r.ang;
+    animPerson(r.mesh, r.walk, r.moving);
+  });
+}
+function placeOnline(){ ON.others.forEach(r => { if (!r.stale) place(r.lbl, r.x, r.y + 2.05, r.z, 70); }); }
+document.addEventListener('visibilitychange', () => {
+  ON.hidden = document.hidden;
+  if (!ON.me) return;
+  if (document.hidden) ON.me.remove().catch(() => {});
+  else { ON.last = null; onlineSend(true); }
+});
+$('btnOnline').addEventListener('click', onlineList);
 
 /* ================= Hành động quầy ================= */
 let nearId = null, T = 0, ctxKey = '', nearSeller = false;
@@ -2072,6 +2180,7 @@ function update(dt){
   if (S.quest === 0 && !S.flags.explored && Math.hypot(P.x - EXPLORE.x, P.z - EXPLORE.z) < 4){ S.flags.explored = true; toast('Bạn đã khám phá Quảng trường Lâm Viên! Nhận thưởng ở bảng nhiệm vụ.', 'gold'); sfx('buy'); }
   nearSeller = people.some(p => p.seller && Math.hypot(P.x - p.x, P.z - p.z) < 3.2);
   updateExpo(dt);
+  updateOnline(dt);
   let best = null, bd = 4.6; STALLS.forEach(d => { const dd = Math.hypot(P.x - d.x, P.z - (d.z + 2.2)); if (dd < bd){ bd = dd; best = d.id; } }); nearId = best;
 
   const ownedList = STALLS.filter(d => st(d.id).owned && stallOpen(d));
@@ -2163,6 +2272,7 @@ function placeLabels(){
   } else if (bangLbl.style.display !== 'none') bangLbl.style.display = 'none';
   for (const p of people){ if (p.seller && p.lbl) place(p.lbl, p.x, p.y + 2.5, p.z, 45); }
   place(nameLbl, P.x, P.y + 2.05, P.z, 60);
+  placeOnline();
   for (const f of floats){ if (place(f.el, f.x, f.y, f.z, 70)) f.el.style.opacity = clamp(f.life, 0, 1); }
 }
 const MAPIMG = new Image(); MAPIMG.src = WORLD.map;
@@ -2647,7 +2757,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
