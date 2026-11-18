@@ -882,9 +882,21 @@ function add(mesh, cast, recv){ mesh.castShadow = !!cast; mesh.receiveShadow = !
 const hemi = new THREE.HemisphereLight(0xdcecff, 0x7c8a5e, 0.3); scene.add(hemi);
 /* mưa phùn: các hạt rơi quanh người chơi */
 const RAIN = (() => { const n = 500, a = new Float32Array(n * 3); for (let i = 0; i < n; i++){ a[i * 3] = rand(-30, 30); a[i * 3 + 1] = rand(0, 25); a[i * 3 + 2] = rand(-30, 30); } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(a, 3)); const p = new THREE.Points(g, new THREE.PointsMaterial({ color:0xbfd9ef, size:0.12, transparent:true, opacity:0.7, depthWrite:false })); p.frustumCulled = false; p.visible = false; scene.add(p); return { p, a }; })();
+/* mưa: khoảng 3/5 người đi dạo tìm đường vào cửa hầm trú mưa */
+let wanderAcc = 0;
+function rainScatter(){ people.filter(p => p.state === 'wander' && !p.seller).forEach((p, i) => { if (i % 5 < 3) setExit(p); }); }
+function wanderFromDoor(){
+  const ds = WORLD.doors || []; if (!ds.length) return;
+  const d = pick(ds), p = makePerson('wander'); p.zone = Math.random() < 0.6 ? 'low' : 'up';
+  placePerson(p, { x:d.x + rand(-0.6, 0.6), z:d.z }); if (!setPath(p, NAV.wander(p.x, p.z, 8, 22, false))) pickWaypoint(p); people.push(p);
+}
 function updateWeather(dt){
   WX.t += dt;
-  if (WX.t >= 150){ WX.t = 0; const r = Math.random(); WX.k = r < 0.5 ? 'sun' : r < 0.8 ? 'rain' : 'fog'; RAIN.p.visible = WX.k === 'rain'; toast('Thời tiết đổi: ' + WX_NAME[WX.k], 'gold'); }
+  if (WX.t >= 150){ WX.t = 0; const r = Math.random(), was = WX.k; WX.k = r < 0.5 ? 'sun' : r < 0.8 ? 'rain' : 'fog'; RAIN.p.visible = WX.k === 'rain';
+    if (WX.k === 'rain' && was !== 'rain'){ rainScatter(); toast('Trời đổ mưa: người đi dạo về bớt, khách vắng hơn. Đồ uống nóng bán chạy và được giá hơn.', 'bad'); }
+    else if (WX.k !== was) toast('Thời tiết đổi: ' + WX_NAME[WX.k] + (was === 'rain' ? '. Tạnh mưa, khách sẽ quay lại dần.' : ''), 'gold'); }
+  /* hết mưa: người đi dạo lần lượt bước ra từ cửa hầm cho tới khi đông như cũ */
+  if (WX.k !== 'rain'){ wanderAcc += dt; if (wanderAcc > 2.5){ wanderAcc = 0; if (people.filter(p => p.state === 'wander' && !p.seller).length < 22) wanderFromDoor(); } }
   if (RAIN.p.visible){ RAIN.p.position.set(P.x, P.h, P.z); const a = RAIN.a; for (let i = 1; i < a.length; i += 3){ a[i] -= dt * 16; if (a[i] < 0) a[i] += 25; } RAIN.p.geometry.attributes.position.needsUpdate = true; }
 }
 const sun = new THREE.DirectionalLight(0xfff1d6, 1.2); scene.add(sun); scene.add(sun.target);
@@ -2136,33 +2148,29 @@ const DVG = (() => {
     x.font = '800 34px "Be Vietnam Pro", sans-serif'; x.fillText('ĐỐ VUI', w / 2, h * 0.78); x.font = '700 26px "Be Vietnam Pro", sans-serif'; x.fillText('ĐÀ LẠT', w / 2, h * 0.89);
   });
   return {
-    card:new THREE.PlaneGeometry(0.8, 1.06), cardM:new THREE.MeshBasicMaterial({ map:t, side:THREE.DoubleSide, toneMapped:false }),
-    ring:new THREE.RingGeometry(0.55, 0.78, 28), ringM:new THREE.MeshBasicMaterial({ color:0xc8f03c, transparent:true, opacity:0.6, depthWrite:false, side:THREE.DoubleSide }),
-    beam:new THREE.CylinderGeometry(0.16, 0.3, 6, 10, 1, true), beamM:new THREE.MeshBasicMaterial({ color:0xd7ff6b, transparent:true, opacity:0.3, depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending })
+    card:new THREE.PlaneGeometry(0.46, 0.61), cardM:new THREE.MeshLambertMaterial({ map:t, side:THREE.DoubleSide })
   };
 })();
-DVG.beam.translate(0, 3, 0);
 function dvSpot(){
   for (let i = 0; i < 50; i++){
-    const p = zoneSpot(pick(['low', 'low', 'up', 'steps']));
+    const p = zoneSpot(pick(['low', 'up', 'up', 'steps', 'steps']));
     if (blocked(p.x, p.z) || STALLS.some(d => Math.hypot(p.x - d.x, p.z - d.z) < 6)) continue;
-    if (dvCards.some(c => Math.hypot(c.x - p.x, c.z - p.z) < 14) || items.some(it => Math.hypot(it.x - p.x, it.z - p.z) < 3) || Math.hypot(p.x - P.x, p.z - P.z) < 10) continue;
+    if (dvCards.some(c => Math.hypot(c.x - p.x, c.z - p.z) < 14) || items.some(it => Math.hypot(it.x - p.x, it.z - p.z) < 3) || Math.hypot(p.x - P.x, p.z - P.z) < 14) continue;
     return p;
   }
   return null;
 }
 function dvSpawn(){
   const p = dvSpot(); if (!p) return;
-  const y = Math.max(0, hAt(p.x, p.z)), g = new THREE.Group(), card = new THREE.Mesh(DVG.card, DVG.cardM), ring = new THREE.Mesh(DVG.ring, DVG.ringM), beam = new THREE.Mesh(DVG.beam, DVG.beamM);
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; ring.renderOrder = 3; beam.renderOrder = 4; card.position.y = 1.25;
-  g.add(card, ring, beam); g.position.set(p.x, y, p.z); scene.add(g);
+  /* thẻ nhỏ, không có vòng sáng hay cột sáng, không hiện trên bản đồ: phải đi săn mới thấy */
+  const y = Math.max(0, hAt(p.x, p.z)), g = new THREE.Group(), card = new THREE.Mesh(DVG.card, DVG.cardM);
+  card.position.y = 0.55; card.castShadow = true; g.add(card); g.rotation.y = Math.random() * TAU; g.position.set(p.x, y, p.z); scene.add(g);
   dvCards.push({ x:p.x, z:p.z, y, g, card, ph:Math.random() * 6 });
 }
 function updateDv(dt){
-  if (!dvInit){ dvInit = true; for (let i = 0; i < DV_CARDS; i++) dvSpawn(); if (!S.flags.dvIntro){ S.flags.dvIntro = 1; setTimeout(() => toast('Thẻ Đố Vui màu xanh chanh nằm rải rác quanh quảng trường. Nhặt thẻ, trả lời đúng để nhận xu!', 'gold'), 4000); } }
-  DVG.ringM.opacity = 0.45 + Math.sin(T * 4) * 0.2;
+  if (!dvInit){ dvInit = true; for (let i = 0; i < DV_CARDS; i++) dvSpawn(); if (!S.flags.dvIntro){ S.flags.dvIntro = 1; setTimeout(() => toast('Có 5 thẻ Đố Vui nhỏ được giấu quanh quảng trường. Ai tinh mắt tìm được và trả lời đúng sẽ có thưởng!', 'gold'), 4000); } }
   for (let i = dvCards.length - 1; i >= 0; i--){
-    const c = dvCards[i]; c.ph += dt; c.card.position.y = 1.25 + Math.sin(c.ph * 2) * 0.12; c.card.rotation.y += dt * 1.4;
+    const c = dvCards[i]; c.ph += dt; c.card.position.y = 0.55 + Math.sin(c.ph * 1.3) * 0.05; c.card.rotation.y += dt * 0.35;
     if (!modalType && Math.hypot(P.x - c.x, P.z - c.z) < 1.5 && Math.abs(P.h - c.y) < 1.6){
       scene.remove(c.g); dvCards.splice(i, 1); sfx('buy'); floatText(c.x, c.y + 1.8, c.z, 'Thẻ Đố Vui!', '#d7ff6b');
       dvNextQ(); openModal('dovui');
@@ -2170,12 +2178,12 @@ function updateDv(dt){
   }
   if (dvCards.length < DV_CARDS){ dvRespawn += dt; if (dvRespawn > (dvCards.length ? DV_RESPAWN : 3)){ dvRespawn = 0; dvSpawn(); } } else dvRespawn = 0;
 }
-function dvMini(g){ g.fillStyle = '#c8f03c'; g.strokeStyle = '#1d2a06'; g.lineWidth = 0.6; dvCards.forEach(c => { if (Math.abs(c.x - P.x) > 90 || Math.abs(c.z - P.z) > 90) return; g.fillRect(c.x - 2.2, c.z - 2.8, 4.4, 5.6); g.strokeRect(c.x - 2.2, c.z - 2.8, 4.4, 5.6); }); }
+function dvMini(){}
 /* ---- hộp thoại một câu hỏi ---- */
 function dvRender(){
   const d = dvS(), n = dvKnown(), cur = d.cur;
   let h = row('Hiểu Đà Lạt: ' + dvRank(n), `Đã biết ${n}/${DV_N} câu · Hôm nay ${Math.min(d.today, DV_DAILY)}/${DV_DAILY} thẻ thưởng lớn<span class="pbar"><i style="width:${n / DV_N * 100}%"></i></span>`, '');
-  if (!cur){ return h + '<p>Đi tìm thẻ Đố Vui màu xanh chanh quanh quảng trường. Thẻ hiện thành ô vuông xanh trên bản đồ nhỏ.</p>'; }
+  if (!cur){ return h + '<p>Có 5 thẻ Đố Vui nhỏ được giấu quanh quảng trường. Hãy đi săn!</p>'; }
   const Q = DV_Q[cur.q];
   h += `<div class="qbox${cur.a >= 0 ? (cur.a === 0 ? ' ok' : ' no') : ''}"><b>${Q[0]}</b>`;
   if (cur.a < 0) h += cur.o.map(k => `<button class="qopt" data-act="dvans:${k}">${Q[1 + k]}</button>`).join('');
@@ -2381,7 +2389,7 @@ function update(dt){
   if (ownedList.length && people.length < 58){
     spawnAcc += dt;
     const lv = ownedList.reduce((a, d) => a + st(d.id).level, 0);
-    let iv = 3.4 / (1 + 0.14 * lv + 0.3 * (ownedList.length - 1)); if (eventOn()) iv /= 2; if (rushOn()) iv /= 2; iv = Math.max(0.45, iv);
+    let iv = 3.4 / (1 + 0.14 * lv + 0.3 * (ownedList.length - 1)); if (eventOn()) iv /= 2; if (rushOn()) iv /= 2; iv = Math.max(0.45, iv); if (WX.k === 'rain') iv *= 2.2;
     if (spawnAcc >= iv){ spawnAcc = 0; spawnCustomer(ownedList); }
   }
 
@@ -2822,7 +2830,7 @@ function renderModal(){
       : row('Chơi lại từ đầu', 'Xóa cấp, xu, quầy và nhiệm vụ.', `<button class="gbtn" data-act="reset">Chơi lại</button>`);
   } else if (modalType === 'hunt'){
     h += row('Khu trưng bày thương hiệu Đà Lạt', `Sân phía đông, cạnh đài phun nước. Đã tham quan ${brandsSeen()}/${BRANDS.length} gian.<span class="pbar"><i style="width:${brandsSeen() / Math.max(1, BRANDS.length) * 100}%"></i></span>`, '');
-    h += row('Đố Vui Đà Lạt · ' + dvRank(dvKnown()), `Tìm thẻ xanh chanh quanh quảng trường (ô vuông xanh trên bản đồ nhỏ). Đã biết ${dvKnown()}/${DV_N} câu.<span class="pbar"><i style="width:${dvKnown() / DV_N * 100}%"></i></span>`, '');
+    h += row('Đố Vui Đà Lạt · ' + dvRank(dvKnown()), `5 thẻ nhỏ được giấu quanh quảng trường, nhặt xong sẽ có thẻ mới ở chỗ khác. Đã biết ${dvKnown()}/${DV_N} câu.<span class="pbar"><i style="width:${dvKnown() / DV_N * 100}%"></i></span>`, '');
     h += row(STAGE_NAME + ' · ' + STAGE_HOST, `Sân khấu chính giữa sân dưới, trước cầu thang lớn. Đang diễn: ${curSong().title}. Đã cổ vũ ${S.stats.cheers || 0} tiết mục.`, '');
     h += '<p>Đi khắp quảng trường để nhặt vật phẩm phát sáng. Chúng hiện thành chấm màu trên bản đồ nhỏ, vòng trắng chỉ vật phẩm gần nhất của nhiệm vụ đang theo. Hoa, quả thông, atiso và hộp quà sẽ mọc lại sau một lúc.</p>';
     HUNTS.forEach(q => {
@@ -2955,7 +2963,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, dvCards, dvS, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
