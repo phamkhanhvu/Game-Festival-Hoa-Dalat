@@ -1,0 +1,555 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Chợ Đà Lạt · Khu Hòa Bình</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--font-display:"Baloo 2","Be Vietnam Pro",system-ui,sans-serif;--font:"Be Vietnam Pro",system-ui,sans-serif;--panel:rgba(14,28,52,.62);--edge:rgba(255,255,255,.55);--lime:#c8f03c}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#9cc6e6;font-family:var(--font);color:#fff;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;will-change:transform;font-weight:700}
+.lbl.name{background:rgba(14,28,52,.72);border-radius:1rem;padding:0 .6rem;font-size:.95rem}
+.lbl.sign{background:rgba(255,255,255,.92);color:#2b2f3a;border-radius:.7rem;padding:.15rem .6rem;font-size:.9rem;border:2px solid var(--lime);box-shadow:0 .2rem .5rem rgba(0,0,0,.25)}
+.lbl.sign.done{border-color:#9aa3ad;opacity:.8}
+.lbl.portal{background:rgba(70,30,140,.85);border-radius:1rem;padding:.1rem .7rem;font-size:.95rem;border:2px solid #b89cff}
+.lbl.float{font-family:var(--font-display);font-size:1.3rem;text-shadow:0 2px 3px rgba(0,0,0,.6)}
+#hud{position:fixed;inset:0;pointer-events:none;font-family:var(--font-display)}
+#hud > *{position:absolute;pointer-events:auto}
+.outline{text-shadow:0 0 3px rgba(0,0,0,.65),0 2px 3px rgba(0,0,0,.45)}
+.top{top:calc(env(safe-area-inset-top,0px) + .7rem);left:calc(env(safe-area-inset-left,0px) + .7rem);display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 9rem)}
+.pill{display:flex;align-items:center;gap:.4rem;height:2.4rem;padding:0 .8rem;background:var(--panel);border:.12rem solid var(--edge);border-radius:2rem;font-size:1.15rem;font-weight:800;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.pill .lv{background:#ffb400;color:#3a2600;border-radius:.6rem;padding:0 .4rem;font-size:.95rem}
+.pill .coin{width:1.2rem;height:1.2rem;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff3a8,#ffc400 55%,#c88a00);box-shadow:inset 0 0 0 .12rem #b07800}
+.place{top:calc(env(safe-area-inset-top,0px) + 3.6rem);left:calc(env(safe-area-inset-left,0px) + .7rem);font-size:1.25rem;font-weight:800;line-height:1.1}
+.place small{display:block;font-family:var(--font);font-size:.8rem;font-weight:600;opacity:.9}
+.minimap{top:calc(env(safe-area-inset-top,0px) + .6rem);right:calc(env(safe-area-inset-right,0px) + .6rem);width:7.6rem;height:7.6rem;border-radius:50%;overflow:hidden;border:.18rem solid rgba(255,255,255,.85);box-shadow:0 .2rem .6rem rgba(0,0,0,.35);background:#c9c2b5}
+.minimap canvas{width:100%;height:100%;display:block}
+.joy{left:calc(env(safe-area-inset-left,0px) + 1.4rem);bottom:calc(env(safe-area-inset-bottom,0px) + 1.4rem);width:8.4rem;height:8.4rem;border-radius:50%;background:rgba(255,255,255,.16);border:.15rem solid rgba(255,255,255,.55);touch-action:none}
+.joy i{position:absolute;left:50%;top:50%;width:3.6rem;height:3.6rem;margin:-1.8rem 0 0 -1.8rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#bcd9f4 60%,#7fa8cf);box-shadow:0 .2rem .5rem rgba(0,0,0,.35)}
+.acts{right:calc(env(safe-area-inset-right,0px) + 1rem);bottom:calc(env(safe-area-inset-bottom,0px) + 1.2rem);display:flex;gap:.8rem;align-items:flex-end}
+.act{width:5rem;height:5rem;border-radius:50%;background:linear-gradient(160deg,rgba(255,255,255,.4),rgba(255,255,255,.1)),rgba(120,190,255,.22);border:.18rem solid rgba(255,255,255,.75);color:#fff;font-family:var(--font-display);font-size:1.05rem;font-weight:800}
+.act[aria-pressed="true"]{background:rgba(200,240,60,.5)}
+#toasts{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 4.2rem);transform:translateX(-50%);display:flex;flex-direction:column;gap:.4rem;align-items:center;pointer-events:none;z-index:5}
+.toast{background:rgba(14,28,52,.86);border:.1rem solid var(--edge);border-radius:1rem;padding:.45rem .9rem;font-weight:700;font-size:.95rem;max-width:88vw;text-align:center;animation:tin .25s ease}
+.toast.gold{border-color:#ffd23f;color:#ffe9a0}.toast.bad{border-color:#ff8a80}
+@keyframes tin{from{opacity:0;transform:translateY(-.5rem)}}
+#card{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);transform:translateX(-50%);width:min(30rem,calc(100vw - 2rem));background:rgba(14,28,52,.9);border:.12rem solid var(--edge);border-radius:1.2rem;padding:1rem 1.1rem;z-index:6;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#card[hidden]{display:none}
+#card h3{margin:0 0 .35rem;font-family:var(--font-display);font-size:1.3rem;color:#ffe9a0}
+#card p{margin:.2rem 0 .6rem;font-size:.95rem;line-height:1.4;color:#e6edf6}
+#card .row{display:flex;gap:.5rem;flex-wrap:wrap}
+.btn{border:0;border-radius:.8rem;padding:.6rem 1rem;font-family:var(--font-display);font-size:1.05rem;font-weight:800;color:#24310a;background:var(--lime);box-shadow:0 .2rem 0 #7f9a1f}
+.btn.ghost{background:rgba(255,255,255,.18);color:#fff;box-shadow:none}
+.btn:disabled{opacity:.55}
+.qopt{display:block;width:100%;text-align:left;margin:.35rem 0;border-radius:.7rem;background:rgba(18,30,52,.7);border:.12rem solid rgba(159,198,255,.45);color:#eef3fa;font-weight:700;padding:.55rem .8rem;font-size:1rem;font-family:var(--font)}
+#fade{position:fixed;inset:0;background:radial-gradient(circle,#6a3cc4,#1a0b3a);opacity:0;pointer-events:none;transition:opacity .6s;z-index:9;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:1.6rem}
+#fade.on{opacity:1;pointer-events:auto}
+#loading{position:fixed;inset:0;background:linear-gradient(160deg,#20335a,#3c6a96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;z-index:10;text-align:center;padding:1.5rem}
+#loading h1{margin:0;font-family:var(--font-display);font-size:2rem}
+#loading p{margin:0;opacity:.85}
+#loading b{font-family:var(--font-display);font-size:1.6rem;color:var(--lime)}
+#loading[hidden]{display:none}
+</style>
+<canvas id="cv"></canvas>
+<div id="labels"></div>
+<div id="hud">
+  <div class="top">
+    <div class="pill outline"><span class="lv" id="hLv">Lv.1</span><span id="hName">Chủ Quầy</span></div>
+    <div class="pill outline"><span class="coin"></span><b id="hCoins">0</b></div>
+  </div>
+  <div class="place outline">Chợ Đà Lạt · Khu Hòa Bình<small id="hHint">Check-in các điểm và săn thẻ Đố Vui</small></div>
+  <div class="minimap"><canvas id="mm" width="240" height="240"></canvas></div>
+  <div class="joy" id="joy"><i id="knob"></i></div>
+  <div class="acts"><button class="act outline" id="btnRun" aria-pressed="false">Chạy</button><button class="act outline" id="btnHome">Về cổng</button></div>
+</div>
+<div id="toasts"></div>
+<div id="card" hidden></div>
+<div id="fade"><span>Đang dịch chuyển…</span></div>
+<div id="loading"><h1>Chợ Đà Lạt</h1><p>Khu Hòa Bình · Đà Lạt</p><b id="loadPct">0%</b><p id="loadMsg">Đang tải bản đồ…</p></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="world2.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const TAU = Math.PI * 2, clamp = (v, a, b) => v < a ? a : v > b ? b : v, rand = (a, b) => a + Math.random() * (b - a), now = () => Date.now();
+const fmt = n => Math.floor(n).toLocaleString('en-US');
+const W2 = window.WORLD2;
+if (!W2){ $('loadMsg').textContent = 'Không tải được dữ liệu bản đồ. Hãy tải lại trang.'; return; }
+const B64 = /claude|anthropic/i.test(location.hostname) || /[?&]b64=1/.test(location.search);
+const b64u8 = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+function loadBin(url, onProgress, approx){
+  const u = B64 ? url + '.b64.txt' : url;
+  return fetch(u).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + url);
+    if (!onProgress || !r.body || !r.body.getReader) return r.arrayBuffer();
+    const total = +r.headers.get('content-length') || approx * (B64 ? 1.34 : 1), reader = r.body.getReader(), chunks = []; let got = 0;
+    const pump = () => reader.read().then(({ done, value }) => { if (done) return new Blob(chunks).arrayBuffer(); chunks.push(value); got += value.length; onProgress(got / total); return pump(); });
+    return pump();
+  }).then(buf => B64 ? b64u8(new TextDecoder().decode(buf).trim()).buffer : buf);
+}
+const parseGlb = buf => new Promise((res, rej) => new THREE.GLTFLoader().parse(buf, '', res, rej));
+const loadImg = url => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error(url)); im.src = url; });
+
+/* ===== Tiến trình dùng chung với Quảng trường Lâm Viên (cùng ô lưu trên máy) ===== */
+const SAVE_KEY = 'quayhang-dalat-v3';
+let S = null;
+try { S = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch(e){}
+if (!S || typeof S !== 'object') S = { v:5, name:'Chủ Quầy', level:1, exp:0, coins:2000, gems:20, outfit:'blue', flags:{}, stats:{ earned:0 } };
+S.cho = S.cho && typeof S.cho === 'object' ? S.cho : {}; S.cho.ck = S.cho.ck || {};
+S.flags = S.flags || {}; S.stats = S.stats || { earned:0 };
+function save(){ try { S.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){} }
+const expNeed = l => Math.round(60 * Math.pow(l, 1.4));
+function give(r){
+  if (r.coins){ S.coins = (S.coins || 0) + r.coins; }
+  if (r.gems) S.gems = (S.gems || 0) + r.gems;
+  if (r.exp){ S.exp = (S.exp || 0) + r.exp; while (S.exp >= expNeed(S.level)){ S.exp -= expNeed(S.level); S.level++; S.gems = (S.gems || 0) + 5; toast(`Lên cấp ${S.level}! +5 kim cương`, 'gold'); } }
+  hud(); save();
+}
+const rewardText = r => [r.coins ? fmt(r.coins) + ' xu' : '', r.gems ? r.gems + ' kim cương' : '', r.exp ? r.exp + ' EXP' : ''].filter(Boolean).join(', ');
+function hud(){ $('hLv').textContent = 'Lv.' + (S.level || 1); $('hName').textContent = S.name || 'Chủ Quầy'; $('hCoins').textContent = fmt(S.coins || 0); }
+function toast(msg, kind){ const box = $('toasts'), el = document.createElement('div'); el.className = 'toast' + (kind ? ' ' + kind : ''); el.textContent = msg; box.appendChild(el); while (box.children.length > 3) box.firstChild.remove(); setTimeout(() => el.remove(), 3000); }
+hud();
+
+/* ===== Lưới đi lại ===== */
+const GR = (() => { const h = new Int16Array(b64u8(W2.h).buffer), top = new Int16Array(b64u8(W2.top).buffer); return { nx:W2.nx, nz:W2.nz, x0:W2.x0, z0:W2.z0, cs:W2.step, h, top }; })();
+function groundAt(x, z){
+  const fx = (x - GR.x0) / GR.cs, fz = (z - GR.z0) / GR.cs, i = Math.floor(fx), j = Math.floor(fz);
+  if (i < 0 || j < 0 || i >= GR.nx - 1 || j >= GR.nz - 1) return NaN;
+  const a = j * GR.nx + i, b = a + 1, c = a + GR.nx, d = c + 1, H = GR.h;
+  if (H[a] === -32768 || H[b] === -32768 || H[c] === -32768 || H[d] === -32768) return NaN;
+  const u = fx - i, v = fz - j;
+  return ((H[a] * (1 - u) + H[b] * u) * (1 - v) + (H[c] * (1 - u) + H[d] * u) * v) * 0.01;
+}
+function topAt(x, z){ const i = Math.round((x - GR.x0) / GR.cs), j = Math.round((z - GR.z0) / GR.cs); if (i < 0 || j < 0 || i >= GR.nx || j >= GR.nz) return 0; return GR.top[j * GR.nx + i] * 0.01; }
+const MAX_SLOPE = 1.5;
+function stepOk(x, z, nx, nz){ const cur = groundAt(x, z), nh = groundAt(nx, nz); if (nh !== nh) return false; return !(cur === cur && Math.abs(nh - cur) > MAX_SLOPE * Math.hypot(nx - x, nz - z) + 0.02); }
+const P = { x:W2.spawn.x, z:W2.spawn.z, h:W2.spawn.y, y:W2.spawn.y, ang:Math.PI, walk:0, moving:false, vy:0 };
+function movePlayer(dx, dz){
+  const dist = Math.hypot(dx, dz), n = Math.max(1, Math.ceil(dist / 0.2)), sx = dx / n, sz = dz / n;
+  for (let i = 0; i < n; i++){
+    if (stepOk(P.x, P.z, P.x + sx, P.z + sz)){ P.x += sx; P.z += sz; }
+    else if (Math.abs(sx) > 1e-5 && stepOk(P.x, P.z, P.x + sx, P.z)) P.x += sx;
+    else if (Math.abs(sz) > 1e-5 && stepOk(P.x, P.z, P.x, P.z + sz)) P.z += sz;
+    else break;
+  }
+}
+
+/* ===== Đồ họa ===== */
+const cv = $('cv');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' }); }
+catch(e){ $('loadMsg').textContent = 'Trình duyệt này không bật được đồ họa 3D (WebGL).'; return; }
+renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.8;
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75));
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9cc6e6); scene.fog = new THREE.Fog(0xb8d3e8, 120, 520);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 1200);
+const C = hex => new THREE.Color(hex).convertSRGBToLinear();
+const hemi = new THREE.HemisphereLight(0xdcecff, 0x8a8370, 0.55); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1d6, 1.15); sun.position.set(-60, 120, 40); scene.add(sun);
+let W = 0, H = 0;
+function resize(){ W = innerWidth; H = innerHeight; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+function canvasTex(w, h, draw){ const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; }
+/* bóng tròn dưới chân nhân vật (cảnh lớn nên không bật đổ bóng toàn cảnh) */
+const blob = new THREE.Mesh(new THREE.CircleGeometry(0.5, 20), new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.28, depthWrite:false }));
+blob.rotation.x = -Math.PI / 2; scene.add(blob);
+
+/* ===== Nhân vật ===== */
+const OUTFITS = [
+  { id:'blue',   name:'Áo khoác đỏ gạch', color:'#9e3d33', price:0 },
+  { id:'red',    name:'Áo len đỏ',     color:'#c4453a', price:25 },
+  { id:'yellow', name:'Áo len vàng',   color:'#d9a322', price:25 },
+  { id:'purple', name:'Hoodie tím',    color:'#7a55c0', price:25 },
+  { id:'green',  name:'Áo khoác rêu',  color:'#4f7a3c', price:25 },
+];
+let playerMesh = new THREE.Group();
+{ const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.6, 10), new THREE.MeshLambertMaterial({ color:C('#9e3d33') })); body.position.y = 0.85; playerMesh.add(body); }
+scene.add(playerMesh);
+const JACKET_BASE = '#86362a';
+function buildSkinned(sc, img){
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body); body.add(sc);
+  const pc = document.createElement('canvas'); pc.width = img.naturalWidth; pc.height = img.naturalHeight; const px2 = pc.getContext('2d'); px2.drawImage(img, 0, 0);
+  const pix = px2.getImageData(0, 0, pc.width, pc.height).data;
+  const tex = new THREE.Texture(img); tex.encoding = THREE.sRGBEncoding; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
+  const jackets = [];
+  sc.traverse(o => {
+    if (!o.isSkinnedMesh) return;
+    o.frustumCulled = false; o.castShadow = true;
+    o.geometry.computeVertexNormals();                      /* pháp tuyến mượt trước khi tách đỉnh theo từng tam giác */
+    /* tách đỉnh theo từng tam giác (tự làm, giữ nguyên kiểu dữ liệu và cờ normalized của trọng số xương) */
+    const src = o.geometry, ix = src.index, N = ix ? ix.count : src.attributes.position.count, ge = new THREE.BufferGeometry(), GET = ['getX', 'getY', 'getZ', 'getW'];
+    for (const k in src.attributes){
+      const a = src.attributes[k], sz = a.itemSize, A = a.isInterleavedBufferAttribute ? a.data.array : a.array, out = new A.constructor(N * sz);
+      for (let i = 0; i < N; i++){ const v = ix ? ix.getX(i) : i; for (let c = 0; c < sz; c++) out[i * sz + c] = a[GET[c]](v); }
+      ge.setAttribute(k, new THREE.BufferAttribute(out, sz, a.normalized));
+    }
+    o.geometry = ge;
+    const pos = ge.attributes.position, n = pos.count;
+    let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9;
+    for (let v = 0; v < n; v++){ const y = pos.getY(v), x = pos.getX(v); if (y < y0) y0 = y; if (y > y1) y1 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+    /* mặt phẳng lưng: giữa bề dày của chân (thân người) và điểm lùi sau nhất (ba lô) */
+    let zb = 1e9, zl0 = 1e9, zl1 = -1e9;
+    for (let v = 0; v < n; v++){ const z = pos.getZ(v); if (z < zb) zb = z; if ((pos.getY(v) - y0) / (y1 - y0) < 0.4){ if (z < zl0) zl0 = z; if (z > zl1) zl1 = z; } }
+    const zPack = zl0 + (zb - zl0) * 0.35, clampN = (v, a, b) => v < a ? a : v > b ? b : v;
+    const uv = new Float32Array(n * 2), ca = new Float32Array(n * 3).fill(1), jk = [];
+    for (let t = 0; t < n; t += 3){
+      /* tam giác quay mặt về phía trước (+z) dùng nửa ảnh mặt trước, còn lại dùng nửa ảnh mặt sau */
+      const ax = pos.getX(t + 1) - pos.getX(t), ay = pos.getY(t + 1) - pos.getY(t), bx = pos.getX(t + 2) - pos.getX(t), by = pos.getY(t + 2) - pos.getY(t);
+      const front = ax * by - ay * bx > 0;
+      /* khối ba lô nhô ra sau lưng: cả mặt bên cũng lấy màu ba lô thay vì màu áo */
+      const cz = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3, cty = ((pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3 - y0) / (y1 - y0), pack = cz < zPack && cty > 0.5 && cty < 0.82;
+      for (let v = t; v < t + 3; v++){
+        let fu = (pos.getX(v) - x0) / (x1 - x0), w = 0.003 + 0.994 * (pos.getY(v) - y0) / (y1 - y0);
+        if (pack){ fu = clampN(fu, 0.35, 0.73); w = clampN(w, 0.555, 0.765); }
+        const u = 0.006 + 0.488 * fu + (front && !pack ? 0 : 0.5);
+        uv[v * 2] = u; uv[v * 2 + 1] = w;
+        const pi = (Math.min(pc.height - 1, Math.floor((1 - w) * pc.height)) * pc.width + Math.min(pc.width - 1, Math.floor(u * pc.width))) * 4;
+        if (pix[pi] > 85 && pix[pi + 1] < 95 && pix[pi] > pix[pi + 1] * 1.6) jk.push(v);   /* điểm ảnh màu đỏ gạch = áo khoác */
+      }
+    }
+    ge.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); ge.setAttribute('color', new THREE.BufferAttribute(ca, 3)); o.normalizeSkinWeights();
+    o.material = new THREE.MeshLambertMaterial({ map:tex, vertexColors:true, skinning:true });
+    jackets.push({ attr:ge.attributes.color, idx:jk });
+  });
+  sc.updateMatrixWorld(true);
+  let box = new THREE.Box3().setFromObject(sc); sc.scale.multiplyScalar(1.78 / (box.max.y - box.min.y)); sc.updateMatrixWorld(true);
+  box = new THREE.Box3().setFromObject(sc); sc.position.y -= box.min.y; sc.position.x -= (box.min.x + box.max.x) / 2; sc.position.z -= (box.min.z + box.max.z) / 2;
+  g.updateMatrixWorld(true);
+  /* mỗi xương xoay quanh trục trái-phải của nhân vật, quy về hệ toạ độ riêng của xương */
+  const bones = {}, wq = new THREE.Quaternion(), XA = new THREE.Vector3(1, 0, 0), qt = new THREE.Quaternion();
+  sc.traverse(o => { if (o.isBone){ o.getWorldQuaternion(wq); bones[o.name] = { b:o, rest:o.quaternion.clone(), axis:XA.clone().applyQuaternion(wq.clone().invert()).normalize() }; } });
+  const swing = (name, ang) => { const e = bones[name]; if (!e) return; qt.setFromAxisAngle(e.axis, ang); e.b.quaternion.copy(e.rest).multiply(qt); };
+  const px = () => ({ rotation:{ x:0 } }), u = { real:true, body, by:0, amp:0.55, legL:px(), legR:px(), armL:px(), armR:px(), shirt:[1] };
+  u.pose = () => {
+    const l = u.legL.rotation.x, r = u.legR.rotation.x, al = u.armL.rotation.x, ar = u.armR.rotation.x;
+    swing('LeftUpLeg', l); swing('LeftLeg', Math.max(0, l) * 1.3 + Math.abs(l) * 0.12); swing('RightUpLeg', r); swing('RightLeg', Math.max(0, r) * 1.3 + Math.abs(r) * 0.12);
+    swing('LeftArm', al * 0.7); swing('LeftForeArm', -0.15 - Math.max(0, -al) * 0.45); swing('RightArm', ar * 0.7); swing('RightForeArm', -0.15 - Math.max(0, -ar) * 0.45);
+  };
+  /* đổi màu áo khoác theo trang phục đã mua (nhân màu lên phần áo đỏ của ảnh); null = màu gốc */
+  const jb = C(JACKET_BASE);
+  u.recolor = hex => { const c = hex ? C(hex) : null, r = c ? Math.min(3, c.r / jb.r) : 1, gg = c ? Math.min(3, c.g / jb.g) : 1, bb = c ? Math.min(3, c.b / jb.b) : 1;
+    jackets.forEach(j => { const a = j.attr.array; for (const v of j.idx){ a[v * 3] = r; a[v * 3 + 1] = gg; a[v * 3 + 2] = bb; } j.attr.needsUpdate = true; }); };
+  u.pose(); g.userData = u; return g;
+}
+
+function animPerson(mesh, walk, moving){
+  const u = mesh.userData; if (!u || !u.real) return; const s = moving ? Math.sin(walk) : 0, a = u.amp;
+  u.legL.rotation.x = s * a; u.legR.rotation.x = -s * a; u.body.position.y = u.by + (moving ? Math.abs(Math.cos(walk)) * 0.03 : 0); u.body.rotation.z = moving ? Math.cos(walk) * 0.025 : 0;
+  u.armL.rotation.x = -s * a * 1.1; u.armR.rotation.x = s * a * 1.1; if (u.pose) u.pose();
+}
+const lerpAng = (a, b, k) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return a + d * k; };
+
+/* ===== Nhãn nổi ===== */
+const layer = $('labels'), v3 = new THREE.Vector3();
+function mkLabel(cls, txt){ const el = document.createElement('div'); el.className = 'lbl ' + cls; el.textContent = txt; layer.appendChild(el); return el; }
+function place(el, x, y, z, maxDist){
+  v3.set(x, y, z); const d = v3.distanceTo(camera.position); v3.project(camera);
+  if (v3.z > 1 || v3.z < -1 || d > maxDist || Math.abs(v3.x) > 1.3 || Math.abs(v3.y) > 1.4){ if (el.style.display !== 'none') el.style.display = 'none'; return; }
+  if (el.style.display === 'none') el.style.display = '';
+  el.style.transform = `translate(-50%,-100%) translate(${((v3.x * 0.5 + 0.5) * W).toFixed(1)}px,${((-v3.y * 0.5 + 0.5) * H).toFixed(1)}px)`;
+}
+const nameLbl = mkLabel('name', S.name || 'Chủ Quầy');
+const floats = [];
+function floatText(x, y, z, t, c){ const el = mkLabel('float', t); el.style.color = c; floats.push({ el, x, y, z, life:1.6 }); }
+
+/* ===== Cổng dịch chuyển (về Quảng trường Lâm Viên) ===== */
+const PORTAL = W2.portal;
+function portalMesh(){
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.14, 12, 48), new THREE.MeshBasicMaterial({ color:0xb89cff, toneMapped:false })); ring.position.y = 1.7; g.add(ring);
+  const swirl = canvasTex(256, 256, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.35, 'rgba(184,156,255,.8)'); gr.addColorStop(1, 'rgba(70,30,160,.15)'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 6; for (let k = 0; k < 4; k++){ c.beginPath(); for (let t = 0; t < 1; t += 0.02){ const a = t * 5 + k * Math.PI / 2, r = t * w * 0.45; c.lineTo(w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r); } c.stroke(); } });
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.4, 40), new THREE.MeshBasicMaterial({ map:swirl, transparent:true, side:THREE.DoubleSide, depthWrite:false, toneMapped:false })); disc.position.y = 1.7; g.add(disc);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.1, 0.18, 32), new THREE.MeshLambertMaterial({ color:C('#3b2a66') })); base.position.y = 0.09; g.add(base);
+  const glow = new THREE.Mesh(new THREE.RingGeometry(1.2, 2.0, 40), new THREE.MeshBasicMaterial({ color:0xb89cff, transparent:true, opacity:0.5, depthWrite:false, side:THREE.DoubleSide, toneMapped:false })); glow.rotation.x = -Math.PI / 2; glow.position.y = 0.2; g.add(glow);
+  g.userData = { disc, ring, glow }; return g;
+}
+const portal = portalMesh(); portal.position.set(PORTAL.x, PORTAL.y, PORTAL.z); portal.rotation.y = Math.atan2(W2.spawn.x - PORTAL.x, W2.spawn.z - PORTAL.z); scene.add(portal);
+const portalLbl = mkLabel('portal', 'Cổng về Quảng trường Lâm Viên');
+let portalArmed = false, leaving = false;
+function goHome(){
+  if (leaving) return; leaving = true; save();
+  $('fade').classList.add('on'); setTimeout(() => { location.href = 'index.html' + (location.search.includes('b64=1') ? '?b64=1' : ''); }, 650);
+}
+
+/* ===== Điểm check-in ===== */
+const CKS = W2.checkins.map(c => Object.assign({}, c, { lbl:null, post:null }));
+const signMat = new THREE.MeshLambertMaterial({ color:C('#c8f03c') }), postMat = new THREE.MeshLambertMaterial({ color:C('#2b2f3a') });
+CKS.forEach(c => {
+  const g = new THREE.Group(); const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), postMat); post.position.y = 1.1; g.add(post);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.08), signMat); board.position.y = 2.2; g.add(board);
+  g.position.set(c.x, c.y, c.z); scene.add(g); c.post = g; c.lbl = mkLabel('sign' + (S.cho.ck[c.id] ? ' done' : ''), (S.cho.ck[c.id] ? '✓ ' : '📷 ') + c.name);
+});
+let nearCk = null, cardKey = '';
+function cardShow(html, key){ if (cardKey === key) return; cardKey = key; const el = $('card'); el.innerHTML = html; el.hidden = !html; }
+function updateCard(){
+  if (QZ.cur) return;
+  if (nearCk){ const c = nearCk, done = !!S.cho.ck[c.id];
+    cardShow(`<h3>${c.name}</h3><p>${c.desc}</p><div class="row">${done ? '<button class="btn" disabled>Đã check-in ✓</button>' : '<button class="btn" data-act="ck">Check-in · +500 xu, +15 EXP</button>'}</div>`, 'ck:' + c.id + ':' + done); return; }
+  cardShow('', '');
+}
+$('card').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return; const a = b.dataset.act;
+  if (a === 'ck' && nearCk && !S.cho.ck[nearCk.id]){
+    S.cho.ck[nearCk.id] = 1; give({ coins:500, exp:15 }); floatText(nearCk.x, nearCk.y + 2.8, nearCk.z, '+500 xu', '#ffd84a');
+    nearCk.lbl.textContent = '✓ ' + nearCk.name; nearCk.lbl.classList.add('done');
+    const n = Object.keys(S.cho.ck).length; toast(`Check-in ${nearCk.name} (${n}/${CKS.length})`, 'gold');
+    if (n === CKS.length && !S.cho.allck){ S.cho.allck = 1; give({ gems:10 }); setTimeout(() => toast('Bạn đã check-in đủ các điểm ở Chợ Đà Lạt! +10 kim cương', 'gold'), 700); }
+    cardKey = '';
+  } else if (a === 'qa') qzAnswer(+b.dataset.k);
+  else if (a === 'qnext'){ QZ.cur = null; cardKey = ''; save(); }
+});
+
+/* ===== Thẻ Đố Vui giấu quanh chợ (dùng chung bộ câu hỏi và bộ sưu tập với Quảng trường) ===== */
+const DV_Q = [
+ ['Đà Lạt thường được gọi bằng biệt danh nào gắn với các loài hoa?', 'Xứ sở ngàn hoa', 'Xứ sở hoa anh đào', 'Thành phố hoa phượng đỏ', 'Đất võ trời văn'],
+ ['Loài cây nào thường xuất hiện trong hình ảnh những con đường và đồi núi Đà Lạt?', 'Cây thông', 'Cây dừa', 'Cây phượng', 'Cây bàng'],
+ ['Hồ nước nào nằm ngay khu vực trung tâm Đà Lạt?', 'Hồ Xuân Hương', 'Hồ Tuyền Lâm', 'Hồ Gươm', 'Hồ Than Thở'],
+ ['Quảng trường nổi tiếng nằm cạnh hồ Xuân Hương có tên gì?', 'Quảng trường Lâm Viên', 'Quảng trường Ba Đình', 'Quảng trường Lam Sơn', 'Quảng trường 2/4'],
+ ['Hai công trình tạo hình nổi bật tại Quảng trường Lâm Viên là gì?', 'Hoa dã quỳ và nụ hoa atisô', 'Hoa sen và búp măng', 'Hoa mai anh đào và trái dâu', 'Hoa hồng và quả thông'],
+ ['Chợ nổi tiếng ở trung tâm Đà Lạt có tên gì?', 'Chợ Đà Lạt', 'Chợ Bến Thành', 'Chợ Đông Ba', 'Chợ Hàn'],
+ ['Đà Lạt thuộc tỉnh nào của Việt Nam?', 'Lâm Đồng', 'Đắk Lắk', 'Khánh Hòa', 'Gia Lai'],
+ ['Đà Lạt nằm trên vùng địa hình nào?', 'Cao nguyên', 'Đồng bằng', 'Ven biển', 'Hải đảo'],
+ ['Đà Lạt nổi tiếng với kiểu khí hậu nào?', 'Khí hậu cao nguyên mát mẻ', 'Nhiệt đới nóng ẩm quanh năm', 'Sa mạc khô nóng', 'Hàn đới băng giá'],
+ ['Hiện tượng thời tiết nào thường tạo nên vẻ mờ ảo cho Đà Lạt vào sáng sớm?', 'Sương mù', 'Bão cát', 'Mưa đá', 'Tuyết rơi'],
+ ['Thức uống nóng nào du khách hay tìm uống vào buổi tối lạnh ở Đà Lạt?', 'Sữa đậu nành nóng', 'Nước mía', 'Trà đá', 'Nước dừa'],
+ ['Món ăn vặt nào thường được gọi vui là "pizza Đà Lạt"?', 'Bánh tráng nướng', 'Bánh xèo', 'Bánh căn', 'Bánh bèo'],
+ ['Loại quả màu đỏ, thường được hái tại vườn, là đặc sản nổi tiếng của Đà Lạt?', 'Dâu tây', 'Thanh long', 'Vải thiều', 'Chôm chôm'],
+ ['Loài hoa màu hồng thường nở rộ vào đầu năm và gắn liền với Đà Lạt?', 'Hoa mai anh đào', 'Hoa dã quỳ', 'Hoa sen', 'Hoa đào Nhật Tân'],
+ ['Loài hoa vàng thường nở vào cuối năm trên các tuyến đường cao nguyên?', 'Hoa dã quỳ', 'Hoa mai anh đào', 'Hoa phượng', 'Hoa sen'],
+ ['Khi du khách nói đến "đi chợ đêm", họ thường nhắc đến khu vực nào?', 'Chợ Đà Lạt và các phố lân cận', 'Khu vực hồ Tuyền Lâm', 'Khu vực đèo Prenn', 'Khu vực thác Datanla'],
+ ['Nhà thờ nổi tiếng nào ở Đà Lạt có hình con gà trên đỉnh tháp?', 'Nhà thờ Con Gà (Chính tòa Đà Lạt)', 'Nhà thờ Domaine de Marie', 'Nhà thờ Đức Bà Sài Gòn', 'Nhà thờ Lớn Hà Nội'],
+ ['Nhà ga cổ nổi tiếng của Đà Lạt có tên gì?', 'Ga Đà Lạt', 'Ga Hàng Cỏ', 'Ga Sài Gòn', 'Ga Huế'],
+ ['Đỉnh núi gắn với truyền thuyết tình yêu Lang và Biang là núi nào?', 'Langbiang', 'Núi Bà Đen', 'Fansipan', 'Núi Ngự Bình'],
+ ['Lễ hội lớn tôn vinh các loài hoa của Đà Lạt có tên là gì?', 'Festival Hoa Đà Lạt', 'Lễ hội Pháo hoa Quốc tế', 'Lễ hội Cà phê Buôn Ma Thuột', 'Festival Huế'],
+ ['Hồ nào nổi tiếng với cảnh rừng thông, du thuyền và không gian nghỉ dưỡng?', 'Hồ Tuyền Lâm', 'Hồ Ba Bể', 'Hồ Tây', 'Hồ Trị An'],
+ ['Thiền viện nổi tiếng nằm gần hồ Tuyền Lâm tên gì?', 'Thiền viện Trúc Lâm Đà Lạt', 'Chùa Linh Phước', 'Chùa Bái Đính', 'Chùa Thiên Mụ'],
+ ['Thác nước nào ở Đà Lạt nổi tiếng với hệ thống máng trượt xuyên rừng?', 'Thác Datanla', 'Thác Bản Giốc', 'Thác Pongour', 'Thác Cam Ly'],
+ ['Thác nước nào nằm trên tuyến đường đèo cửa ngõ phía Nam Đà Lạt?', 'Thác Prenn', 'Thác Cam Ly', 'Thác Bản Giốc', 'Thác Dray Nur'],
+ ['Thác nào mang tên một dòng suối gắn với Đà Lạt?', 'Thác Cam Ly', 'Thác Bản Giốc', 'Thác Dray Nur', 'Thác Pongour'],
+ ['Hồ nào mang tên gợi đến nỗi buồn và những câu chuyện tình yêu?', 'Hồ Than Thở', 'Hồ Tuyền Lâm', 'Hồ Gươm', 'Hồ Xuân Hương'],
+ ['Đồi nào gần hồ Than Thở nổi tiếng với câu chuyện về hai cây thông?', 'Đồi thông hai mộ', 'Đồi Robin', 'Đồi Đa Phú', 'Đồi chè Cầu Đất'],
+ ['Thung lũng du lịch nào nổi tiếng với chủ đề tình yêu và cảnh quan lãng mạn?', 'Thung lũng Tình Yêu', 'Thung lũng Mường Hoa', 'Thung lũng Mai Châu', 'Thung lũng Bắc Sơn'],
+ ['Ngọn đồi nào nổi tiếng với cảnh bình minh, mây và rừng thông tại Đà Lạt?', 'Đồi Đa Phú', 'Đồi Robin', 'Đồi thông hai mộ', 'Đồi cát Mũi Né'],
+ ['Địa điểm nào gắn với cụm từ "Cây thông cô đơn"?', 'Khu vực hồ Suối Vàng', 'Khu vực hồ Gươm', 'Khu vực chợ Đà Lạt', 'Khu vực Ga Đà Lạt'],
+ ['Hồ Đan Kia còn gắn với tên gọi phổ biến nào?', 'Hồ Suối Vàng', 'Hồ Than Thở', 'Hồ Tuyền Lâm', 'Hồ Xuân Hương'],
+ ['Ngọn đồi nào có tên rất lạ, từng nổi tiếng với thảm cỏ hồng gần khu Suối Vàng?', 'Đồi cỏ hồng', 'Đồi Robin', 'Đồi chè', 'Đồi cát bay'],
+ ['Đèo nổi tiếng dẫn vào Đà Lạt từ phía Nam có tên gì?', 'Đèo Prenn', 'Đèo Hải Vân', 'Đèo Mã Pí Lèng', 'Đèo Ô Quy Hồ'],
+ ['Con đèo trên tuyến đường Đà Lạt – Nha Trang thường được gọi bằng tên gì?', 'Đèo Khánh Lê (đèo Hòn Giao)', 'Đèo Hải Vân', 'Đèo Prenn', 'Đèo Cả'],
+ ['Ngôi chùa ở Trại Mát nổi tiếng với nhiều công trình khảm sành sứ là chùa nào?', 'Chùa Linh Phước', 'Thiền viện Trúc Lâm', 'Chùa Một Cột', 'Chùa Thiên Mụ'],
+ ['Chùa Linh Phước còn được nhiều người gọi bằng tên dân gian nào?', 'Chùa Ve Chai', 'Chùa Cầu', 'Chùa Hang', 'Chùa Vàng'],
+ ['Công trình nào ở Đà Lạt nổi tiếng với kiến trúc kỳ lạ như trong truyện cổ tích?', 'Biệt thự Hằng Nga (Crazy House)', 'Dinh Bảo Đại', 'Khách sạn Dalat Palace', 'Ga Đà Lạt'],
+ ['Hồ nước nào ở Đà Lạt được đặt theo tên một nữ thi sĩ nổi tiếng?', 'Hồ Xuân Hương', 'Hồ Than Thở', 'Hồ Tuyền Lâm', 'Hồ Đan Kia'],
+ ['Khu vực nào có Nhà thờ Con Gà, khu Hòa Bình và chợ Đà Lạt?', 'Khu trung tâm Đà Lạt', 'Khu Trại Mát', 'Khu Lạc Dương', 'Khu Tuyền Lâm'],
+ ['Địa điểm nào ở Đà Lạt có kiến trúc nhà ga cổ và đoàn tàu phục vụ du lịch?', 'Ga Đà Lạt', 'Ga Hà Nội', 'Ga Huế', 'Ga Đồng Hới'],
+ ['Loài hoa nào được trồng rất phổ biến trong các vườn hoa cắt cành ở Đà Lạt?', 'Hoa cúc', 'Hoa sen', 'Hoa súng', 'Hoa ban'],
+ ['Đà Lạt nổi tiếng với loại hoa nào thường được tặng trong dịp lễ tình nhân?', 'Hoa hồng', 'Hoa dã quỳ', 'Hoa súng', 'Hoa sen'],
+ ['Loài hoa có tên bắt đầu bằng chữ "cẩm", nhiều màu sắc, thường được trồng tại Đà Lạt?', 'Hoa cẩm tú cầu', 'Hoa cúc', 'Hoa hồng', 'Hoa ly'],
+ ['Loài hoa nào có tên giống đồng tiền dùng trong mua bán?', 'Hoa đồng tiền', 'Hoa mười giờ', 'Hoa ly', 'Hoa lay ơn'],
+ ['Một sản phẩm từ cây atisô thường được du khách mua làm quà là gì?', 'Trà atisô', 'Mứt gừng', 'Nước mắm', 'Bánh pía'],
+ ['Loại rau nào thường xuất hiện trong các món salad rau Đà Lạt?', 'Xà lách', 'Rau muống', 'Rau đay', 'Rau ngót'],
+ ['Loại củ màu cam nổi tiếng trong nông sản Đà Lạt là củ gì?', 'Cà rốt', 'Củ cải trắng', 'Củ dền', 'Khoai môn'],
+ ['Loại rau họ cải tạo thành những bông nhỏ, thường có màu xanh hoặc trắng?', 'Bông cải', 'Bắp cải', 'Su hào', 'Cải thìa'],
+ ['Món bánh mì chấm với chén xíu mại (thịt viên sốt) phổ biến vào buổi sáng ở Đà Lạt là món gì?', 'Bánh mì xíu mại', 'Bánh mì chảo', 'Bánh mì phá lấu', 'Bánh mì que'],
+ ['Loại mứt làm từ một loại quả mọng đỏ đặc trưng của Đà Lạt là gì?', 'Mứt dâu tây', 'Mứt gừng', 'Mứt dừa', 'Mứt me'],
+ ['Thức uống nào làm từ quả dâu tằm, thường được mua làm quà tại Đà Lạt?', 'Nước cốt dâu tằm', 'Nước mía', 'Nước dừa', 'Nước sâm'],
+ ['Món ăn nóng nào thường được nướng trên bếp than và ăn vào buổi tối se lạnh?', 'Khoai lang nướng', 'Gỏi cuốn', 'Chè đậu xanh', 'Nem chua'],
+ ['Làng hoa nào nằm trên tuyến đường Vạn Thành và nổi tiếng với nghề trồng hoa?', 'Làng hoa Vạn Thành', 'Làng hoa Thái Phiên', 'Làng hoa Hà Đông', 'Làng hoa Sa Đéc'],
+ ['Làng hoa nào nằm ở khu vực Trại Mát, gắn với nghề trồng hoa lâu đời?', 'Làng hoa Thái Phiên', 'Làng hoa Vạn Thành', 'Làng hoa Hà Đông', 'Làng hoa Sa Đéc'],
+ ['Làng hoa nào nổi tiếng ở khu vực gần Thung lũng Tình Yêu?', 'Làng hoa Hà Đông', 'Làng hoa Thái Phiên', 'Làng hoa Vạn Thành', 'Làng hoa Sa Đéc'],
+ ['Mùa hoa nào khiến những tuyến đường quanh Đà Lạt phủ sắc vàng khoảng tháng 10–12?', 'Mùa hoa dã quỳ', 'Mùa hoa mai anh đào', 'Mùa phượng tím', 'Mùa hoa bằng lăng'],
+ ['Tên gọi nào chỉ những vườn rau, hoa được trồng trong công trình có mái che ở Đà Lạt?', 'Nhà kính', 'Nhà sàn', 'Nhà rông', 'Nhà tranh'],
+ ['Nông sản nào ở Đà Lạt thường được trồng trên giá thể và thu hoạch theo chùm?', 'Cà chua', 'Bí đỏ', 'Khoai tây', 'Cà rốt'],
+ ['Bác sĩ, nhà thám hiểm nào đặt chân lên cao nguyên Lang Biang năm 1893?', 'Alexandre Yersin', 'Louis Pasteur', 'Paul Doumer', 'Ernest Hébrard'],
+ ['Ngày nào được ghi nhận là ngày Yersin đặt chân lên cao nguyên Lang Biang?', '21/6/1893', '20/4/1916', '2/9/1945', '1/1/1900'],
+ ['Yersin là nhà thám hiểm mang quốc tịch nào?', 'Thụy Sĩ, sau nhập quốc tịch Pháp', 'Anh', 'Đức', 'Bỉ'],
+ ['Năm 1916, triều đình nào ban hành dụ thành lập thị tứ Đà Lạt?', 'Nhà Nguyễn, thời vua Duy Tân', 'Nhà Nguyễn, thời vua Gia Long', 'Nhà Lê, thời vua Lê Thánh Tông', 'Nhà Trần'],
+ ['Đạo dụ thành lập thị tứ Đà Lạt được ban hành ngày nào?', '20/4/1916', '21/6/1893', '2/9/1945', '1/1/1923'],
+ ['Tên cao nguyên gắn liền với sự hình thành Đà Lạt là gì?', 'Cao nguyên Lâm Viên (Lang Biang)', 'Cao nguyên Mộc Châu', 'Cao nguyên Đồng Văn', 'Cao nguyên Pleiku'],
+ ['Những cộng đồng nào sinh sống trên cao nguyên Lâm Viên từ trước khi có đô thị Đà Lạt?', 'Người Lạch, Chil và Srê (dân tộc Cơ Ho)', 'Người Thái và người Mường', 'Người H\'Mông và người Dao', 'Người Chăm và người Raglai'],
+ ['Toàn quyền Đông Dương nào gắn với việc chọn vùng cao nguyên để xây nơi nghỉ dưỡng?', 'Paul Doumer', 'Ernest Hébrard', 'Alexandre Yersin', 'Louis Pasteur'],
+ ['Kiến trúc sư người Pháp nào hoàn thành đồ án quy hoạch Đà Lạt năm 1923?', 'Ernest Hébrard', 'Paul Doumer', 'Gustave Eiffel', 'Alexandre Yersin'],
+ ['Đồ án quy hoạch nổi tiếng của Ernest Hébrard hoàn thành năm nào?', 'Năm 1923', 'Năm 1893', 'Năm 1916', 'Năm 1945'],
+ ['Khách sạn lịch sử nổi tiếng nhìn về phía hồ Xuân Hương có tên là gì?', 'Dalat Palace', 'Continental Sài Gòn', 'Rex Sài Gòn', 'Sofitel Metropole Hà Nội'],
+ ['Dinh nào gắn với nơi nghỉ dưỡng, sinh hoạt của vua Bảo Đại và gia đình ở Đà Lạt?', 'Dinh III (Dinh Bảo Đại)', 'Dinh Độc Lập', 'Dinh Gia Long', 'Lăng Khải Định'],
+ ['Có bao nhiêu dinh thường được gọi là Dinh I, Dinh II và Dinh III tại Đà Lạt?', 'Ba dinh', 'Hai dinh', 'Bốn dinh', 'Năm dinh'],
+ ['Ga Đà Lạt xưa là điểm cuối của tuyến đường sắt nối từ đâu (thuộc Ninh Thuận cũ)?', 'Tháp Chàm', 'Phan Thiết', 'Nha Trang', 'Quy Nhơn'],
+ ['Loại đường sắt đặc biệt nào từng dùng trên đoạn dốc lớn của tuyến Tháp Chàm – Đà Lạt?', 'Đường sắt răng cưa', 'Tàu điện ngầm', 'Cáp treo', 'Đường sắt cao tốc'],
+ ['Nhà ga du lịch Đà Lạt hiện nay gắn với tuyến tàu ngắn đi đến khu vực nào?', 'Trại Mát', 'Hồ Tuyền Lâm', 'Langbiang', 'Tháp Chàm'],
+ ['Tên gọi "Ấp Ánh Sáng" ở Đà Lạt gắn với khu vực nào?', 'Khu dân cư gần hồ Xuân Hương và chợ Đà Lạt', 'Khu Trại Mát', 'Khu Tuyền Lâm', 'Khu Lạc Dương'],
+ ['Nhà thờ Domaine de Marie còn được gọi bằng tên nào?', 'Nhà thờ Mai Anh', 'Nhà thờ Con Gà', 'Nhà thờ Cam Ly', 'Nhà thờ Đức Bà'],
+ ['Công trình nào ở Đà Lạt được đặt tên theo nhà bác học Louis Pasteur?', 'Viện Pasteur Đà Lạt', 'Dinh III', 'Ga Đà Lạt', 'Khách sạn Dalat Palace'],
+ ['Trường học có kiến trúc cổ và tháp chuông ở Đà Lạt, mang tên một nhà khoa học, là trường nào?', 'Lycée Yersin (nay là CĐ Sư phạm Đà Lạt)', 'Trường Quốc Học Huế', 'Trường Chu Văn An', 'Trường Petrus Ký'],
+ ['Festival Hoa Đà Lạt lần đầu tiên được tổ chức vào năm nào?', 'Năm 2005', 'Năm 2000', 'Năm 2010', 'Năm 1995'],
+ ['Sự kiện hoa năm 2004 nào được xem là bước chuẩn bị cho Festival Hoa Đà Lạt?', 'Lễ hội Sắc hoa Đà Lạt', 'Lễ hội Trà', 'Ngày hội Cà phê', 'Lễ hội Đua voi'],
+ ['Festival Hoa Đà Lạt lần thứ II diễn ra năm nào?', 'Năm 2007', 'Năm 2006', 'Năm 2008', 'Năm 2010'],
+ ['Năm nào Đà Lạt được Thủ tướng Chính phủ công nhận là đô thị Festival Hoa?', 'Năm 2009', 'Năm 2005', 'Năm 2015', 'Năm 2019'],
+ ['Đà Lạt gia nhập Mạng lưới các Thành phố Sáng tạo UNESCO vào năm nào?', 'Năm 2023', 'Năm 2019', 'Năm 2021', 'Năm 2025'],
+ ['Đà Lạt gia nhập Mạng lưới các Thành phố Sáng tạo UNESCO trong lĩnh vực nào?', 'Âm nhạc', 'Ẩm thực', 'Thủ công mỹ nghệ', 'Văn học'],
+ ['Tên viết tắt tiếng Anh của Tổ chức Giáo dục, Khoa học và Văn hóa Liên Hợp Quốc là gì?', 'UNESCO', 'UNICEF', 'WHO', 'ASEAN'],
+ ['Tính từ năm Yersin đặt chân lên Lang Biang, năm 2026 đánh dấu bao nhiêu năm?', '133 năm', '123 năm', '110 năm', '143 năm'],
+ ['Tính từ đạo dụ thành lập thị tứ Đà Lạt năm 1916, năm 2026 là tròn bao nhiêu năm?', '110 năm', '100 năm', '103 năm', '133 năm'],
+ ['Festival Hoa Đà Lạt năm 2026 là kỳ tổ chức thứ mấy?', 'Lần thứ XI', 'Lần thứ IX', 'Lần thứ X', 'Lần thứ XII'],
+ ['Cây thuốc nổi tiếng có hình nụ hoa khổng lồ tại Quảng trường Lâm Viên là gì?', 'Atisô', 'Sâm Ngọc Linh', 'Đinh lăng', 'Bạc hà'],
+ ['Loài hoa nào làm hình tượng cho khối công trình màu vàng tại Quảng trường Lâm Viên?', 'Hoa dã quỳ', 'Hoa hồng', 'Hoa cúc', 'Hoa mai anh đào'],
+ ['Công trình hình nụ atisô và hoa dã quỳ nằm ở phía nào của hồ Xuân Hương?', 'Bờ Nam của hồ', 'Bờ Bắc của hồ', 'Bờ Đông của hồ', 'Giữa lòng hồ'],
+ ['Dòng suối nào được ngăn đập để tạo nên hồ nước trung tâm Đà Lạt?', 'Suối Cam Ly', 'Sông Đồng Nai', 'Sông Hương', 'Suối Vàng'],
+ ['Hồ Xuân Hương là hồ tự nhiên hoàn toàn hay hồ nhân tạo?', 'Hồ nhân tạo', 'Hồ tự nhiên hoàn toàn', 'Hồ miệng núi lửa', 'Một vịnh biển cũ'],
+ ['Tên gọi Trại Mát gắn liền với địa điểm tâm linh nổi tiếng nào?', 'Chùa Linh Phước', 'Thiền viện Trúc Lâm', 'Chùa Thiên Mụ', 'Chùa Bái Đính'],
+ ['Trong truyền thuyết địa phương, tên Langbiang gắn với hai nhân vật nào?', 'Chàng Lang và nàng Biang', 'Sơn Tinh và Thủy Tinh', 'Chử Đồng Tử và Tiên Dung', 'Lạc Long Quân và Âu Cơ'],
+ ['Địa danh nào mang tên "thung lũng" và gắn với biểu tượng tình yêu?', 'Thung lũng Tình Yêu', 'Thung lũng Mường Hoa', 'Thung lũng Mai Châu', 'Thung lũng Bắc Sơn'],
+ ['Nơi nào ở Đà Lạt nổi tiếng với một cây thông đứng riêng giữa cảnh quan hồ, đồi?', 'Cây thông cô đơn ở hồ Suối Vàng', 'Cây đa Tân Trào', 'Cây bàng vuông Trường Sa', 'Cây gạo Tây Bắc'],
+ ['Hai thế mạnh văn hóa nào tiêu biểu nhất để giới thiệu Đà Lạt với thế giới (UNESCO và lễ hội)?', 'Hoa và âm nhạc', 'Biển và đảo', 'Cà phê và lúa gạo', 'Hang động và núi đá']
+];;
+const DV_N = DV_Q.length, DV_DAILY = 10, QZ = { cards:[], cur:null, res:null, t:0 };
+function dvS(){ if (!S.dv || typeof S.dv !== 'object') S.dv = {}; const d = S.dv; if (!d.ok) d.ok = {}; const dk = (() => { const t = new Date(); return t.getFullYear() + '-' + (t.getMonth() + 1) + '-' + t.getDate(); })(); if (d.day !== dk){ d.day = dk; d.today = 0; } return d; }
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const cardTex = canvasTex(256, 340, (x, w, h) => { x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.fillStyle = '#c8f03c'; x.fillRect(12, 12, w - 24, h - 24); x.fillStyle = '#1d2a06'; x.font = '900 190px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', w / 2, h * 0.43); x.font = '800 34px sans-serif'; x.fillText('ĐỐ VUI', w / 2, h * 0.78); x.font = '700 26px sans-serif'; x.fillText('ĐÀ LẠT', w / 2, h * 0.89); });
+const cardGeo = new THREE.PlaneGeometry(0.46, 0.61), cardMat = new THREE.MeshLambertMaterial({ map:cardTex, side:THREE.DoubleSide });
+function qzSpot(){
+  for (let t = 0; t < 400; t++){
+    const x = rand(-120, 90), z = rand(-130, 100), g = groundAt(x, z); if (g !== g) continue;
+    let ok = true; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const h = groundAt(x + dx, z + dz); if (h !== h || Math.abs(h - g) > 0.2){ ok = false; break; } }
+    if (!ok || Math.hypot(x - P.x, z - P.z) < 18 || QZ.cards.some(c => Math.hypot(c.x - x, c.z - z) < 25)) continue;
+    return { x, z, y:g };
+  }
+  return null;
+}
+function qzSpawn(){ const p = qzSpot(); if (!p) return; const m = new THREE.Mesh(cardGeo, cardMat); m.position.set(p.x, p.y + 0.55, p.z); m.rotation.y = Math.random() * TAU; scene.add(m); QZ.cards.push(Object.assign(p, { m, ph:Math.random() * 6 })); }
+function qzOpen(){
+  const d = dvS(), fresh = []; for (let i = 0; i < DV_N; i++) if (!d.ok[i]) fresh.push(i);
+  const pool = fresh.length ? fresh : [...Array(DV_N).keys()], q = pool[(Math.random() * pool.length) | 0];
+  QZ.cur = { q, o:shuffle([0, 1, 2, 3]), a:-1 }; QZ.res = null; qzRender();
+}
+function qzRender(){
+  const c = QZ.cur, Q = DV_Q[c.q], n = Object.keys(dvS().ok).length;
+  let h = `<h3>Thẻ Đố Vui Đà Lạt</h3><p style="opacity:.8;margin-top:0">Đã biết ${n}/${DV_N} câu</p><p><b>${Q[0]}</b></p>`;
+  if (c.a < 0) h += c.o.map(k => `<button class="qopt" data-act="qa" data-k="${k}">${Q[1 + k]}</button>`).join('');
+  else h += (c.a === 0 ? `<p>Chính xác!${QZ.res ? ' Thưởng: ' + rewardText(QZ.res) : ''}</p>` : `<p>Chưa đúng. Đáp án: <b>${Q[1]}</b></p>`) + '<div class="row"><button class="btn" data-act="qnext">Tiếp tục khám phá</button></div>';
+  cardKey = 'qz:' + c.q + ':' + c.a; const el = $('card'); el.innerHTML = h; el.hidden = false;
+}
+function qzAnswer(k){
+  const c = QZ.cur; if (!c || c.a >= 0) return; const d = dvS(); c.a = k; d.today = (d.today || 0) + 1;
+  if (k === 0){ d.ok[c.q] = 1; QZ.res = d.today <= DV_DAILY ? { coins:800, exp:8 } : { coins:150, exp:3 }; give(QZ.res); } else { QZ.res = null; save(); }
+  qzRender();
+}
+let qzInit = false;
+function updateCards(dt){
+  if (!qzInit){ qzInit = true; for (let i = 0; i < 4; i++) qzSpawn(); }
+  for (let i = QZ.cards.length - 1; i >= 0; i--){
+    const c = QZ.cards[i]; c.ph += dt; c.m.position.y = c.y + 0.55 + Math.sin(c.ph * 1.3) * 0.05; c.m.rotation.y += dt * 0.35;
+    if (!QZ.cur && Math.hypot(P.x - c.x, P.z - c.z) < 1.5 && Math.abs(P.h - c.y) < 1.6){ scene.remove(c.m); QZ.cards.splice(i, 1); floatText(c.x, c.y + 1.8, c.z, 'Thẻ Đố Vui!', '#d7ff6b'); qzOpen(); }
+  }
+  if (QZ.cards.length < 4){ QZ.t += dt; if (QZ.t > (QZ.cards.length ? 45 : 2)){ QZ.t = 0; qzSpawn(); } } else QZ.t = 0;
+}
+
+/* ===== Điều khiển ===== */
+const J = { x:0, y:0 }; let jid = null, jc = null; const joy = $('joy'), knob = $('knob');
+function jmove(e){ const dx = e.clientX - jc.x, dy = e.clientY - jc.y, r = jc.r, d = Math.hypot(dx, dy), k = d > r ? r / d : 1; J.x = dx * k / r; J.y = dy * k / r; knob.style.transform = `translate(${dx * k}px,${dy * k}px)`; }
+joy.addEventListener('pointerdown', e => { jid = e.pointerId; try { joy.setPointerCapture(jid); } catch(_){} const r = joy.getBoundingClientRect(); jc = { x:r.left + r.width / 2, y:r.top + r.height / 2, r:r.width * 0.4 }; jmove(e); });
+joy.addEventListener('pointermove', e => { if (e.pointerId === jid) jmove(e); });
+const jend = e => { if (e.pointerId === jid){ jid = null; J.x = J.y = 0; knob.style.transform = ''; } };
+joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend);
+const keys = {}; addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; }); addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+let running = false; $('btnRun').addEventListener('click', () => { running = !running; $('btnRun').setAttribute('aria-pressed', running); });
+$('btnHome').addEventListener('click', () => { P.x = PORTAL.x + Math.sin(portal.rotation.y) * 4; P.z = PORTAL.z + Math.cos(portal.rotation.y) * 4; const g = groundAt(P.x, P.z); if (g === g){ P.h = g; P.y = g; } else { P.x = W2.spawn.x; P.z = W2.spawn.z; P.h = P.y = W2.spawn.y; } P.ang = portal.rotation.y + Math.PI; yaw = P.ang + Math.PI; toast('Đã về cạnh cổng dịch chuyển. Bước vào cổng để về Quảng trường.'); });
+let yaw = 0, pitch = 0.35, camDist = 8.5, ptr = null;
+cv.addEventListener('pointerdown', e => { ptr = { id:e.pointerId, x:e.clientX, y:e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch(_){} });
+cv.addEventListener('pointermove', e => { if (!ptr || e.pointerId !== ptr.id) return; yaw -= (e.clientX - ptr.x) * 0.006; pitch = clamp(pitch + (e.clientY - ptr.y) * 0.005, 0.05, 1.2); ptr.x = e.clientX; ptr.y = e.clientY; });
+const pend = e => { if (ptr && e.pointerId === ptr.id) ptr = null; }; cv.addEventListener('pointerup', pend); cv.addEventListener('pointercancel', pend);
+cv.addEventListener('wheel', e => { camDist = clamp(camDist + Math.sign(e.deltaY) * 0.8, 4, 18); }, { passive:true });
+
+/* ===== Camera: lùi lại sau nhân vật, không chui vào nhà ===== */
+const camPos = new THREE.Vector3(), camTgt = new THREE.Vector3();
+function desiredCam(out){
+  const hx = P.x, hy = P.y + 2.0, hz = P.z; let d = camDist;
+  const dx = Math.sin(yaw) * Math.cos(pitch), dy = Math.sin(pitch), dz = Math.cos(yaw) * Math.cos(pitch);
+  for (let t = 0.6; t <= camDist; t += 0.4){ const x = hx + dx * t, y = hy + dy * t, z = hz + dz * t; if (topAt(x, z) > y - 0.4){ d = Math.max(1.6, t - 0.5); break; } }
+  out.set(hx + dx * d, hy + dy * d, hz + dz * d); const g = topAt(out.x, out.z); if (out.y < g + 0.5) out.y = g + 0.5;
+}
+
+/* ===== Bản đồ nhỏ ===== */
+const mm = $('mm'), mg = mm.getContext('2d'); const mapImg = new Image(); mapImg.src = W2.map;
+function drawMini(){
+  const s = 1.6; mg.save(); mg.fillStyle = '#c9c2b5'; mg.fillRect(0, 0, 240, 240); mg.translate(120, 120); mg.rotate(yaw + Math.PI); mg.scale(s, s); mg.translate(-P.x, -P.z);
+  if (mapImg.complete) mg.drawImage(mapImg, GR.x0, GR.z0, GR.nx * GR.cs, GR.nz * GR.cs);
+  mg.fillStyle = '#8a5cf0'; mg.beginPath(); mg.arc(PORTAL.x, PORTAL.z, 4, 0, TAU); mg.fill();
+  CKS.forEach(c => { mg.fillStyle = S.cho.ck[c.id] ? '#9aa3ad' : '#c8f03c'; mg.strokeStyle = '#1d2a06'; mg.lineWidth = 0.8; mg.beginPath(); mg.arc(c.x, c.z, 3.2, 0, TAU); mg.fill(); mg.stroke(); });
+  mg.restore(); mg.fillStyle = '#ff4f3a'; mg.beginPath(); mg.moveTo(120, 108); mg.lineTo(128, 128); mg.lineTo(120, 123); mg.lineTo(112, 128); mg.closePath(); mg.fill();
+}
+
+/* ===== Ngày đêm theo giờ thật ===== */
+let nightK = -1; const glowMats = [];
+function dayNight(){
+  const t = new Date(), hr = t.getHours() + t.getMinutes() / 60;
+  const k = hr < 5 ? 0 : hr < 7 ? (hr - 5) / 2 : hr < 17.5 ? 1 : hr < 19 ? 1 - (hr - 17.5) / 1.5 : 0;
+  if (Math.abs(k - nightK) < 0.01) return; nightK = k;
+  sun.intensity = 0.15 + 1.0 * k; hemi.intensity = 0.28 + 0.27 * k; renderer.toneMappingExposure = 0.6 + 0.2 * k;
+  scene.background.setRGB(0.05 + 0.56 * k, 0.07 + 0.71 * k, 0.16 + 0.74 * k); scene.fog.color.copy(scene.background);
+  glowMats.forEach(m => { m.emissiveIntensity = (1 - k) * 1.2; });
+}
+
+/* ===== Tải bản đồ ===== */
+loadBin('market.glb', f => { $('loadPct').textContent = Math.min(99, Math.round(f * 100)) + '%'; }, 8.4e6).then(parseGlb).then(g => {
+  g.scene.traverse(o => {
+    if (!o.isMesh) return; const m = o.material, nm = (m.name || '').toLowerCase();
+    if ('metalness' in m){ m.metalness = 0; m.roughness = Math.max(m.roughness, 0.75); }
+    if (/window|lit|warm/.test(nm)){ m.emissive = m.color.clone(); m.emissiveIntensity = 0; glowMats.push(m); }
+    o.matrixAutoUpdate = false; o.updateMatrix();
+  });
+  scene.add(g.scene); $('loading').hidden = true;
+  if (!S.cho.seen){ S.cho.seen = 1; setTimeout(() => toast('Chào mừng tới Chợ Đà Lạt! Check-in 5 điểm nổi tiếng và săn thẻ Đố Vui giấu quanh chợ.', 'gold'), 600); save(); }
+  return Promise.all([loadBin('character.glb').then(parseGlb), loadImg('character.jpg')]).then(([c, img]) => {
+    const k = buildSkinned(c.scene, img); k.position.copy(playerMesh.position); k.rotation.y = playerMesh.rotation.y; k.scale.setScalar(1.06);
+    scene.remove(playerMesh); playerMesh = k; scene.add(k);
+    const o = OUTFITS.find(x => x.id === S.outfit) || OUTFITS[0]; if (k.userData.recolor) k.userData.recolor(o.id === 'blue' ? null : o.color);
+  }).catch(e => console.warn('nhân vật', e));
+}).catch(e => { console.error(e); $('loadMsg').textContent = 'Không tải được bản đồ Chợ Đà Lạt (' + e.message + '). Hãy tải lại trang.'; });
+
+/* ===== Vòng lặp ===== */
+let last = performance.now(), T = 0, dnT = 0;
+yaw = P.ang + Math.PI;
+function update(dt){
+  T += dt;
+  let ix = J.x + ((keys.d || keys.arrowright) ? 1 : 0) - ((keys.a || keys.arrowleft) ? 1 : 0), iz = J.y + ((keys.s || keys.arrowdown) ? 1 : 0) - ((keys.w || keys.arrowup) ? 1 : 0);
+  const mag = Math.min(1, Math.hypot(ix, iz)); P.moving = mag > 0.12 && !QZ.cur;
+  if (P.moving){
+    const sp = (running || keys.shift ? 9.5 : 5.2) * mag, a = Math.atan2(ix, iz) + yaw + Math.PI, wx = Math.sin(a), wz = Math.cos(a);
+    movePlayer(wx * sp * dt, wz * sp * dt); P.walk += dt * (running ? 15 : 9.5); P.ang = lerpAng(P.ang, Math.atan2(wx, wz), 1 - Math.pow(0.0001, dt));
+  }
+  const g = groundAt(P.x, P.z); if (g === g){ P.h = g; P.y += (g - P.y) * Math.min(1, dt * 18); }
+  playerMesh.position.set(P.x, P.y, P.z); playerMesh.rotation.y = P.ang; animPerson(playerMesh, P.walk, P.moving);
+  blob.position.set(P.x, P.y + 0.03, P.z);
+  /* cổng: phải bước ra xa một lần rồi mới kích hoạt, tránh vừa tới đã bị đẩy về */
+  const pd = Math.hypot(P.x - PORTAL.x, P.z - PORTAL.z);
+  if (pd > 4) portalArmed = true; if (portalArmed && pd < 1.3 && !leaving) goHome();
+  const u = portal.userData; u.disc.rotation.z -= dt * 1.6; u.glow.material.opacity = 0.35 + Math.sin(T * 3) * 0.15; u.ring.scale.setScalar(1 + Math.sin(T * 2) * 0.03);
+  nearCk = null; let bd = 3.6; CKS.forEach(c => { const d = Math.hypot(P.x - c.x, P.z - c.z); if (d < bd && Math.abs(P.h - c.y) < 2){ bd = d; nearCk = c; } });
+  updateCards(dt); updateCard();
+  for (let i = floats.length - 1; i >= 0; i--){ const f = floats[i]; f.life -= dt; f.y += dt * 0.8; f.el.style.opacity = Math.min(1, f.life); if (f.life <= 0){ f.el.remove(); floats.splice(i, 1); } }
+  dnT -= dt; if (dnT <= 0){ dnT = 20; dayNight(); }
+}
+function frame(t){
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  update(dt);
+  desiredCam(camTgt); camPos.lerp(camTgt, 1 - Math.pow(0.0005, dt)); camera.position.copy(camPos); camera.lookAt(P.x, P.y + 2.0, P.z);
+  sun.position.set(P.x - 60, 120, P.z + 40); sun.target.position.set(P.x, 0, P.z); sun.target.updateMatrixWorld();
+  renderer.render(scene, camera);
+  place(nameLbl, P.x, P.y + 2.05, P.z, 60); place(portalLbl, PORTAL.x, PORTAL.y + 3.6, PORTAL.z, 90);
+  CKS.forEach(c => place(c.lbl, c.x, c.y + 2.9, c.z, 70));
+  floats.forEach(f => place(f.el, f.x, f.y, f.z, 80));
+  drawMini();
+  requestAnimationFrame(frame);
+}
+desiredCam(camTgt); camPos.copy(camTgt);
+requestAnimationFrame(frame);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+addEventListener('pagehide', save);
+window.__cho = { P, S:() => S, groundAt, CKS, QZ, goHome, step:n => { for (let i = 0; i < n; i++) update(0.05); }, set:o => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, dist:v => { camDist = v; } };
+})();
+</script>

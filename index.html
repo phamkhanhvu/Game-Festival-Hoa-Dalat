@@ -2383,6 +2383,7 @@ function cartSpotOk(x, z){
     if (propHit(x + (dz > 1 ? dx * 0.3 : dx), z + dz, 0.2)) return 'Chỗ này bị vướng, hãy đẩy ra chỗ thoáng hơn.';
   }
   if (STALLS.some(s => s !== CART && Math.hypot(s.x - x, s.z - z) < 7)) return 'Quá sát quầy khác, đẩy xe ra xa thêm một chút.';
+  if (PORTAL && Math.hypot(PORTAL.x - x, PORTAL.z - z) < 7) return 'Quá sát cổng dịch chuyển, đẩy xe ra xa thêm một chút.';
   if (BRANDS.some(b => Math.hypot(b.x - x, b.z - z) < 6)) return 'Quá sát gian thương hiệu, đẩy xe ra xa thêm một chút.';
   if (cartHot(x, z)) return 'Khu trung tâm dành cho sân khấu và gian thương hiệu. Xe đẩy hàng rong hãy ra rìa quảng trường.';
   const sp = WORLD.spawn, path = NAV.path(sp.x, sp.z, x, z + 4.5);
@@ -2419,6 +2420,39 @@ function updateCart(dt){
   cartQ += dt; if (cartQ > 0.2){ cartQ = 0; cartBtn(); }
 }
 $('btnCart').addEventListener('click', e => { e.stopPropagation(); cartPush(); });
+/* ===== Cổng dịch chuyển sang map Chợ Đà Lạt – Khu Hòa Bình (trang cho.html, dùng chung tiến trình lưu trên máy) ===== */
+const PORTAL = WORLD.portal || null;
+const portalFx = { g:null, lbl:null, armed:false, going:false };
+if (PORTAL){
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.14, 12, 48), new THREE.MeshBasicMaterial({ color:0xb89cff, toneMapped:false })); ring.position.y = 1.7; g.add(ring);
+  const swirl = canvasTex(256, 256, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.35, 'rgba(184,156,255,.8)'); gr.addColorStop(1, 'rgba(70,30,160,.15)'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 6; for (let k = 0; k < 4; k++){ c.beginPath(); for (let t = 0; t < 1; t += 0.02){ const a = t * 5 + k * Math.PI / 2, r = t * w * 0.45; c.lineTo(w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r); } c.stroke(); } });
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.4, 40), new THREE.MeshBasicMaterial({ map:swirl, transparent:true, side:THREE.DoubleSide, depthWrite:false, toneMapped:false })); disc.position.y = 1.7; g.add(disc);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.1, 0.18, 32), lamb('#3b2a66')); base.position.y = 0.09; base.receiveShadow = true; g.add(base);
+  const glow = new THREE.Mesh(new THREE.RingGeometry(1.2, 2.0, 40), new THREE.MeshBasicMaterial({ color:0xb89cff, transparent:true, opacity:0.5, depthWrite:false, side:THREE.DoubleSide, toneMapped:false })); glow.rotation.x = -Math.PI / 2; glow.position.y = 0.2; g.add(glow);
+  g.position.set(PORTAL.x, PORTAL.y, PORTAL.z); g.rotation.y = Math.PI / 2;   /* mặt cổng quay về phía sân (hướng đông) */
+  g.userData = { disc, ring, glow }; scene.add(g); portalFx.g = g;
+  portalFx.lbl = mkLabel('tag', '<b>Cổng dịch chuyển</b><span class="s gold">Chợ Đà Lạt · Khu Hòa Bình</span>');
+}
+/* điểm đứng khi quay về từ Chợ: ngay trước mặt cổng */
+const portalFront = () => ({ x:PORTAL.x + 4, z:PORTAL.z });
+function portalGo(){
+  if (portalFx.going) return; portalFx.going = true;
+  const f0 = portalFront(); P.x = f0.x; P.z = f0.z; P.goto = null; S.player = f0; save();
+  let f = $('portalFade');
+  if (!f){ f = document.createElement('div'); f.id = 'portalFade'; f.style.cssText = 'position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#6a3cc4,#1a0b3a);color:#fff;font:800 1.6rem "Baloo 2",sans-serif;opacity:0;transition:opacity .6s'; f.textContent = 'Đang dịch chuyển tới Chợ Đà Lạt…'; document.body.appendChild(f); }
+  requestAnimationFrame(() => { f.style.opacity = '1'; });
+  setTimeout(() => { location.href = 'cho.html' + (/[?&]b64=1/.test(location.search) ? '?b64=1' : ''); }, 650);
+}
+function updatePortal(dt){
+  if (!portalFx.g) return;
+  const u = portalFx.g.userData; u.disc.rotation.z -= dt * 1.6; u.glow.material.opacity = 0.35 + Math.sin(T * 3) * 0.15; u.ring.scale.setScalar(1 + Math.sin(T * 2) * 0.03);
+  const d = Math.hypot(P.x - PORTAL.x, P.z - PORTAL.z);
+  if (d > 4) portalFx.armed = true;   /* phải bước ra xa cổng một lần rồi mới kích hoạt, tránh vừa quay về đã bị đưa đi */
+  if (portalFx.armed && d < 1.3 && !modalType && !S.cartPush) portalGo();
+}
+function placePortal(){ if (portalFx.lbl) place(portalFx.lbl, PORTAL.x, PORTAL.y + 3.7, PORTAL.z, 90); }
 
 /* ================= Hành động quầy ================= */
 let nearId = null, T = 0, ctxKey = '', nearSeller = false;
@@ -2653,7 +2687,7 @@ function update(dt){
   applyDayNight(); nightLights(dt);
   updateEvents();
   updateTraffic(dt);
-  updateWeather(dt); updateItems(dt); updateDv(dt); updateCart(dt);
+  updateWeather(dt); updateItems(dt); updateDv(dt); updateCart(dt); updatePortal(dt);
   S.onlineAcc += dt;
   for (const f of floats){ f.y += dt * 1.1; f.life -= dt; }
   while (floats.length && floats[0].life <= 0) floats.shift().el.remove();
@@ -2688,7 +2722,7 @@ function placeLabels(){
   } else if (bangLbl.style.display !== 'none') bangLbl.style.display = 'none';
   for (const p of people){ if (p.seller && p.lbl) place(p.lbl, p.x, p.y + 2.5, p.z, 45); }
   place(nameLbl, P.x, P.y + 2.05, P.z, 60);
-  placeOnline();
+  placeOnline(); placePortal();
   for (const f of floats){ if (place(f.el, f.x, f.y, f.z, 70)) f.el.style.opacity = clamp(f.life, 0, 1); }
 }
 const MAPIMG = new Image(); MAPIMG.src = WORLD.map;
@@ -2701,7 +2735,7 @@ function drawMinimap(){
   if (WORLD.stage){ const t = WORLD.stage; g.fillStyle = '#b0246a'; g.fillRect(t.x - t.w / 2, t.z - t.d / 2, t.w, t.d); }
   BRANDS.forEach(b => { g.fillStyle = b.sponsor ? '#2f6fc0' : BOWN[b.id] && BOWN[b.id].uid === myUid() ? '#c8f03c' : b.T.color; g.strokeStyle = '#10243f'; g.lineWidth = 0.6; g.fillRect(b.x - 2.6, b.z - 2, 5.2, 4); g.strokeRect(b.x - 2.6, b.z - 2, 5.2, 4); });
   STALLS.forEach(d => { g.fillStyle = st(d.id).owned ? '#ffc83d' : '#8d8a85'; g.strokeStyle = '#3a2a10'; g.lineWidth = 0.7; g.fillRect(d.x - 3, d.z - 3, 6, 6); g.strokeRect(d.x - 3, d.z - 3, 6, 6); });
-  items.forEach(it => { if (Math.abs(it.x - P.x) > 90 || Math.abs(it.z - P.z) > 90) return; g.fillStyle = ITEM_DEF[it.type].color; g.strokeStyle = '#1d2c45'; g.lineWidth = 0.5; g.beginPath(); g.arc(it.x, it.z, it.type === 'tem' || it.type === 'qua' ? 2.8 : 2.1, 0, TAU); g.fill(); g.stroke(); }); dvMini(g);
+  items.forEach(it => { if (Math.abs(it.x - P.x) > 90 || Math.abs(it.z - P.z) > 90) return; g.fillStyle = ITEM_DEF[it.type].color; g.strokeStyle = '#1d2c45'; g.lineWidth = 0.5; g.beginPath(); g.arc(it.x, it.z, it.type === 'tem' || it.type === 'qua' ? 2.8 : 2.1, 0, TAU); g.fill(); g.stroke(); }); dvMini(g); if (PORTAL){ g.fillStyle = '#8a5cf0'; g.strokeStyle = '#fff'; g.lineWidth = 0.8; g.beginPath(); g.arc(PORTAL.x, PORTAL.z, 3.4, 0, TAU); g.fill(); g.stroke(); }
   const hq = curHunt();
   if (hq && huntP(hq) < hq.goal){
     const want = hq.type === 'open' ? 'qua' : hq.type; let best = null, bd = 1e9;
