@@ -2938,7 +2938,26 @@ function decorVehicle(key, len, z, y, dir, speed, x0){
   g.scale.setScalar(len / p.len); g.position.set(x0, y, z); g.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
   scene.add(g); DECOR.traffic.push({ g, dir, speed });
 }
+/* xe chạy theo tuyến phố (map Chợ): mỗi tuyến là đường gấp khúc trên mặt đường; xe đi bên phải, hết tuyến thì quay đầu sang làn ngược lại; vòng xoay bùng binh chạy vòng mãi */
+const ROUTES = (WORLD.routes || []).map(r => { const p = r.pts.map(a => ({ x:a[0], z:a[1], y:a[2] })); if (r.loop) p.push(p[0]); const cum = [0]; for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i].x - p[i - 1].x, p[i].z - p[i - 1].z)); return Object.assign({}, r, { p, cum, L:cum[cum.length - 1] }); });
+const ROUTE_CARS = ['car_sedan', 'car_taxi', 'car_hatch', 'car_suv', 'car_van'];
+const ROUTE_VEH = [];
+ROUTES.forEach((r, ri) => { const n = r.cars + r.motos; for (let k = 0; k < n; k++){ const moto = k >= r.cars; ROUTE_VEH.push({ key:moto ? 'moto' : ROUTE_CARS[(ri + k) % ROUTE_CARS.length], len:moto ? 1.9 : 4.4, r, s:r.L * ((k * 0.618) % 1), dir:r.loop ? 1 : (k % 2 ? 1 : -1), sp:r.speed * (moto ? 1.15 : 1), lane:moto ? 2.6 : 1.4, g:null }); } });
+function routeAt(r, s, out){
+  let i = 1; while (i < r.cum.length - 1 && r.cum[i] < s) i++;
+  const a = r.p[i - 1], b = r.p[i], seg = r.cum[i] - r.cum[i - 1] || 1, t = Math.min(1, Math.max(0, (s - r.cum[i - 1]) / seg));
+  out.x = a.x + (b.x - a.x) * t; out.z = a.z + (b.z - a.z) * t; out.y = a.y + (b.y - a.y) * t; out.hx = (b.x - a.x) / seg; out.hz = (b.z - a.z) / seg; return out;
+}
+const RT_TMP = {};
+function updateRouteVeh(v, dt){
+  const r = v.r; v.s += v.sp * v.dir * dt;
+  if (r.loop){ v.s = ((v.s % r.L) + r.L) % r.L; } else if (v.s > r.L){ v.s = r.L; v.dir = -1; } else if (v.s < 0){ v.s = 0; v.dir = 1; }
+  const q = routeAt(r, v.s, RT_TMP), hx = q.hx * v.dir, hz = q.hz * v.dir;
+  /* làn bên phải theo hướng chạy */
+  v.g.position.set(q.x - hz * v.lane, q.y + 0.02, q.z + hx * v.lane); v.g.rotation.y = Math.atan2(hx, hz);
+}
 function updateTraffic(dt){
+  for (const v of ROUTE_VEH) if (v.g) updateRouteVeh(v, dt);
   for (const t of DECOR.traffic){ const g = t.g; g.position.x += t.dir * t.speed * dt; if (g.position.x > TRAFFIC_X1) g.position.x = TRAFFIC_X0; else if (g.position.x < TRAFFIC_X0) g.position.x = TRAFFIC_X1; const hy = hAt(g.position.x, g.position.z); if (hy > -50) g.position.y = hy; }
 }
 /* xe chạy trên đường Trần Quốc Toản trước quảng trường: [mô hình, dài, z làn, y, hướng, tốc độ, x ban đầu]; chạy bên phải */
@@ -2951,7 +2970,7 @@ const TRAFFIC = (WORLD.lanes || []).length ? [
 ] : [];
 function loadDecor(){
   if (!THREE.GLTFLoader) return Promise.reject(new Error('thiếu GLTFLoader'));
-  const low = S.gfx === 'low', treeKeys = [...new Set(WORLD.trees.map(t => t.k))], dotKeys = Object.keys(WORLD.flowers), tk = [...new Set(TRAFFIC.map(t => t[0]))];
+  const low = S.gfx === 'low', treeKeys = [...new Set(WORLD.trees.map(t => t.k))], dotKeys = Object.keys(WORLD.flowers), tk = [...new Set(TRAFFIC.map(t => t[0]).concat(ROUTE_VEH.map(v => v.key)))];
   return fetch('decor.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(pack =>
     [...treeKeys, ...dotKeys, 'lamp', ...tk].reduce((q, k) => q.then(() => decorParse(pack, k)), Promise.resolve())
   ).then(() => {
@@ -2959,6 +2978,7 @@ function loadDecor(){
     dotKeys.forEach(k => { let list = WORLD.flowers[k]; if (low) list = list.filter((_, i) => i % 2 === 0); if (list.length) decorPlace(k, list, {}); });
     decorPlace('lamp', WORLD.lamps.map(l => [l.x, l.y, l.z, 0, 5.6]), { shadow:true });
     TRAFFIC.forEach((t, i) => { if (!low || i % 2 === 0) decorVehicle(...t); });
+    ROUTE_VEH.forEach((v, i) => { if (low && i % 2) return; const p = DECOR.protos[v.key]; if (!p) return; const g = new THREE.Group(); p.parts.forEach(pt => g.add(new THREE.Mesh(pt.g, pt.m))); g.scale.setScalar(v.len / p.len); scene.add(g); v.g = g; updateRouteVeh(v, 0); });
   });
 }
 /* ================= HUD ================= */
@@ -3275,7 +3295,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
