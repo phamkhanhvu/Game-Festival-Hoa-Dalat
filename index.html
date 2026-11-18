@@ -476,8 +476,8 @@ const STALLS = [
 ];
 const byId = {}; STALLS.forEach(d => byId[d.id] = d);
 /* vị trí quầy lấy từ dữ liệu thế giới (đã kiểm tra: nền phẳng, thoáng, đi tới được) */
-/* xe đẩy không có chỗ cố định: mặc định đỗ giữa sân dưới, sau đó ở chỗ người chơi đỗ lần cuối */
-const CART_HOME = { x:112, z:-37 };
+/* xe đẩy không có chỗ cố định: mặc định đỗ ở rìa phía tây sân dưới, sau đó ở chỗ người chơi đỗ lần cuối */
+const CART_HOME = { x:50, z:-44 };
 STALLS.forEach(d => { const w = WORLD.stalls[d.id] || Object.assign({ y:Math.max(0, hAt(CART_HOME.x, CART_HOME.z)) }, CART_HOME); d.x = w.x; d.z = w.z; d.y = w.y; });
 const OUTFITS = [
   { id:'blue',   name:'Áo khoác đỏ gạch', color:'#9e3d33', price:0 },
@@ -1769,7 +1769,8 @@ function setPath(p, path){ if (!path || !path.length) return false; p.path = pat
 function pickWaypoint(p){ setPath(p, NAV.wander(p.x, p.z, 8, 22, false)); }
 function slot(d, i){ return { x:d.x + (i === 0 ? 0 : (i % 2 ? 0.35 : -0.35)), z:d.z + 1.75 + i * 0.95 }; }
 /* cửa hầm gần nhất (hai cửa hầm ở hai bên chân cầu thang lớn) */
-function nearDoor(x, z){ let best = null, bd = 1e9; (WORLD.doors || []).forEach(d => { const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd){ bd = dd; best = d; } }); return best; }
+/* cửa hầm chỉ dùng cho quầy trong bán kính 55: quầy ở rìa quảng trường thì khách đi bộ tới từ khu xung quanh */
+function nearDoor(x, z, far){ let best = null, bd = far ? 1e9 : 55; (WORLD.doors || []).forEach(d => { const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd){ bd = dd; best = d; } }); return best; }
 function setExit(p){
   p.state = 'exit'; p.sp *= 1.1;
   /* khách ra về: đi vào cửa hầm gần nhất rồi khuất; không tìm được đường thì đi dạo ra xa như cũ */
@@ -2364,6 +2365,10 @@ function dvAct(a, id){
    Xe đẩy là một quầy di động: bấm Đẩy xe để đẩy đi, tới chỗ đông người thì bấm Đỗ xe; khách chỉ ghé khi xe đang đỗ. */
 const CART = byId.xeday;
 let cartQ = 0;
+/* khu trung tâm sân dưới (sân khấu, gian thương hiệu, lối vào) không cho đỗ xe hàng rong */
+const cartHot = (x, z) => x > 54 && x < 180 && z > -76 && z < -21 && hAt(x, z) < 1.5;
+/* xe đỗ sai chỗ (ví dụ lưu từ bản cũ ở giữa sân) thì về chỗ mặc định ở rìa phía tây */
+if (cartHot(CART.x, CART.z)){ CART.x = CART_HOME.x; CART.z = CART_HOME.z; CART.y = Math.max(0, hAt(CART.x, CART.z)); if (S.cart) S.cart = { x:CART.x, z:CART.z }; }
 function cartSet(x, z, ang){
   const d = CART, gy = hAt(x, z); d.x = x; d.z = z; d.y = gy > -50 ? gy : 0;
   const rt = RT[d.id];
@@ -2379,7 +2384,8 @@ function cartSpotOk(x, z){
   }
   if (STALLS.some(s => s !== CART && Math.hypot(s.x - x, s.z - z) < 7)) return 'Quá sát quầy khác, đẩy xe ra xa thêm một chút.';
   if (BRANDS.some(b => Math.hypot(b.x - x, b.z - z) < 6)) return 'Quá sát gian thương hiệu, đẩy xe ra xa thêm một chút.';
-  const dr = nearDoor(x, z), path = dr ? NAV.path(dr.x, dr.z, x, z + 4.5) : null;
+  if (cartHot(x, z)) return 'Khu trung tâm dành cho sân khấu và gian thương hiệu. Xe đẩy hàng rong hãy ra rìa quảng trường.';
+  const sp = WORLD.spawn, path = NAV.path(sp.x, sp.z, x, z + 4.5);
   if (!path || !path.length) return 'Khách không đi tới được chỗ này.';
   return '';
 }
