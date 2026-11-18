@@ -378,7 +378,7 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
   <div class="toasts" id="toasts"></div>
   <div class="flash" id="flash"></div>
 
-  <div class="rotate" id="loading" style="top:38%"><p style="margin:0">Đang tải Quảng trường Lâm Viên… <b id="loadPct">0%</b></p></div>
+  <div class="rotate" id="loading" style="top:38%"><p style="margin:0"><span id="loadName">Đang tải Quảng trường Lâm Viên…</span> <b id="loadPct">0%</b></p></div>
   <div class="rotate" id="rotate" hidden>
     <p>Xoay ngang điện thoại để nhìn rộng quảng trường hơn.</p>
     <button class="gbtn" id="rotateOk">Chơi luôn</button>
@@ -403,11 +403,13 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="world.js"></script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
+const MAP = window.MAP_ID || 'lv';   /* lv: Quảng trường Lâm Viên · cho: Chợ Đà Lạt – Khu Hòa Bình */
+if (MAP === 'cho'){ document.title = 'Chợ Đà Lạt · Quầy Hàng Đà Lạt'; const ln = $('loadName'); if (ln) ln.textContent = 'Đang tải Chợ Đà Lạt – Khu Hòa Bình…'; }
 const TAU = Math.PI * 2;
 const fmt = n => Math.floor(n).toLocaleString('en-US');
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -461,7 +463,13 @@ if (!window.THREE){ fatal('Không tải được thư viện 3D. Hãy kiểm tra
 const THREE = window.THREE;
 
 /* ================= Dữ liệu ================= */
-const STALLS = [
+const STALLS_ALL = [
+  { id:'c_kembo', map:'cho', name:'Kem Bơ Đà Lạt', short:'KEM BƠ', nv:'07', cost:1000, lv:1, price:100, ing:30, serve:2.4, xp:4, umb:['#7dbb3c','#fff4e6'], sign:'#4f7a1f', vendor:'#5f8f3e' },
+  { id:'c_hoa', map:'cho', name:'Sạp Hoa Tươi', short:'HOA TƯƠI', nv:'06', cost:6000, lv:3, price:110, ing:30, serve:2.4, xp:4, umb:['#e86aa6','#fff4e6'], sign:'#a23a6e', vendor:'#d977a0' },
+  { id:'c_nuong', map:'cho', name:'Xiên Nướng Chợ Đêm', short:'XIÊN NƯỚNG', nv:'10', cost:10000, lv:4, price:130, ing:40, serve:2.8, xp:5, umb:['#e2382f','#3a2a1e'], sign:'#8a2a14', vendor:'#c97a2a', night:true },
+  { id:'c_atiso', map:'cho', name:'Trà Atisô', short:'TRÀ ATISÔ', nv:'08', cost:18000, lv:5, price:220, ing:70, serve:3.0, xp:6, umb:['#3f9a62','#fff4e6'], sign:'#2e6b4a', vendor:'#4f9a6e' },
+  { id:'c_len', map:'cho', name:'Áo Len Đà Lạt', short:'ÁO LEN', nv:'09', cost:25000, lv:6, price:300, ing:110, serve:3.2, xp:7, umb:['#7a55c0','#fff4e6'], sign:'#4a2f80', vendor:'#7a55c0' },
+  { id:'c_mut', map:'cho', name:'Mứt Chợ Đà Lạt', short:'MỨT ĐÀ LẠT', nv:'03', cost:50000, lv:8, price:450, ing:180, serve:2.8, xp:9, umb:['#d9a322','#fff4e6'], sign:'#8a5a0e', vendor:'#c97a2a' },
   { id:'xeday', name:'Xe Đẩy Khoai Nướng', short:'KHOAI NƯỚNG', nv:'10', cost:0, lv:1, price:55, ing:15, serve:2.2, xp:3, umb:['#e8902f','#fff4e6'], sign:'#8a4a12', vendor:'#c97a2a', cart:true },
   { id:'khoai',     name:'Hoa Đà Lạt',       short:'HOA ĐÀ LẠT', nv:'07', x:-24, z:49, cost:5000,  lv:3, price:90,  ing:25,  serve:2.3, xp:3, umb:['#e86aa6','#fff4e6'], sign:'#a23a6e', vendor:'#5f8f3e' },
   { id:'banhtrang', name:'Bánh Tráng Nướng', short:'BÁNH TRÁNG', nv:'10', x:-8,  z:49, cost:1000,  lv:1, price:120, ing:40,  serve:3.0, xp:4, umb:['#e2382f','#fff4e6'], sign:'#a8261f', vendor:'#e2453b' },
@@ -474,6 +482,8 @@ const STALLS = [
   { id:'rong',  name:'Rượu Vang Đà Lạt', short:'RƯỢU VANG',   nv:'03', x:0,   z:-42, cost:90000, lv:11, price:700, ing:260, serve:3.2, xp:12, umb:['#7b1e3a','#f7e7c6'], sign:'#4a0f22', vendor:'#8b2a45' },
   { id:'tra',   name:'Trà Hoa Cao Cấp',  short:'TRÀ HOA',     nv:'04', x:36,  z:-42, cost:75000, lv:10, price:600, ing:220, serve:3.0, xp:11, umb:['#6fb58a','#fff4e6'], sign:'#2e6b4a', vendor:'#4f9a6e' },
 ];
+/* mỗi map có các quầy riêng; tiến trình lưu đủ quầy của mọi map */
+const STALLS = STALLS_ALL.filter(d => (d.map || 'lv') === MAP);
 const byId = {}; STALLS.forEach(d => byId[d.id] = d);
 /* vị trí quầy lấy từ dữ liệu thế giới (đã kiểm tra: nền phẳng, thoáng, đi tới được) */
 /* xe đẩy không có chỗ cố định: mặc định đỗ ở rìa phía tây sân dưới, sau đó ở chỗ người chơi đỗ lần cuối */
@@ -491,7 +501,7 @@ const PANTS = ['#2b2f3a','#3d4f7a','#5a4636','#20242c','#6b6f78','#34435e'];
 const HAIRS = ['#1f1a17','#2b1d14','#3a2a1e','#141414'];
 
 function freshState(){
-  const stalls = {}; STALLS.forEach(d => stalls[d.id] = { owned:!!d.cart, level:1, stock:d.cart ? 20 : 0 });
+  const stalls = {}; STALLS_ALL.forEach(d => stalls[d.id] = { owned:!!d.cart, level:1, stock:d.cart ? 20 : 0 });
   return { v:5, name:'Chủ Quầy', level:1, exp:0, coins:2000, gems:20, sold:0,
     stats:{ earned:0, restocks:0, missed:0, jackpots:0, served:0, photos:0, bulk:0 },
     stalls, quest:0, flags:{}, brands:{}, stage:{}, achv:{}, outfit:'blue', outfits:['blue'], order:null, nextOrder:0, quiz:{},
@@ -505,7 +515,7 @@ function normalize(s){
   m.flags = m.flags || {}; m.brands = m.brands || {}; m.stage = m.stage || {}; m.achv = m.achv || {}; m.hunts = m.hunts || {}; m.quiz = m.quiz || {};
   m.inv = Object.assign(freshState().inv, s.inv || {}); m.found = Object.assign(freshState().found, s.found || {});
   m.stamps = Array.isArray(s.stamps) && s.stamps.length === 8 ? s.stamps : freshState().stamps;
-  STALLS.forEach(d => { if (!m.stalls[d.id]) m.stalls[d.id] = { owned:!!d.cart, level:1, stock:d.cart ? 20 : 0 }; });
+  STALLS_ALL.forEach(d => { if (!m.stalls[d.id]) m.stalls[d.id] = { owned:!!d.cart, level:1, stock:d.cart ? 20 : 0 }; });
   if (!m.player || typeof m.player.z !== 'number' || m.v !== 5 || hAt(m.player.x, m.player.z) < -50) m.player = { x:SPAWN.x, z:SPAWN.z };
   m.v = 5;
   return m;
@@ -520,8 +530,10 @@ function load(){
 }
 const LOCAL_HAD_SAVE = (() => { try { return !!localStorage.getItem(SAVE_KEY); } catch(e){ return false; } })();
 let S = load();
+/* vị trí lưu theo từng map */
+{ const pp = (S.pos && S.pos[MAP]) || (MAP === 'lv' ? S.player : null); S.player = pp && hAt(pp.x, pp.z) > -50 ? { x:pp.x, z:pp.z } : { x:SPAWN.x, z:SPAWN.z }; }
 S.cartPush = false;
-if (S.cart && typeof S.cart.x === 'number' && hAt(S.cart.x, S.cart.z) > -50){ const d = byId.xeday; d.x = S.cart.x; d.z = S.cart.z; d.y = Math.max(0, hAt(d.x, d.z)); }
+if (byId.xeday && S.cart && typeof S.cart.x === 'number' && hAt(S.cart.x, S.cart.z) > -50){ const d = byId.xeday; d.x = S.cart.x; d.z = S.cart.z; d.y = Math.max(0, hAt(d.x, d.z)); }
 const P = { x:S.player.x, z:S.player.z, y:0, h:Math.max(0, hAt(S.player.x, S.player.z)), j:0, vy:0, ang:Math.PI, walk:0, moving:false, sta:100, goto:null, stuck:0 };
 /* ===== Lưu theo tài khoản Claude (người chơi đăng nhập claude.ai) ===== */
 const CLOUD = { ref:null, lastKey:'', pushing:false, dirty:false, adopting:false, status:'Đang kết nối tài khoản…' };
@@ -707,7 +719,7 @@ function cloudPush(){
 }
 function save(){
   if (CLOUD.adopting) return;
-  try { S.savedAt = now(); S.player = { x:P.x, z:P.z }; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
+  try { S.savedAt = now(); S.player = { x:P.x, z:P.z }; S.pos = S.pos || {}; S.pos[MAP] = S.player; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
   cloudPush(); boardPush();
 }
 try { const hot = window.claude && window.claude.hot; if (hot && hot.snapshot) hot.snapshot(() => { S.player = { x:P.x, z:P.z }; return { S }; }); } catch(e){}
@@ -785,7 +797,7 @@ function rewardText(r){ const a = []; if (r.coins) a.push(fmt(r.coins) + ' xu');
 /* ================= Nhiệm vụ & thành tựu ================= */
 const owned = id => st(id).owned ? 1 : 0;
 const EXPLORE = { x:WORLD.explore.x, z:WORLD.explore.z };
-function stallT(id){ const d = byId[id]; return { x:d.x, z:d.z, stall:id }; }
+function stallT(id){ const d = byId[id]; return d ? { x:d.x, z:d.z, stall:id } : null; }
 function firstOwnedT(){ const d = STALLS.find(d => st(d.id).owned); return d ? stallT(d.id) : null; }
 const QUESTS = [
   { t:'Bán 10 phần khoai nướng ở xe đẩy', goal:10, p:() => S.stats.cartSold || 0, tgt:() => stallT('xeday'), hint:'Hành trình từ xe đẩy thành thương hiệu Đà Lạt bắt đầu ở đây. Đứng cạnh xe đẩy, khách sẽ ghé mua.', r:{ coins:600, exp:15 } },
@@ -914,7 +926,8 @@ const RAIN = (() => { const n = 500, a = new Float32Array(n * 3); for (let i = 0
 let wanderAcc = 0;
 function rainScatter(){ people.filter(p => p.state === 'wander' && !p.seller).forEach((p, i) => { if (i % 5 < 3) setExit(p); }); }
 function wanderFromDoor(){
-  const ds = WORLD.doors || []; if (!ds.length) return;
+  const ds = WORLD.doors || [];
+  if (!ds.length){ const sp = randomSpot('low'); if (Math.hypot(sp.x - P.x, sp.z - P.z) < 25) return; const p = makePerson('wander'); p.zone = 'low'; placePerson(p, sp); people.push(p); return; }   /* map không có cửa hầm: người đi dạo xuất hiện ở chỗ xa người chơi */
   const d = pick(ds), p = makePerson('wander'); p.zone = Math.random() < 0.6 ? 'low' : 'up';
   placePerson(p, { x:d.x + rand(-0.6, 0.6), z:d.z }); if (!setPath(p, NAV.wander(p.x, p.z, 8, 22, false))) pickWaypoint(p); people.push(p);
 }
@@ -1096,7 +1109,7 @@ function upgradePlayerSkinned(sc, img){
 }
 function loadModel(){
   const el = $('loading'), pct = $('loadPct');
-  loadBin('model.glb', f => { pct.textContent = Math.min(99, Math.round(f * 100)) + '%'; }, 4.7e6).then(parseGlb).then(g => {
+  loadBin(MAP === 'cho' ? 'market.glb' : 'model.glb', f => { pct.textContent = Math.min(99, Math.round(f * 100)) + '%'; }, MAP === 'cho' ? 8.4e6 : 4.7e6).then(parseGlb).then(g => {
     model = g.scene;
     model.traverse(o => {
       if (!o.isMesh) return; const m = o.material, nm = m.name || '';
@@ -1157,7 +1170,7 @@ if (festOn()){ WORLD.pots.forEach(t => PROPS.push({ x:t.x, z:t.z, r:0.6 })); [-2
 const RECTP = [];                      /* vật cản hình chữ nhật: sân khấu chính, gian trưng bày */
 if (WORLD.stage){ const t = WORLD.stage; RECTP.push({ x0:t.x - t.w / 2, x1:t.x + t.w / 2, z0:t.z - t.d / 2, z1:t.z + t.d / 2 }, { x0:t.x - t.w / 2 - 1.5, x1:t.x + t.w / 2 + 1.5, z0:t.z + t.d / 2 - 1.1, z1:t.z + t.d / 2 - 0.1 }); }
 /* gian thương hiệu chỉ dựng khi có sự kiện; gian hàng trước lối vào quay cửa về phía bắc (về sân khấu) */
-if (CUR_EVENT) (WORLD.booths || []).forEach(b => { const n = b.z > -45; RECTP.push({ x0:b.x - 2.7, x1:b.x + 2.7, z0:n ? b.z - 1.3 : b.z - 1.8, z1:n ? b.z + 1.8 : b.z + 1.3 }); });
+if (CUR_EVENT) (WORLD.booths || []).forEach(b => { const n = b.face ? b.face < 0 : b.z > -45; RECTP.push({ x0:b.x - 2.7, x1:b.x + 2.7, z0:n ? b.z - 1.3 : b.z - 1.8, z1:n ? b.z + 1.8 : b.z + 1.3 }); });
 function propHit(x, z, pad){ for (let i = 0; i < RECTP.length; i++){ const r = RECTP[i]; if (x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad) return true; }
   for (let i = 0; i < PROPS.length; i++){ const c = PROPS[i], dx = x - c.x, dz = z - c.z, r = c.r + pad; if (dx * dx + dz * dz < r * r) return true; } return false; }
 function blocked(x, z){ const g = groundAt(x, z); return g !== g || propHit(x, z, 0.5); }
@@ -1233,6 +1246,7 @@ const NAV = (() => {
 const ZONES = (() => {
   const z = { low:[], up:[], steps:[] };
   for (let c = 0; c < NAV.n; c++){ if (!NAV.valid[c]) continue; const i = c % NAV.cnx, j = (c - i) / NAV.cnx, x = NAV.X(i), zz = NAV.Z(j), h = NAV.hh[c];
+    if (MAP !== 'lv'){ if (Math.hypot(x, zz) < 140) z.low.push(c); continue; }
     if (h < 1.2 && Math.hypot(x - 117, zz + 22) < 78) z.low.push(c); else if (h > 13.5 && h < 14.2 && x > 62 && x < 176) z.up.push(c); else if (h > 1.2 && x > 40) z.steps.push(c); }
   return z;
 })();
@@ -1547,7 +1561,7 @@ function buildStall(d){
 }
 /* đèn đêm: chỉ 4 bóng đèn thật, luôn gán cho 4 nguồn sáng gần người chơi nhất (quầy và cột đèn) để máy yếu vẫn mượt */
 const LIGHT_SRC = STALLS.filter(d => !d.cart).map(d => ({ x:d.x, y:d.y + 3.1, z:d.z + 0.7, c:0xffb35c })).concat(WORLD.lamps.map(p => ({ x:p.x, y:p.y + 4.9, z:p.z, c:0xffd08a }))).concat(WORLD.stage ? [{ x:WORLD.stage.x, y:WORLD.stage.y + 5.5, z:WORLD.stage.z + 3, c:0xff7ac8 }] : []);
-if (CUR_EVENT) (WORLD.booths || []).forEach(b => LIGHT_SRC.push({ x:b.x, y:b.y + 3.0, z:b.z + (b.z > -45 ? -0.6 : 0.6), c:0xfff0d0, i:4 }));
+if (CUR_EVENT) (WORLD.booths || []).forEach(b => LIGHT_SRC.push({ x:b.x, y:b.y + 3.0, z:b.z + ((b.face ? b.face < 0 : b.z > -45) ? -0.6 : 0.6), c:0xfff0d0, i:4 }));
 /* đèn rọi nhẹ đi theo người chơi ban đêm, để nhân vật không thành bóng đen khi ở xa các nguồn sáng */
 const PLAYER_FILL = new THREE.PointLight(0xfff2dc, 0, 13, 1.4); PLAYER_FILL.visible = false; scene.add(PLAYER_FILL);
 const NIGHT_POOL = [0, 1, 2, 3].map(() => { const l = new THREE.PointLight(0xffb35c, 0, 28, 1.3); l.visible = false; scene.add(l); return l; });
@@ -1697,7 +1711,7 @@ function spawnItem(type, idx, x, z){
 function initItems(){
   items.splice(0).forEach(it => scene.remove(it.g));
   for (const t in ITEM_DEF){ if (t === 'tem') continue; for (let i = 0; i < ITEM_DEF[t].max; i++){ const p = spotFor(ITEM_DEF[t].zones); if (p) spawnItem(t, -1, p.x, p.z); } }
-  STAMPS.forEach((st, i) => { if (!S.stamps[i]){ const p = findSpot(st.x, st.z); spawnItem('tem', i, p.x, p.z); } });
+  if (MAP === 'lv') STAMPS.forEach((st, i) => { if (!S.stamps[i]){ const p = findSpot(st.x, st.z); spawnItem('tem', i, p.x, p.z); } });   /* tem chỉ có ở Quảng trường */
 }
 function collect(it, i){
   scene.remove(it.g); items.splice(i, 1);
@@ -1838,13 +1852,13 @@ const BOOTH_TIER = {
 const BOOTH_PLAN = ['kc', 'kc', 'vang', 'vang', 'vang', 'vang', 'bac', 'bac', 'tt', 'tt', 'tt', 'tt'];
 const BOOTH_BUYOUT = 1.5, BOOTH_REFUND = 1.2, STAGE_Z_SPLIT = -45;   /* gian ở hàng trước lối vào (phía nam) quay cửa về phía sân khấu */
 const BRANDS = !CUR_EVENT ? [] : (WORLD.booths || []).map((b, i) => {
-  const kind = BOOTH_PLAN[i] || 'tt', face = b.z > STAGE_Z_SPLIT ? -1 : 1;
+  const kind = BOOTH_PLAN[i] || 'tt', face = b.face || (b.z > STAGE_Z_SPLIT ? -1 : 1), pre = MAP === 'lv' ? '' : MAP[0];
   if (kind === 'tt'){
     const k = BOOTH_PLAN.slice(0, i + 1).filter(x => x === 'tt').length;
-    return Object.assign({ id:'s' + k, no:i + 1, sponsor:true, name:'Nhà tài trợ ' + k, tag:'Gian dành cho thương hiệu Đà Lạt', desc:'Vị trí này dành cho một nhà tài trợ của sự kiện. Tên, logo và lời giới thiệu sẽ hiện ở đây.', color:BRAND_COLORS[i % BRAND_COLORS.length] }, BRAND_INFO[k - 1] || {}, { x:b.x, y:b.y, z:b.z, face, group:null });
+    return Object.assign({ id:'s' + pre + k, k, no:i + 1, sponsor:true, name:'Nhà tài trợ ' + k, tag:'Gian dành cho thương hiệu Đà Lạt', desc:'Vị trí này dành cho một nhà tài trợ của sự kiện. Tên, logo và lời giới thiệu sẽ hiện ở đây.', color:BRAND_COLORS[i % BRAND_COLORS.length] }, BRAND_INFO[k - 1] || {}, { x:b.x, y:b.y, z:b.z, face, group:null });
   }
   const k = BOOTH_PLAN.slice(0, i + 1).filter(x => x !== 'tt').length, T = BOOTH_TIER[kind];
-  return { id:'p' + k, no:i + 1, tier:kind, T, name:'Gian ' + T.name + ' ' + k, tag:'Còn trống · cần cấp ' + T.lv, desc:'', color:'#8d96a3', x:b.x, y:b.y, z:b.z, face, group:null };
+  return { id:'p' + pre + k, k, no:i + 1, tier:kind, T, name:'Gian ' + T.name + ' ' + k, tag:'Còn trống · cần cấp ' + T.lv, desc:'', color:'#8d96a3', x:b.x, y:b.y, z:b.z, face, group:null };
 });
 const BG = { floor:new THREE.BoxGeometry(5.2, 0.06, 3), back:new THREE.BoxGeometry(5.2, 3, 0.12), side:new THREE.BoxGeometry(0.12, 3, 1.7), post:new THREE.BoxGeometry(0.12, 3.5, 0.12), fascia:new THREE.BoxGeometry(5.4, 0.72, 0.16), face:new THREE.PlaneGeometry(5.3, 0.66), panel:new THREE.PlaneGeometry(2.6, 1.7), desk:new THREE.BoxGeometry(1.7, 1.0, 0.6), deskF:new THREE.PlaneGeometry(1.6, 0.9), shelf:new THREE.BoxGeometry(1.6, 0.08, 0.4), box:new THREE.BoxGeometry(0.3, 0.34, 0.26), star:new THREE.OctahedronGeometry(0.28) };
 const BM = { wall:lamb('#f4f2ec'), trim:lamb('#d8d4ca') };
@@ -1856,7 +1870,7 @@ function boothView(b){
   if (b.sponsor) return b;
   const o = BOWN[b.id];
   if (o){ b.name = String(o.brand || 'Thương hiệu').slice(0, 24); b.color = /^#[0-9a-f]{6}$/i.test(o.color || '') ? o.color : BRAND_COLORS[b.no % BRAND_COLORS.length]; b.tag = 'Chủ gian: ' + String(o.owner || 'Người chơi').slice(0, 16); }
-  else { b.name = 'Gian ' + b.T.name + ' ' + b.id.slice(1); b.color = '#8d96a3'; b.tag = 'Còn trống · cần cấp ' + b.T.lv; }
+  else { b.name = 'Gian ' + b.T.name + ' ' + b.k; b.color = '#8d96a3'; b.tag = 'Còn trống · cần cấp ' + b.T.lv; }
   return b;
 }
 function buildBooth(b){
@@ -1874,7 +1888,7 @@ function buildBooth(b){
     c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = b.color; c.beginPath(); c.arc(w / 2, 120, 86, 0, TAU); c.fill();
     if (b.T){ c.strokeStyle = b.T.color; c.lineWidth = 14; c.stroke(); }
     c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '800 84px "Baloo 2", "Trebuchet MS", sans-serif';
-    const named = b.sponsor ? !!BRAND_INFO[b.id.slice(1) - 1] : !!BOWN[b.id];
+    const named = b.sponsor ? !!BRAND_INFO[b.k - 1] : !!BOWN[b.id];
     const ini = named ? b.name.split(/\s+/).map(s => s[0]).join('').slice(0, 2).toUpperCase() : (b.T ? b.T.name[0] + b.T.name.split(' ').pop()[0] : 'TT');
     c.fillText(ini, w / 2, 126);
     c.fillStyle = '#2b2f3a'; let fs = 40; do { c.font = `700 ${fs}px "Be Vietnam Pro", system-ui, sans-serif`; fs -= 2; } while (c.measureText(b.name).width > w - 40 && fs > 18); c.fillText(b.name, w / 2, 244);
@@ -1913,7 +1927,7 @@ function boothsApply(data){
     if (!same) buildBooth(b);
   });
   const now2 = myBooth(); BO.mine = now2 ? now2.id : null;
-  if (prevMine && prevMine !== BO.mine && u){ const b = BRANDS.find(x => x.id === prevMine), o = b && BOWN[b.id]; if (o && o.uid !== u) toast(`${o.owner || 'Một người chơi'} vừa mua lại ${'Gian ' + b.T.name + ' ' + b.id.slice(1)} của bạn. Bạn được hoàn tiền khi nhận thông báo.`, 'bad'); }
+  if (prevMine && prevMine !== BO.mine && u){ const b = BRANDS.find(x => x.id === prevMine), o = b && BOWN[b.id]; if (o && o.uid !== u) toast(`${o.owner || 'Một người chơi'} vừa mua lại ${'Gian ' + b.T.name + ' ' + b.k} của bạn. Bạn được hoàn tiền khi nhận thông báo.`, 'bad'); }
   ctxKey = '';
 }
 /* khởi động: trên dalatevent.com đọc chủ gian từ máy chủ (ai cũng xem được), trong bản xem thử thì lưu trên máy */
@@ -1951,7 +1965,7 @@ async function buyBooth(){
       const res = await BO.ref.child(b.id).transaction(c => { if (c && c.uid === u) return; if (c && price < c.price * BOOTH_BUYOUT) return; prev = c || null; return Object.assign({ t:firebase.database.ServerValue.TIMESTAMP }, rec); });
       if (!res.committed){ toast('Có người vừa mua gian này trước bạn. Xem lại giá rồi thử lại.', 'bad'); return; }
     } catch(e){ console.warn('mua gian', e); toast('Chưa mua được gian (' + ((e && (e.code || e.message)) || 'lỗi') + ').', 'bad'); return; }
-    if (prev && prev.uid && prev.uid !== u) firebase.database().ref('payouts/' + prev.uid).push({ coins:Math.round(prev.price * BOOTH_REFUND), booth:'Gian ' + T.name + ' ' + b.id.slice(1), by:String(S.name).slice(0, 16), t:firebase.database.ServerValue.TIMESTAMP }).catch(e => console.warn('hoàn tiền', e));
+    if (prev && prev.uid && prev.uid !== u) firebase.database().ref('payouts/' + prev.uid).push({ coins:Math.round(prev.price * BOOTH_REFUND), booth:'Gian ' + T.name + ' ' + b.k, by:String(S.name).slice(0, 16), t:firebase.database.ServerValue.TIMESTAMP }).catch(e => console.warn('hoàn tiền', e));
   }
   S.coins -= price; S.stats.booths = (S.stats.booths || 0) + 1;
   if (BO.local) boothsApply(S.bown[CUR_EVENT.key]);
@@ -1970,7 +1984,7 @@ async function saveBrand(){
 }
 function brandRender(){
   const b = myBooth(), cols = BRAND_COLORS.map(c => `<button class="swatch${(S.brandColor || BRAND_COLORS[0]) === c ? ' on' : ''}" data-act="brandcol:${c.slice(1)}" style="background:${c}" aria-label="màu ${c}"></button>`).join('');
-  let h = b ? `<p>Bạn đang sở hữu <b>Gian ${b.T.name} ${b.id.slice(1)}</b> trong ${escH(CUR_EVENT.name)}. Mọi người chơi đều thấy tên này trên biển gian.</p>` : '<p>Tên thương hiệu sẽ hiện trên gian khi bạn mua được một gian ở trung tâm quảng trường.</p>';
+  let h = b ? `<p>Bạn đang sở hữu <b>Gian ${b.T.name} ${b.k}</b> trong ${escH(CUR_EVENT.name)}. Mọi người chơi đều thấy tên này trên biển gian.</p>` : '<p>Tên thương hiệu sẽ hiện trên gian khi bạn mua được một gian ở trung tâm quảng trường.</p>';
   h += `<div class="field"><label for="optBrand"><b>Tên thương hiệu</b></label><input id="optBrand" maxlength="24" value="${escH(BO.draft != null ? BO.draft : (S.brand || ('Thương hiệu ' + S.name)))}"></div>`;
   h += `<div class="field"><b>Màu thương hiệu</b><div class="swatches">${cols}</div></div>`;
   h += '<button class="gbtn green" data-act="brandsave">Lưu tên thương hiệu</button>';
@@ -2057,7 +2071,7 @@ function updateExpo(dt){
   { const e = 0.3 * nightK; if (Math.abs(BM.wall.emissiveIntensity - e) > 0.01) BOOTH_GLOW.forEach(m => { m.emissiveIntensity = e; }); }
   nearBooth = null; let bd = 4.6; for (const b of BRANDS){ const f = boothFront(b), dd = Math.hypot(P.x - f.x, P.z - f.z); if (dd < bd && Math.abs(P.h - b.y) < 1.5){ bd = dd; nearBooth = b; } }
   boothIncome(dt);
-  if (!STAGE) return;
+  if (!STAGE){ if (bgmVol !== 0) setBgmVol(0); return; }   /* map không có sân khấu: không phát nhạc */
   const ds = Math.hypot(P.x - STAGE.x, P.z - STAGE.z);
   nearStage = Math.abs(P.x - STAGE.x) < STAGE.w / 2 + 5 && P.z > STAGE.z + STAGE.d / 2 - 0.5 && P.z < STAGE.z + STAGE.d / 2 + 11 && Math.abs(P.h - STAGE.y) < 1.5;
   /* nhạc phát ra từ sân khấu: càng xa càng nhỏ, quá 150 đơn vị thì không còn nghe thấy */
@@ -2100,8 +2114,8 @@ function onlineStop(keepDb){
 function onlineSend(force){
   if (!ON.me || ON.hidden) return;
   const t = now(), o = OUTFITS.find(x => x.id === S.outfit) || OUTFITS[0];
-  const d = { n:String(S.name || 'Chủ Quầy').slice(0, 16), x:Math.round(P.x * 100) / 100, z:Math.round(P.z * 100) / 100, a:Math.round(P.ang * 100) / 100, m:P.moving ? 1 : 0, o:o.id === 'blue' ? '' : o.color, lv:S.level };
-  const L = ON.last, changed = !L || L.n !== d.n || L.o !== d.o || L.m !== d.m || L.lv !== d.lv || Math.hypot(L.x - d.x, L.z - d.z) > 0.04 || Math.abs(L.a - d.a) > 0.06;
+  const d = { n:String(S.name || 'Chủ Quầy').slice(0, 16), x:Math.round(P.x * 100) / 100, z:Math.round(P.z * 100) / 100, a:Math.round(P.ang * 100) / 100, m:P.moving ? 1 : 0, o:o.id === 'blue' ? '' : o.color, lv:S.level, mp:MAP };
+  const L = ON.last, changed = !L || L.n !== d.n || L.o !== d.o || L.m !== d.m || L.lv !== d.lv || L.mp !== d.mp || Math.hypot(L.x - d.x, L.z - d.z) > 0.04 || Math.abs(L.a - d.a) > 0.06;
   if (!force && (t - ON.sentAt < ON_SEND_MS || (!changed && t - ON.sentAt < ON_BEAT_MS))) return;
   ON.sentAt = t; ON.last = d;
   ON.me.set(Object.assign({ t:firebase.database.ServerValue.TIMESTAMP }, d)).catch(e => { console.warn('online ghi', e && e.code); });
@@ -2123,6 +2137,7 @@ function onlineMesh(r){
 function onlineTint(r){ const u = r.mesh.userData, c = r.d.o || ''; if (r.col === c) return; r.col = c; if (u.recolor) u.recolor(c || null); }
 function onlineUpsert(snap){
   const id = snap.key, d = snap.val(); if (!d || id === ON.uid || typeof d.x !== 'number' || typeof d.z !== 'number') return;
+  if ((d.mp || 'lv') !== MAP){ onlineDrop(id); return; }   /* người chơi ở map khác */
   if (hAt(d.x, d.z) < -50) return;
   let r = ON.others.get(id);
   if (!r){
@@ -2363,13 +2378,14 @@ function dvAct(a, id){
 }
 /* ===== Xe đẩy khởi nghiệp: điểm bắt đầu của hành trình "Từ xe đẩy thành thương hiệu Đà Lạt" =====
    Xe đẩy là một quầy di động: bấm Đẩy xe để đẩy đi, tới chỗ đông người thì bấm Đỗ xe; khách chỉ ghé khi xe đang đỗ. */
-const CART = byId.xeday;
+const CART = byId.xeday || null;   /* chỉ map Quảng trường có xe đẩy */
 let cartQ = 0;
 /* khu trung tâm sân dưới (sân khấu, gian thương hiệu, lối vào) không cho đỗ xe hàng rong */
 const cartHot = (x, z) => x > 54 && x < 180 && z > -76 && z < -21 && hAt(x, z) < 1.5;
 /* xe đỗ sai chỗ (ví dụ lưu từ bản cũ ở giữa sân) thì về chỗ mặc định ở rìa phía tây */
-if (cartHot(CART.x, CART.z)){ CART.x = CART_HOME.x; CART.z = CART_HOME.z; CART.y = Math.max(0, hAt(CART.x, CART.z)); if (S.cart) S.cart = { x:CART.x, z:CART.z }; }
+if (CART && cartHot(CART.x, CART.z)){ CART.x = CART_HOME.x; CART.z = CART_HOME.z; CART.y = Math.max(0, hAt(CART.x, CART.z)); if (S.cart) S.cart = { x:CART.x, z:CART.z }; }
 function cartSet(x, z, ang){
+  if (!CART){ return; }
   const d = CART, gy = hAt(x, z); d.x = x; d.z = z; d.y = gy > -50 ? gy : 0;
   const rt = RT[d.id];
   if (rt.group){ rt.group.position.set(x, d.y, z); rt.group.rotation.y = ang || 0; }
@@ -2391,6 +2407,7 @@ function cartSpotOk(x, z){
   return '';
 }
 function cartPush(){
+  if (!CART){ return; }
   if (!st(CART.id).owned) return;
   if (S.cartPush){ cartPark(); return; }
   if (Math.hypot(P.x - CART.x, P.z - CART.z) > 5){ toast('Lại gần xe đẩy của bạn để đẩy đi.', 'bad'); return; }
@@ -2399,6 +2416,7 @@ function cartPush(){
   toast('Đang đẩy xe. Tìm chỗ đông người rồi bấm Đỗ xe.'); sfx('coin'); cartBtn(); ctxKey = '';
 }
 function cartPark(){
+  if (!CART){ return; }
   const x = Math.round(CART.x * 2) / 2, z = Math.round(CART.z * 2) / 2, why = cartSpotOk(x, z);
   if (why){ toast(why, 'bad'); sfx('bad'); return; }
   S.cartPush = false; S.cart = { x, z }; S.stats.cartMoves = (S.stats.cartMoves || 0) + 1; cartSet(x, z, 0);
@@ -2406,12 +2424,14 @@ function cartPark(){
 }
 /* nút Đẩy xe / Đỗ xe hiện khi đứng gần xe của mình hoặc đang đẩy */
 function cartBtn(){
+  if (!CART){ const el = $('btnCart'); if (el) el.hidden = true; return; }
   const el = $('btnCart'); if (!el) return;
   const show = st(CART.id).owned && (S.cartPush || Math.hypot(P.x - CART.x, P.z - (CART.z + 1)) < 4.5);
   if (el.hidden === show) el.hidden = !show;
   const t = S.cartPush ? 'Đỗ xe' : 'Đẩy xe'; if (el.lastChild.textContent.trim() !== t) el.lastChild.textContent = t;
 }
 function updateCart(dt){
+  if (!CART){ return; }
   if (S.cartPush){
     /* xe chạy phía trước người chơi theo hướng đi */
     const tx = P.x + Math.sin(P.ang) * 1.9, tz = P.z + Math.cos(P.ang) * 1.9, k = Math.min(1, dt * 10);
@@ -2422,6 +2442,8 @@ function updateCart(dt){
 $('btnCart').addEventListener('click', e => { e.stopPropagation(); cartPush(); });
 /* ===== Cổng dịch chuyển sang map Chợ Đà Lạt – Khu Hòa Bình (trang cho.html, dùng chung tiến trình lưu trên máy) ===== */
 const PORTAL = WORLD.portal || null;
+const PORTAL_ROT = !PORTAL ? 0 : MAP === 'lv' ? Math.PI / 2 : Math.atan2(SPAWN.x - PORTAL.x, SPAWN.z - PORTAL.z);
+const PORTAL_TO = MAP === 'lv' ? { url:'index.html?map=cho', name:'Chợ Đà Lạt · Khu Hòa Bình', go:'Chợ Đà Lạt' } : { url:'index.html', name:'Quảng trường Lâm Viên', go:'Quảng trường Lâm Viên' };
 const portalFx = { g:null, lbl:null, armed:false, going:false };
 if (PORTAL){
   const g = new THREE.Group();
@@ -2431,19 +2453,19 @@ if (PORTAL){
   const disc = new THREE.Mesh(new THREE.CircleGeometry(1.4, 40), new THREE.MeshBasicMaterial({ map:swirl, transparent:true, side:THREE.DoubleSide, depthWrite:false, toneMapped:false })); disc.position.y = 1.7; g.add(disc);
   const base = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.1, 0.18, 32), lamb('#3b2a66')); base.position.y = 0.09; base.receiveShadow = true; g.add(base);
   const glow = new THREE.Mesh(new THREE.RingGeometry(1.2, 2.0, 40), new THREE.MeshBasicMaterial({ color:0xb89cff, transparent:true, opacity:0.5, depthWrite:false, side:THREE.DoubleSide, toneMapped:false })); glow.rotation.x = -Math.PI / 2; glow.position.y = 0.2; g.add(glow);
-  g.position.set(PORTAL.x, PORTAL.y, PORTAL.z); g.rotation.y = Math.PI / 2;   /* mặt cổng quay về phía sân (hướng đông) */
+  g.position.set(PORTAL.x, PORTAL.y, PORTAL.z); g.rotation.y = PORTAL_ROT;   /* mặt cổng quay về phía sân */
   g.userData = { disc, ring, glow }; scene.add(g); portalFx.g = g;
-  portalFx.lbl = mkLabel('tag', '<b>Cổng dịch chuyển</b><span class="s gold">Chợ Đà Lạt · Khu Hòa Bình</span>');
+  portalFx.lbl = mkLabel('tag', '<b>Cổng dịch chuyển</b><span class="s gold">' + PORTAL_TO.name + '</span>');
 }
 /* điểm đứng khi quay về từ Chợ: ngay trước mặt cổng */
-const portalFront = () => ({ x:PORTAL.x + 4, z:PORTAL.z });
+const portalFront = () => ({ x:PORTAL.x + Math.sin(PORTAL_ROT) * 4, z:PORTAL.z + Math.cos(PORTAL_ROT) * 4 });
 function portalGo(){
   if (portalFx.going) return; portalFx.going = true;
-  const f0 = portalFront(); P.x = f0.x; P.z = f0.z; P.goto = null; S.player = f0; save();
+  const f0 = portalFront(); P.x = f0.x; P.z = f0.z; P.goto = null; S.player = f0; S.pos = S.pos || {}; S.pos[MAP] = f0; save();
   let f = $('portalFade');
-  if (!f){ f = document.createElement('div'); f.id = 'portalFade'; f.style.cssText = 'position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#6a3cc4,#1a0b3a);color:#fff;font:800 1.6rem "Baloo 2",sans-serif;opacity:0;transition:opacity .6s'; f.textContent = 'Đang dịch chuyển tới Chợ Đà Lạt…'; document.body.appendChild(f); }
+  if (!f){ f = document.createElement('div'); f.id = 'portalFade'; f.style.cssText = 'position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#6a3cc4,#1a0b3a);color:#fff;font:800 1.6rem "Baloo 2",sans-serif;opacity:0;transition:opacity .6s'; f.textContent = 'Đang dịch chuyển tới ' + PORTAL_TO.go + '…'; document.body.appendChild(f); }
   requestAnimationFrame(() => { f.style.opacity = '1'; });
-  setTimeout(() => { location.href = 'cho.html' + (/[?&]b64=1/.test(location.search) ? '?b64=1' : ''); }, 650);
+  setTimeout(() => { location.href = PORTAL_TO.url + (/[?&]b64=1/.test(location.search) ? (PORTAL_TO.url.includes('?') ? '&' : '?') + 'b64=1' : ''); }, 650);
 }
 function updatePortal(dt){
   if (!portalFx.g) return;
@@ -2453,6 +2475,28 @@ function updatePortal(dt){
   if (portalFx.armed && d < 1.3 && !modalType && !S.cartPush) portalGo();
 }
 function placePortal(){ if (portalFx.lbl) place(portalFx.lbl, PORTAL.x, PORTAL.y + 3.7, PORTAL.z, 90); }
+/* ===== Điểm check-in (map Chợ Đà Lạt): đi tới biển xanh chanh là check-in, mỗi điểm thưởng một lần ===== */
+const CHECKINS = (WORLD.checkins || []).map(c => Object.assign({}, c));
+if (CHECKINS.length){
+  const sm = lamb('#c8f03c'), pm = lamb('#2b2f3a');
+  CHECKINS.forEach(c => {
+    const g = new THREE.Group(), post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), pm), board = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.08), sm);
+    post.position.y = 1.1; board.position.y = 2.2; post.castShadow = board.castShadow = true; g.add(post, board); g.position.set(c.x, c.y, c.z); scene.add(g);
+    c.lbl = mkLabel('tag', ''); ckLabel(c);
+  });
+}
+function ckDone(c){ S.cho = S.cho || {}; S.cho.ck = S.cho.ck || {}; return !!S.cho.ck[c.id]; }
+function ckLabel(c){ c.lbl.innerHTML = '<b>' + (ckDone(c) ? '✓ ' : '📷 ') + c.name + '</b>' + (ckDone(c) ? '' : '<span class="s gold">Check-in +500 xu</span>'); }
+function updateCheckins(){
+  for (const c of CHECKINS){
+    if (ckDone(c) || Math.hypot(P.x - c.x, P.z - c.z) > 2.6 || Math.abs(P.h - c.y) > 2) continue;
+    S.cho.ck[c.id] = 1; give({ coins:500, exp:15 }); sfx('buy'); floatText(c.x, c.y + 2.8, c.z, '+500 xu', '#ffd84a'); ckLabel(c);
+    const n = CHECKINS.filter(ckDone).length; toast(`Check-in ${c.name} (${n}/${CHECKINS.length}): ${c.desc}`, 'gold');
+    if (n === CHECKINS.length && !S.cho.allck){ S.cho.allck = 1; give({ gems:10 }); setTimeout(() => toast('Bạn đã check-in đủ các điểm ở Chợ Đà Lạt! +10 kim cương', 'gold'), 1200); }
+    save(); updateHud();
+  }
+}
+function placeCheckins(){ CHECKINS.forEach(c => place(c.lbl, c.x, c.y + 2.95, c.z, 70)); }
 
 /* ================= Hành động quầy ================= */
 let nearId = null, T = 0, ctxKey = '', nearSeller = false;
@@ -2583,7 +2627,7 @@ cv.addEventListener('pointerup', ptrEnd); cv.addEventListener('pointercancel', p
 cv.addEventListener('wheel', e => { camDist = clamp(camDist + Math.sign(e.deltaY) * 0.8, 4, 16); }, { passive:true });
 
 /* ================= Cập nhật ================= */
-function questTarget(){ const q = QUESTS[S.quest]; if (!q || !q.tgt || q.p() >= q.goal) return null; return q.tgt(); }
+function questTarget(){ if (MAP !== 'lv') return null; const q = QUESTS[S.quest]; if (!q || !q.tgt || q.p() >= q.goal) return null; return q.tgt(); }
 /* đi bộ: chia nhỏ quãng đường, trượt dọc vật cản thay vì đứng khựng */
 function movePlayer(dx, dz){
   const dist = Math.hypot(dx, dz), n = Math.max(1, Math.ceil(dist / 0.2)), sx = dx / n, sz = dz / n;
@@ -2687,7 +2731,7 @@ function update(dt){
   applyDayNight(); nightLights(dt);
   updateEvents();
   updateTraffic(dt);
-  updateWeather(dt); updateItems(dt); updateDv(dt); updateCart(dt); updatePortal(dt);
+  updateWeather(dt); updateItems(dt); updateDv(dt); updateCart(dt); updatePortal(dt); updateCheckins();
   S.onlineAcc += dt;
   for (const f of floats){ f.y += dt * 1.1; f.life -= dt; }
   while (floats.length && floats[0].life <= 0) floats.shift().el.remove();
@@ -2722,7 +2766,7 @@ function placeLabels(){
   } else if (bangLbl.style.display !== 'none') bangLbl.style.display = 'none';
   for (const p of people){ if (p.seller && p.lbl) place(p.lbl, p.x, p.y + 2.5, p.z, 45); }
   place(nameLbl, P.x, P.y + 2.05, P.z, 60);
-  placeOnline(); placePortal();
+  placeOnline(); placePortal(); placeCheckins();
   for (const f of floats){ if (place(f.el, f.x, f.y, f.z, 70)) f.el.style.opacity = clamp(f.life, 0, 1); }
 }
 const MAPIMG = new Image(); MAPIMG.src = WORLD.map;
@@ -2873,6 +2917,7 @@ function decorScatter(k, n){
   return out;
 }
 function decorPlace(key, list, opt){
+  if (!list || !list.length) return;
   const p = DECOR.protos[key], d = new THREE.Object3D(), byLen = opt && opt.len;
   let cx = 0, cz = 0, r = 0; list.forEach(a => { cx += a[0] / list.length; cz += a[2] / list.length; });
   list.forEach(a => { r = Math.max(r, Math.hypot(a[0] - cx, a[2] - cz)); });
@@ -2939,7 +2984,7 @@ function updateHud(){
   $('dotWelfare').hidden = !welfareReady();
   const t = now();
   setText('evTimer', eventOn() ? 'Đang diễn ra ' + mmss(S.eventEnd - t) : t < S.eventReady ? 'Hồi ' + mmss(S.eventReady - t) : 'Sẵn sàng');
-  const chips = [clockChip(), seasonInfo().name, WX_NAME[WX.k]]; if (festOn()) chips.push('Festival Hoa Đà Lạt +15%'); if (combo >= 2 && now() - comboT < 8000) chips.push('Chuỗi phục vụ x' + combo); if (nightOpenNow()) chips.push('Chợ đêm đến 23:00'); if (eventOn()) chips.push('Giờ vàng ' + mmss(S.eventEnd - t)); if (rushOn()) chips.push('Khách đông ' + mmss(S.rushEnd - t));
+  const chips = [clockChip(), seasonInfo().name, WX_NAME[WX.k]]; if (MAP === 'cho') chips.unshift('Chợ Đà Lạt'); if (festOn()) chips.push('Festival Hoa Đà Lạt +15%'); if (combo >= 2 && now() - comboT < 8000) chips.push('Chuỗi phục vụ x' + combo); if (nightOpenNow()) chips.push('Chợ đêm đến 23:00'); if (eventOn()) chips.push('Giờ vàng ' + mmss(S.eventEnd - t)); if (rushOn()) chips.push('Khách đông ' + mmss(S.rushEnd - t));
   if (S.order) chips.push('Đơn đoàn ' + S.order.n + '/' + S.order.need + ' · ' + mmss(S.order.end - t));
   if (CLOUD.status) chips.push(CLOUD.status);
   if (fbAuth && !fbAuth.currentUser) chips.push('<b data-open="settings" class="chip" style="background:#d7ff6b;color:#052b78;cursor:pointer">Đăng ký / Đăng nhập</b>');
