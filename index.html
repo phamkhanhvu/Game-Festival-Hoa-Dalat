@@ -299,10 +299,6 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="26" width="10" height="14" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><rect x="19" y="10" width="10" height="30" fill="#ffd84a" stroke="#8a5a00" stroke-width="2"/><rect x="30" y="20" width="10" height="20" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><path d="M6 42h36" stroke="#7a4a06" stroke-width="3"/></svg>
       Bảng Xếp Hạng
     </button>
-    <button class="mbtn outline" data-open="dovui">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 10h32a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H22l-9 7v-7H8a4 4 0 0 1-4-4V14a4 4 0 0 1 4-4z" fill="#c8f03c" stroke="#4a6a0a" stroke-width="2"/><text x="24" y="29" text-anchor="middle" font-size="17" font-weight="900" fill="#1d2a06" font-family="sans-serif">?</text></svg>
-      Đố Vui<span class="dot" id="dotDv"></span>
-    </button>
     <button class="mbtn outline" data-open="veso">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="13" width="38" height="22" rx="3" fill="#ffd84a" stroke="#8a5a00" stroke-width="2"/><path d="M5 24h38" stroke="#8a5a00" stroke-width="1.5" stroke-dasharray="3 3"/><circle cx="14" cy="24" r="3" fill="#e2453b"/><text x="26" y="29" font-size="11" font-weight="700" text-anchor="middle" fill="#8a5a00">88</text></svg>
       Vé Số
@@ -2009,7 +2005,7 @@ document.addEventListener('visibilitychange', () => {
   else { ON.last = null; onlineSend(true); }
 });
 $('btnOnline').addEventListener('click', onlineList);
-/* ===== Đố Vui Đà Lạt: mỗi ngày 5 câu trắc nghiệm có thưởng, sưu tầm đủ bộ câu hỏi để lên danh hiệu "Đại sứ Đà Lạt" =====
+/* ===== Đố Vui Đà Lạt: thẻ giải đố phát sáng nằm rải rác khắp quảng trường; đi tới nhặt thẻ thì trả lời một câu hỏi về Đà Lạt =====
    Mỗi câu: [câu hỏi, đáp án đúng, ba đáp án nhiễu]. Câu đã trả lời đúng một lần được tính vào bộ sưu tập. */
 const DV_Q = [
  ['Đà Lạt thường được gọi bằng biệt danh nào gắn với các loài hoa?', 'Xứ sở ngàn hoa', 'Xứ sở hoa anh đào', 'Thành phố hoa phượng đỏ', 'Đất võ trời văn'],
@@ -2111,61 +2107,96 @@ const DV_Q = [
  ['Nơi nào ở Đà Lạt nổi tiếng với một cây thông đứng riêng giữa cảnh quan hồ, đồi?', 'Cây thông cô đơn ở hồ Suối Vàng', 'Cây đa Tân Trào', 'Cây bàng vuông Trường Sa', 'Cây gạo Tây Bắc'],
  ['Hai thế mạnh văn hóa nào tiêu biểu nhất để giới thiệu Đà Lạt với thế giới (UNESCO và lễ hội)?', 'Hoa và âm nhạc', 'Biển và đảo', 'Cà phê và lúa gạo', 'Hang động và núi đá']
 ];
-const DV_N = DV_Q.length, DV_ROUND = 5;
+const DV_N = DV_Q.length;
+const DV_CARDS = 5, DV_DAILY = 10, DV_RESPAWN = 45;
 const DV_RANKS = [[0, 'Khách du lịch'], [10, 'Người yêu Đà Lạt'], [30, 'Hướng dẫn viên'], [60, 'Người Đà Lạt chính hiệu'], [90, 'Đại sứ Đà Lạt']];
 function dvS(){
   if (!S.dv || typeof S.dv !== 'object') S.dv = {};
-  const d = S.dv; if (!d.ok) d.ok = {}; if (!Array.isArray(d.ids)) d.ids = [];
+  const d = S.dv; if (!d.ok) d.ok = {}; if (d.day !== dateKey()){ d.day = dateKey(); d.today = 0; }
   return d;
 }
 const dvKnown = () => Object.keys(dvS().ok).length;
 function dvRank(n){ let r = DV_RANKS[0][1]; DV_RANKS.forEach(([k, t]) => { if (n >= k) r = t; }); return r; }
 function dvShuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
-/* chọn 5 câu: ưu tiên câu chưa trả lời đúng, mỗi câu kèm thứ tự đáp án đã xáo để mở lại vẫn giữ nguyên */
-function dvNewRound(extra){
-  const d = dvS(), fresh = [], old = [];
-  for (let i = 0; i < DV_N; i++) (d.ok[i] ? old : fresh).push(i);
-  const pick = dvShuffle(fresh).slice(0, DV_ROUND); dvShuffle(old); while (pick.length < DV_ROUND && old.length) pick.push(old.pop());
-  d.ids = pick.map(q => ({ q, o:dvShuffle([0, 1, 2, 3]), a:-1 })); d.i = 0; d.got = 0; d.extra = !!extra; d.done = false; d.res = null;
-  if (!extra) d.day = dateKey();
-}
-function dvDailyDone(){ const d = dvS(); return d.day === dateKey() && (d.extra || d.done); }
-function dvRender(){
+/* câu hỏi cho thẻ vừa nhặt: ưu tiên câu chưa trả lời đúng; câu đang dở (đóng hộp thoại khi chưa trả lời) được giữ cho thẻ sau */
+function dvNextQ(){
   const d = dvS();
-  if (d.day !== dateKey() && !(d.extra && !d.done)) dvNewRound(false);
-  const n = dvKnown();
-  let h = `<p>Mỗi ngày 5 câu hỏi về Đà Lạt. Trả lời đúng để nhận xu và sưu tầm đủ ${DV_N} câu, lên danh hiệu <b style="color:#d7ff6b">Đại sứ Đà Lạt</b>.</p>`;
-  h += row('Hiểu Đà Lạt: ' + dvRank(n), `Đã biết ${n}/${DV_N} câu<span class="pbar"><i style="width:${n / DV_N * 100}%"></i></span>`, '');
-  if (d.done){
-    h += `<div class="qbox ok"><b>${d.extra ? 'Xong lượt luyện thêm' : 'Xong 5 câu hôm nay'}: đúng ${d.got}/${DV_ROUND}</b><p>${d.extra ? 'Luyện thêm giúp mở khoá câu mới cho bộ sưu tập.' : 'Ngày mai có 5 câu mới với phần thưởng đầy đủ.'}</p>`;
-    h += `<button class="gbtn green" data-act="dvmore">Luyện thêm 5 câu<small>+150 xu mỗi câu đúng</small></button></div>`;
-    return h;
+  if (d.cur && d.cur.a < 0) return;
+  const fresh = []; for (let i = 0; i < DV_N; i++) if (!d.ok[i]) fresh.push(i);
+  const pool = fresh.length ? fresh : [...Array(DV_N).keys()];
+  let q = pool[(Math.random() * pool.length) | 0]; if (pool.length > 1 && d.cur && q === d.cur.q) q = pool[(pool.indexOf(q) + 1) % pool.length];
+  d.cur = { q, o:dvShuffle([0, 1, 2, 3]), a:-1 }; d.res = null;
+}
+/* ---- thẻ giải đố trong thế giới 3D ---- */
+const dvCards = []; let dvRespawn = 0, dvInit = false;
+const DVG = (() => {
+  const t = canvasTex(256, 340, (x, w, h) => {
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h); x.fillStyle = '#c8f03c'; x.fillRect(12, 12, w - 24, h - 24);
+    x.fillStyle = '#1d2a06'; x.font = '900 190px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', w / 2, h * 0.43);
+    x.font = '800 34px "Be Vietnam Pro", sans-serif'; x.fillText('ĐỐ VUI', w / 2, h * 0.78); x.font = '700 26px "Be Vietnam Pro", sans-serif'; x.fillText('ĐÀ LẠT', w / 2, h * 0.89);
+  });
+  return {
+    card:new THREE.PlaneGeometry(0.8, 1.06), cardM:new THREE.MeshBasicMaterial({ map:t, side:THREE.DoubleSide, toneMapped:false }),
+    ring:new THREE.RingGeometry(0.55, 0.78, 28), ringM:new THREE.MeshBasicMaterial({ color:0xc8f03c, transparent:true, opacity:0.6, depthWrite:false, side:THREE.DoubleSide }),
+    beam:new THREE.CylinderGeometry(0.16, 0.3, 6, 10, 1, true), beamM:new THREE.MeshBasicMaterial({ color:0xd7ff6b, transparent:true, opacity:0.3, depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending })
+  };
+})();
+DVG.beam.translate(0, 3, 0);
+function dvSpot(){
+  for (let i = 0; i < 50; i++){
+    const p = zoneSpot(pick(['low', 'low', 'up', 'steps']));
+    if (blocked(p.x, p.z) || STALLS.some(d => Math.hypot(p.x - d.x, p.z - d.z) < 6)) continue;
+    if (dvCards.some(c => Math.hypot(c.x - p.x, c.z - p.z) < 14) || items.some(it => Math.hypot(it.x - p.x, it.z - p.z) < 3) || Math.hypot(p.x - P.x, p.z - P.z) < 10) continue;
+    return p;
   }
-  const cur = d.ids[d.i], Q = DV_Q[cur.q];
-  h += `<div class="qbox${cur.a >= 0 ? (cur.a === 0 ? ' ok' : ' no') : ''}"><small style="opacity:.75">${d.extra ? 'Luyện thêm' : 'Hôm nay'} · câu ${d.i + 1}/${DV_ROUND}</small><b>${Q[0]}</b>`;
+  return null;
+}
+function dvSpawn(){
+  const p = dvSpot(); if (!p) return;
+  const y = Math.max(0, hAt(p.x, p.z)), g = new THREE.Group(), card = new THREE.Mesh(DVG.card, DVG.cardM), ring = new THREE.Mesh(DVG.ring, DVG.ringM), beam = new THREE.Mesh(DVG.beam, DVG.beamM);
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; ring.renderOrder = 3; beam.renderOrder = 4; card.position.y = 1.25;
+  g.add(card, ring, beam); g.position.set(p.x, y, p.z); scene.add(g);
+  dvCards.push({ x:p.x, z:p.z, y, g, card, ph:Math.random() * 6 });
+}
+function updateDv(dt){
+  if (!dvInit){ dvInit = true; for (let i = 0; i < DV_CARDS; i++) dvSpawn(); if (!S.flags.dvIntro){ S.flags.dvIntro = 1; setTimeout(() => toast('Thẻ Đố Vui màu xanh chanh nằm rải rác quanh quảng trường. Nhặt thẻ, trả lời đúng để nhận xu!', 'gold'), 4000); } }
+  DVG.ringM.opacity = 0.45 + Math.sin(T * 4) * 0.2;
+  for (let i = dvCards.length - 1; i >= 0; i--){
+    const c = dvCards[i]; c.ph += dt; c.card.position.y = 1.25 + Math.sin(c.ph * 2) * 0.12; c.card.rotation.y += dt * 1.4;
+    if (!modalType && Math.hypot(P.x - c.x, P.z - c.z) < 1.5 && Math.abs(P.h - c.y) < 1.6){
+      scene.remove(c.g); dvCards.splice(i, 1); sfx('buy'); floatText(c.x, c.y + 1.8, c.z, 'Thẻ Đố Vui!', '#d7ff6b');
+      dvNextQ(); openModal('dovui');
+    }
+  }
+  if (dvCards.length < DV_CARDS){ dvRespawn += dt; if (dvRespawn > (dvCards.length ? DV_RESPAWN : 3)){ dvRespawn = 0; dvSpawn(); } } else dvRespawn = 0;
+}
+function dvMini(g){ g.fillStyle = '#c8f03c'; g.strokeStyle = '#1d2a06'; g.lineWidth = 0.6; dvCards.forEach(c => { if (Math.abs(c.x - P.x) > 90 || Math.abs(c.z - P.z) > 90) return; g.fillRect(c.x - 2.2, c.z - 2.8, 4.4, 5.6); g.strokeRect(c.x - 2.2, c.z - 2.8, 4.4, 5.6); }); }
+/* ---- hộp thoại một câu hỏi ---- */
+function dvRender(){
+  const d = dvS(), n = dvKnown(), cur = d.cur;
+  let h = row('Hiểu Đà Lạt: ' + dvRank(n), `Đã biết ${n}/${DV_N} câu · Hôm nay ${Math.min(d.today, DV_DAILY)}/${DV_DAILY} thẻ thưởng lớn<span class="pbar"><i style="width:${n / DV_N * 100}%"></i></span>`, '');
+  if (!cur){ return h + '<p>Đi tìm thẻ Đố Vui màu xanh chanh quanh quảng trường. Thẻ hiện thành ô vuông xanh trên bản đồ nhỏ.</p>'; }
+  const Q = DV_Q[cur.q];
+  h += `<div class="qbox${cur.a >= 0 ? (cur.a === 0 ? ' ok' : ' no') : ''}"><b>${Q[0]}</b>`;
   if (cur.a < 0) h += cur.o.map(k => `<button class="qopt" data-act="dvans:${k}">${Q[1 + k]}</button>`).join('');
   else {
-    h += cur.a === 0 ? `<p>Chính xác! ${d.res ? 'Thưởng: ' + rewardText(d.res) : ''}</p>` : `<p>Chưa đúng. Đáp án: <b>${Q[1]}</b></p>`;
-    h += `<button class="gbtn" data-act="dvnext">${d.i + 1 < DV_ROUND ? 'Câu tiếp theo' : 'Xem kết quả'}</button>`;
+    h += cur.a === 0 ? `<p>Chính xác!${d.res ? ' Thưởng: ' + rewardText(d.res) : ''}</p>` : `<p>Chưa đúng. Đáp án: <b>${Q[1]}</b></p>`;
+    h += `<button class="gbtn" data-act="dvnext">Tiếp tục khám phá</button>`;
   }
   return h + '</div>';
 }
 function dvAct(a, id){
-  const d = dvS();
+  const d = dvS(), cur = d.cur;
   if (a === 'dvans'){
-    const cur = d.ids[d.i]; if (!cur || cur.a >= 0) return;
-    cur.a = +id; const ok = cur.a === 0, isNew = ok && !d.ok[cur.q];
-    if (ok){ d.got++; d.ok[cur.q] = 1; d.res = d.extra ? { coins:150, exp:3 } : { coins:800, exp:8 }; give(d.res); sfx('level'); if (isNew && [10, 30, 60, 90, DV_N].includes(dvKnown())) setTimeout(() => toast('Danh hiệu mới: ' + dvRank(dvKnown()), 'gold'), 400); }
-    else { d.res = null; sfx('bad'); }
-  } else if (a === 'dvnext'){
-    if (d.ids[d.i].a < 0) return;
-    if (d.i + 1 < DV_ROUND){ d.i++; d.res = null; return; }
-    d.done = true;
-    if (!d.extra){ const r = d.got === DV_ROUND ? { gems:5 } : d.got >= 3 ? { gems:2 } : null; if (r){ give(r); toast(`Đúng ${d.got}/${DV_ROUND} câu hôm nay: +${rewardText(r)}`, 'gold'); } }
-  } else if (a === 'dvmore'){ dvNewRound(true); }
-  dvHud();
+    if (!cur || cur.a >= 0) return;
+    cur.a = +id; d.today = (d.today || 0) + 1;
+    if (cur.a === 0){
+      const before = dvRank(dvKnown()); d.ok[cur.q] = 1; const after = dvRank(dvKnown());
+      d.res = d.today <= DV_DAILY ? { coins:800, exp:8 } : { coins:150, exp:3 }; give(d.res); sfx('level');
+      if (after !== before){ give({ gems:5 }); setTimeout(() => toast('Danh hiệu mới: ' + after + ' (+5 kim cương)', 'gold'), 400); }
+    } else { d.res = null; sfx('bad'); }
+  } else if (a === 'dvnext'){ d.cur = null; closeModal(); return; }
 }
-function dvHud(){ const el = $('dotDv'); if (el) el.hidden = dvDailyDone(); }
 
 /* ================= Hành động quầy ================= */
 let nearId = null, T = 0, ctxKey = '', nearSeller = false;
@@ -2400,7 +2431,7 @@ function update(dt){
   applyDayNight(); nightLights(dt);
   updateEvents();
   updateTraffic(dt);
-  updateWeather(dt); updateItems(dt);
+  updateWeather(dt); updateItems(dt); updateDv(dt);
   S.onlineAcc += dt;
   for (const f of floats){ f.y += dt * 1.1; f.life -= dt; }
   while (floats.length && floats[0].life <= 0) floats.shift().el.remove();
@@ -2448,7 +2479,7 @@ function drawMinimap(){
   if (WORLD.stage){ const t = WORLD.stage; g.fillStyle = '#b0246a'; g.fillRect(t.x - t.w / 2, t.z - t.d / 2, t.w, t.d); }
   BRANDS.forEach(b => { g.fillStyle = S.brands[b.id] ? '#5ad8ff' : '#2f6fc0'; g.strokeStyle = '#10243f'; g.lineWidth = 0.6; g.fillRect(b.x - 2.6, b.z - 2, 5.2, 4); g.strokeRect(b.x - 2.6, b.z - 2, 5.2, 4); });
   STALLS.forEach(d => { g.fillStyle = st(d.id).owned ? '#ffc83d' : '#8d8a85'; g.strokeStyle = '#3a2a10'; g.lineWidth = 0.7; g.fillRect(d.x - 3, d.z - 3, 6, 6); g.strokeRect(d.x - 3, d.z - 3, 6, 6); });
-  items.forEach(it => { if (Math.abs(it.x - P.x) > 90 || Math.abs(it.z - P.z) > 90) return; g.fillStyle = ITEM_DEF[it.type].color; g.strokeStyle = '#1d2c45'; g.lineWidth = 0.5; g.beginPath(); g.arc(it.x, it.z, it.type === 'tem' || it.type === 'qua' ? 2.8 : 2.1, 0, TAU); g.fill(); g.stroke(); });
+  items.forEach(it => { if (Math.abs(it.x - P.x) > 90 || Math.abs(it.z - P.z) > 90) return; g.fillStyle = ITEM_DEF[it.type].color; g.strokeStyle = '#1d2c45'; g.lineWidth = 0.5; g.beginPath(); g.arc(it.x, it.z, it.type === 'tem' || it.type === 'qua' ? 2.8 : 2.1, 0, TAU); g.fill(); g.stroke(); }); dvMini(g);
   const hq = curHunt();
   if (hq && huntP(hq) < hq.goal){
     const want = hq.type === 'open' ? 'qua' : hq.type; let best = null, bd = 1e9;
@@ -2634,7 +2665,6 @@ function setWidth(id, pct){ const v = Math.round(pct * 1000) / 10 + '%'; if (hud
 function welfareReady(){ return S.lastDaily !== dateKey() || S.onlineAcc >= 300; }
 let modalTick = null;
 function updateHud(){
-  dvHud();
   lottoSettle();
   setText('hLv', 'Lv.' + S.level); setText('hName', S.name);
   setWidth('hSta', P.sta / 100); setWidth('hXp', S.exp / expNeed(S.level));
@@ -2792,6 +2822,7 @@ function renderModal(){
       : row('Chơi lại từ đầu', 'Xóa cấp, xu, quầy và nhiệm vụ.', `<button class="gbtn" data-act="reset">Chơi lại</button>`);
   } else if (modalType === 'hunt'){
     h += row('Khu trưng bày thương hiệu Đà Lạt', `Sân phía đông, cạnh đài phun nước. Đã tham quan ${brandsSeen()}/${BRANDS.length} gian.<span class="pbar"><i style="width:${brandsSeen() / Math.max(1, BRANDS.length) * 100}%"></i></span>`, '');
+    h += row('Đố Vui Đà Lạt · ' + dvRank(dvKnown()), `Tìm thẻ xanh chanh quanh quảng trường (ô vuông xanh trên bản đồ nhỏ). Đã biết ${dvKnown()}/${DV_N} câu.<span class="pbar"><i style="width:${dvKnown() / DV_N * 100}%"></i></span>`, '');
     h += row(STAGE_NAME + ' · ' + STAGE_HOST, `Sân khấu chính giữa sân dưới, trước cầu thang lớn. Đang diễn: ${curSong().title}. Đã cổ vũ ${S.stats.cheers || 0} tiết mục.`, '');
     h += '<p>Đi khắp quảng trường để nhặt vật phẩm phát sáng. Chúng hiện thành chấm màu trên bản đồ nhỏ, vòng trắng chỉ vật phẩm gần nhất của nhiệm vụ đang theo. Hoa, quả thông, atiso và hộp quà sẽ mọc lại sau một lúc.</p>';
     HUNTS.forEach(q => {
@@ -2861,7 +2892,7 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'gift'){ openGift(); }
   else if (a === 'quiz'){ openQuiz(+id); }
   else if (a === 'qa'){ if (!quizRes){ const [qi, qo] = id.split('-').map(Number); const ok = STAMP_QUIZ[qi].ok === qo, r = ok ? { coins:1500, exp:15 } : { coins:300, exp:5 }; S.quiz[qi] = ok ? 1 : 0; quizRes = { ok, r }; give(r); toast(ok ? 'Đúng rồi! +' + rewardText(r) : 'Chưa đúng, vẫn nhận thưởng an ủi: +' + rewardText(r), ok ? 'gold' : ''); sfx(ok ? 'level' : 'coin'); } }
-  else if (a === 'dvans' || a === 'dvnext' || a === 'dvmore'){ dvAct(a, id); }
+  else if (a === 'dvans' || a === 'dvnext'){ dvAct(a, id); if (a === 'dvnext') return; }
   else if (a === 'qdone'){ closeModal(); }
   else if (a === 'event'){ if (now() >= S.eventReady && ownedCount()){ S.eventEnd = now() + 90000; S.eventReady = now() + 600000; toast('Giờ vàng chợ đêm bắt đầu! Khách x2, giá +20%', 'gold'); sfx('level'); } }
   save(); renderModal(); updateHud();
@@ -2924,7 +2955,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, dvCards, dvS, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
