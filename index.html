@@ -2444,7 +2444,7 @@ function updateCart(dt){
 $('btnCart').addEventListener('click', e => { e.stopPropagation(); cartPush(); });
 /* ===== Cổng dịch chuyển sang map Chợ Đà Lạt – Khu Hòa Bình (trang cho.html, dùng chung tiến trình lưu trên máy) ===== */
 const PORTAL = WORLD.portal || null;
-const PORTAL_ROT = !PORTAL ? 0 : MAP === 'lv' ? Math.PI / 2 : Math.atan2(SPAWN.x - PORTAL.x, SPAWN.z - PORTAL.z);
+const PORTAL_ROT = !PORTAL ? 0 : MAP === 'lv' ? -Math.PI / 2 : Math.atan2(SPAWN.x - PORTAL.x, SPAWN.z - PORTAL.z);
 const PORTAL_TO = MAP === 'lv' ? { url:'index.html?map=cho', name:'Chợ Đà Lạt · Khu Hòa Bình', go:'Chợ Đà Lạt' } : { url:'index.html', name:'Quảng trường Lâm Viên', go:'Quảng trường Lâm Viên' };
 const portalFx = { g:null, lbl:null, armed:false, going:false };
 if (PORTAL){
