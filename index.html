@@ -2932,9 +2932,23 @@ function decorPlace(key, list, opt){
   });
 }
 /* xe chạy trên đường: mỗi xe là một nhóm lưới riêng, chạy thẳng theo trục x rồi quay vòng lại */
+/* người lái xe máy: ngồi trên yên, tay cầm lái, đội mũ bảo hiểm */
+const RIDER_SHIRTS = ['#2f6f8f', '#b8432f', '#3f7d4f', '#d9a322', '#6a4f9a', '#e8e4da', '#384152'], RIDER_HELMETS = ['#c23a2f', '#f2f2f2', '#2b5fa8', '#e8c22f', '#1f1f22'];
+const helmetGeo = new THREE.SphereGeometry(0.16, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.6);
+function addRider(g, p, len){
+  if (!p.box){ const b = new THREE.Box3(); p.parts.forEach(pt => { pt.g.computeBoundingBox(); b.union(pt.g.boundingBox); }); p.box = b; }
+  const k = len / p.len, seat = (p.box.min.y + (p.box.max.y - p.box.min.y) * 0.72) * k, n = (Math.random() * 1e6) | 0;
+  const r = personMesh({ shirt:RIDER_SHIRTS[n % RIDER_SHIRTS.length], pants:'#2e3440', hair:'#1f1a17' }), u = r.userData;
+  r.children.slice().forEach(c => { if (c.material === blobMat) r.remove(c); });
+  u.legL.rotation.x = u.legR.rotation.x = -1.35; u.legL.position.x = -0.15; u.legR.position.x = 0.15;   /* ngồi, hai chân dang sang hai bên xe */
+  u.armL.rotation.x = u.armR.rotation.x = -1.05; u.torso.rotation.x = 0.12;                          /* tay vươn ra trước cầm lái */
+  const hm = new THREE.Mesh(helmetGeo, pm(RIDER_HELMETS[n % RIDER_HELMETS.length])); hm.position.set(0, 1.69, 0); hm.scale.set(1.05, 1.1, 1.15); r.add(hm);
+  r.position.set(0, (seat - 0.88) / k, -0.12 / k); r.scale.setScalar(1 / k); g.add(r);
+}
 function decorVehicle(key, len, z, y, dir, speed, x0){
   const p = DECOR.protos[key], g = new THREE.Group();
   p.parts.forEach(pt => { const m = new THREE.Mesh(pt.g, pt.m); m.castShadow = false; g.add(m); });
+  if (key === 'moto') addRider(g, p, len);
   g.scale.setScalar(len / p.len); g.position.set(x0, y, z); g.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
   scene.add(g); DECOR.traffic.push({ g, dir, speed });
 }
@@ -2978,7 +2992,7 @@ function loadDecor(){
     dotKeys.forEach(k => { let list = WORLD.flowers[k]; if (low) list = list.filter((_, i) => i % 2 === 0); if (list.length) decorPlace(k, list, {}); });
     decorPlace('lamp', WORLD.lamps.map(l => [l.x, l.y, l.z, 0, 5.6]), { shadow:true });
     TRAFFIC.forEach((t, i) => { if (!low || i % 2 === 0) decorVehicle(...t); });
-    ROUTE_VEH.forEach((v, i) => { if (low && i % 2) return; const p = DECOR.protos[v.key]; if (!p) return; const g = new THREE.Group(); p.parts.forEach(pt => g.add(new THREE.Mesh(pt.g, pt.m))); g.scale.setScalar(v.len / p.len); scene.add(g); v.g = g; updateRouteVeh(v, 0); });
+    ROUTE_VEH.forEach((v, i) => { if (low && i % 2) return; const p = DECOR.protos[v.key]; if (!p) return; const g = new THREE.Group(); p.parts.forEach(pt => g.add(new THREE.Mesh(pt.g, pt.m))); if (v.key === 'moto') addRider(g, p, v.len); g.scale.setScalar(v.len / p.len); scene.add(g); v.g = g; updateRouteVeh(v, 0); });
   });
 }
 /* ================= HUD ================= */
