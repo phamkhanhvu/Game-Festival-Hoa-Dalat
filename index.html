@@ -1,6 +1,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Quầy Hàng Đà Lạt</title>
+<title>DalatEvent · Từ xe đẩy thành thương hiệu</title>
+<meta name="apple-mobile-web-app-title" content="DalatEvent">
+<meta name="application-name" content="DalatEvent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;600;700&display=swap">
@@ -378,7 +380,7 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
   <div class="toasts" id="toasts"></div>
   <div class="flash" id="flash"></div>
 
-  <div class="rotate" id="loading" style="top:38%"><p style="margin:0"><span id="loadName">Đang tải Quảng trường Lâm Viên…</span> <b id="loadPct">0%</b></p></div>
+  <div class="rotate" id="loading" style="top:38%"><p style="margin:0"><b style="display:block;font-size:1.6em;letter-spacing:.02em">DalatEvent</b><span style="display:block;opacity:.85;margin-bottom:.4rem">Từ xe đẩy thành thương hiệu</span><span id="loadName">Đang tải Quảng trường Lâm Viên…</span> <b id="loadPct">0%</b></p></div>
   <div class="rotate" id="rotate" hidden>
     <p>Xoay ngang điện thoại để nhìn rộng quảng trường hơn.</p>
     <button class="gbtn" id="rotateOk">Chơi luôn</button>
@@ -409,7 +411,7 @@ window.FB_READY = (function(){
 'use strict';
 const $ = id => document.getElementById(id);
 const MAP = window.MAP_ID || 'lv';   /* lv: Quảng trường Lâm Viên · cho: Chợ Đà Lạt – Khu Hòa Bình */
-if (MAP === 'cho'){ document.title = 'Chợ Đà Lạt · Quầy Hàng Đà Lạt'; const ln = $('loadName'); if (ln) ln.textContent = 'Đang tải Chợ Đà Lạt – Khu Hòa Bình…'; }
+if (MAP === 'cho'){ document.title = 'DalatEvent · Chợ Đà Lạt'; const ln = $('loadName'); if (ln) ln.textContent = 'Đang tải Chợ Đà Lạt – Khu Hòa Bình…'; }
 const TAU = Math.PI * 2;
 const fmt = n => Math.floor(n).toLocaleString('en-US');
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
