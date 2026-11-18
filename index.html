@@ -299,6 +299,10 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="26" width="10" height="14" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><rect x="19" y="10" width="10" height="30" fill="#ffd84a" stroke="#8a5a00" stroke-width="2"/><rect x="30" y="20" width="10" height="20" fill="#ffc83d" stroke="#8a5a00" stroke-width="2"/><path d="M6 42h36" stroke="#7a4a06" stroke-width="3"/></svg>
       Bảng Xếp Hạng
     </button>
+    <button class="mbtn outline" data-open="dovui">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 10h32a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H22l-9 7v-7H8a4 4 0 0 1-4-4V14a4 4 0 0 1 4-4z" fill="#c8f03c" stroke="#4a6a0a" stroke-width="2"/><text x="24" y="29" text-anchor="middle" font-size="17" font-weight="900" fill="#1d2a06" font-family="sans-serif">?</text></svg>
+      Đố Vui<span class="dot" id="dotDv"></span>
+    </button>
     <button class="mbtn outline" data-open="veso">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="13" width="38" height="22" rx="3" fill="#ffd84a" stroke="#8a5a00" stroke-width="2"/><path d="M5 24h38" stroke="#8a5a00" stroke-width="1.5" stroke-dasharray="3 3"/><circle cx="14" cy="24" r="3" fill="#e2453b"/><text x="26" y="29" font-size="11" font-weight="700" text-anchor="middle" fill="#8a5a00">88</text></svg>
       Vé Số
@@ -777,6 +781,8 @@ const QUESTS = [
 ];
 const ACHV = [
   { id:'brands', t:'Tham quan đủ các gian trưng bày thương hiệu', goal:Math.max(1, (WORLD.booths || []).length), p:() => Object.keys(S.brands || {}).length, g:30 },
+  { id:'dalat30', t:'Đố Vui: biết 30 câu về Đà Lạt', goal:30, p:() => dvKnown(), g:20 },
+  { id:'dalatall', t:'Đố Vui: biết trọn bộ câu hỏi, thành Đại sứ Đà Lạt', goal:98, p:() => dvKnown(), g:60 },
   { id:'cheer10', t:'Cổ vũ 10 bài hát ở Music Festival của Sense Acoustic Cafe', goal:10, p:() => S.stats.cheers || 0, g:15 },
   { id:'festsell', t:'Bán 50 phần hàng trong Festival Hoa', goal:50, p:() => S.stats.festSold || 0, g:15 },
   { id:'s50',   t:'Bán 50 phần hàng',             goal:50,     p:() => S.sold, g:10 },
@@ -2003,6 +2009,163 @@ document.addEventListener('visibilitychange', () => {
   else { ON.last = null; onlineSend(true); }
 });
 $('btnOnline').addEventListener('click', onlineList);
+/* ===== Đố Vui Đà Lạt: mỗi ngày 5 câu trắc nghiệm có thưởng, sưu tầm đủ bộ câu hỏi để lên danh hiệu "Đại sứ Đà Lạt" =====
+   Mỗi câu: [câu hỏi, đáp án đúng, ba đáp án nhiễu]. Câu đã trả lời đúng một lần được tính vào bộ sưu tập. */
+const DV_Q = [
+ ['Đà Lạt thường được gọi bằng biệt danh nào gắn với các loài hoa?', 'Xứ sở ngàn hoa', 'Xứ sở hoa anh đào', 'Thành phố hoa phượng đỏ', 'Đất võ trời văn'],
+ ['Loài cây nào thường xuất hiện trong hình ảnh những con đường và đồi núi Đà Lạt?', 'Cây thông', 'Cây dừa', 'Cây phượng', 'Cây bàng'],
+ ['Hồ nước nào nằm ngay khu vực trung tâm Đà Lạt?', 'Hồ Xuân Hương', 'Hồ Tuyền Lâm', 'Hồ Gươm', 'Hồ Than Thở'],
+ ['Quảng trường nổi tiếng nằm cạnh hồ Xuân Hương có tên gì?', 'Quảng trường Lâm Viên', 'Quảng trường Ba Đình', 'Quảng trường Lam Sơn', 'Quảng trường 2/4'],
+ ['Hai công trình tạo hình nổi bật tại Quảng trường Lâm Viên là gì?', 'Hoa dã quỳ và nụ hoa atisô', 'Hoa sen và búp măng', 'Hoa mai anh đào và trái dâu', 'Hoa hồng và quả thông'],
+ ['Chợ nổi tiếng ở trung tâm Đà Lạt có tên gì?', 'Chợ Đà Lạt', 'Chợ Bến Thành', 'Chợ Đông Ba', 'Chợ Hàn'],
+ ['Đà Lạt thuộc tỉnh nào của Việt Nam?', 'Lâm Đồng', 'Đắk Lắk', 'Khánh Hòa', 'Gia Lai'],
+ ['Đà Lạt nằm trên vùng địa hình nào?', 'Cao nguyên', 'Đồng bằng', 'Ven biển', 'Hải đảo'],
+ ['Đà Lạt nổi tiếng với kiểu khí hậu nào?', 'Khí hậu cao nguyên mát mẻ', 'Nhiệt đới nóng ẩm quanh năm', 'Sa mạc khô nóng', 'Hàn đới băng giá'],
+ ['Hiện tượng thời tiết nào thường tạo nên vẻ mờ ảo cho Đà Lạt vào sáng sớm?', 'Sương mù', 'Bão cát', 'Mưa đá', 'Tuyết rơi'],
+ ['Thức uống nóng nào du khách hay tìm uống vào buổi tối lạnh ở Đà Lạt?', 'Sữa đậu nành nóng', 'Nước mía', 'Trà đá', 'Nước dừa'],
+ ['Món ăn vặt nào thường được gọi vui là "pizza Đà Lạt"?', 'Bánh tráng nướng', 'Bánh xèo', 'Bánh căn', 'Bánh bèo'],
+ ['Loại quả màu đỏ, thường được hái tại vườn, là đặc sản nổi tiếng của Đà Lạt?', 'Dâu tây', 'Thanh long', 'Vải thiều', 'Chôm chôm'],
+ ['Loài hoa màu hồng thường nở rộ vào đầu năm và gắn liền với Đà Lạt?', 'Hoa mai anh đào', 'Hoa dã quỳ', 'Hoa sen', 'Hoa đào Nhật Tân'],
+ ['Loài hoa vàng thường nở vào cuối năm trên các tuyến đường cao nguyên?', 'Hoa dã quỳ', 'Hoa mai anh đào', 'Hoa phượng', 'Hoa sen'],
+ ['Khi du khách nói đến "đi chợ đêm", họ thường nhắc đến khu vực nào?', 'Chợ Đà Lạt và các phố lân cận', 'Khu vực hồ Tuyền Lâm', 'Khu vực đèo Prenn', 'Khu vực thác Datanla'],
+ ['Nhà thờ nổi tiếng nào ở Đà Lạt có hình con gà trên đỉnh tháp?', 'Nhà thờ Con Gà (Chính tòa Đà Lạt)', 'Nhà thờ Domaine de Marie', 'Nhà thờ Đức Bà Sài Gòn', 'Nhà thờ Lớn Hà Nội'],
+ ['Nhà ga cổ nổi tiếng của Đà Lạt có tên gì?', 'Ga Đà Lạt', 'Ga Hàng Cỏ', 'Ga Sài Gòn', 'Ga Huế'],
+ ['Đỉnh núi gắn với truyền thuyết tình yêu Lang và Biang là núi nào?', 'Langbiang', 'Núi Bà Đen', 'Fansipan', 'Núi Ngự Bình'],
+ ['Lễ hội lớn tôn vinh các loài hoa của Đà Lạt có tên là gì?', 'Festival Hoa Đà Lạt', 'Lễ hội Pháo hoa Quốc tế', 'Lễ hội Cà phê Buôn Ma Thuột', 'Festival Huế'],
+ ['Hồ nào nổi tiếng với cảnh rừng thông, du thuyền và không gian nghỉ dưỡng?', 'Hồ Tuyền Lâm', 'Hồ Ba Bể', 'Hồ Tây', 'Hồ Trị An'],
+ ['Thiền viện nổi tiếng nằm gần hồ Tuyền Lâm tên gì?', 'Thiền viện Trúc Lâm Đà Lạt', 'Chùa Linh Phước', 'Chùa Bái Đính', 'Chùa Thiên Mụ'],
+ ['Thác nước nào ở Đà Lạt nổi tiếng với hệ thống máng trượt xuyên rừng?', 'Thác Datanla', 'Thác Bản Giốc', 'Thác Pongour', 'Thác Cam Ly'],
+ ['Thác nước nào nằm trên tuyến đường đèo cửa ngõ phía Nam Đà Lạt?', 'Thác Prenn', 'Thác Cam Ly', 'Thác Bản Giốc', 'Thác Dray Nur'],
+ ['Thác nào mang tên một dòng suối gắn với Đà Lạt?', 'Thác Cam Ly', 'Thác Bản Giốc', 'Thác Dray Nur', 'Thác Pongour'],
+ ['Hồ nào mang tên gợi đến nỗi buồn và những câu chuyện tình yêu?', 'Hồ Than Thở', 'Hồ Tuyền Lâm', 'Hồ Gươm', 'Hồ Xuân Hương'],
+ ['Đồi nào gần hồ Than Thở nổi tiếng với câu chuyện về hai cây thông?', 'Đồi thông hai mộ', 'Đồi Robin', 'Đồi Đa Phú', 'Đồi chè Cầu Đất'],
+ ['Thung lũng du lịch nào nổi tiếng với chủ đề tình yêu và cảnh quan lãng mạn?', 'Thung lũng Tình Yêu', 'Thung lũng Mường Hoa', 'Thung lũng Mai Châu', 'Thung lũng Bắc Sơn'],
+ ['Ngọn đồi nào nổi tiếng với cảnh bình minh, mây và rừng thông tại Đà Lạt?', 'Đồi Đa Phú', 'Đồi Robin', 'Đồi thông hai mộ', 'Đồi cát Mũi Né'],
+ ['Địa điểm nào gắn với cụm từ "Cây thông cô đơn"?', 'Khu vực hồ Suối Vàng', 'Khu vực hồ Gươm', 'Khu vực chợ Đà Lạt', 'Khu vực Ga Đà Lạt'],
+ ['Hồ Đan Kia còn gắn với tên gọi phổ biến nào?', 'Hồ Suối Vàng', 'Hồ Than Thở', 'Hồ Tuyền Lâm', 'Hồ Xuân Hương'],
+ ['Ngọn đồi nào có tên rất lạ, từng nổi tiếng với thảm cỏ hồng gần khu Suối Vàng?', 'Đồi cỏ hồng', 'Đồi Robin', 'Đồi chè', 'Đồi cát bay'],
+ ['Đèo nổi tiếng dẫn vào Đà Lạt từ phía Nam có tên gì?', 'Đèo Prenn', 'Đèo Hải Vân', 'Đèo Mã Pí Lèng', 'Đèo Ô Quy Hồ'],
+ ['Con đèo trên tuyến đường Đà Lạt – Nha Trang thường được gọi bằng tên gì?', 'Đèo Khánh Lê (đèo Hòn Giao)', 'Đèo Hải Vân', 'Đèo Prenn', 'Đèo Cả'],
+ ['Ngôi chùa ở Trại Mát nổi tiếng với nhiều công trình khảm sành sứ là chùa nào?', 'Chùa Linh Phước', 'Thiền viện Trúc Lâm', 'Chùa Một Cột', 'Chùa Thiên Mụ'],
+ ['Chùa Linh Phước còn được nhiều người gọi bằng tên dân gian nào?', 'Chùa Ve Chai', 'Chùa Cầu', 'Chùa Hang', 'Chùa Vàng'],
+ ['Công trình nào ở Đà Lạt nổi tiếng với kiến trúc kỳ lạ như trong truyện cổ tích?', 'Biệt thự Hằng Nga (Crazy House)', 'Dinh Bảo Đại', 'Khách sạn Dalat Palace', 'Ga Đà Lạt'],
+ ['Hồ nước nào ở Đà Lạt được đặt theo tên một nữ thi sĩ nổi tiếng?', 'Hồ Xuân Hương', 'Hồ Than Thở', 'Hồ Tuyền Lâm', 'Hồ Đan Kia'],
+ ['Khu vực nào có Nhà thờ Con Gà, khu Hòa Bình và chợ Đà Lạt?', 'Khu trung tâm Đà Lạt', 'Khu Trại Mát', 'Khu Lạc Dương', 'Khu Tuyền Lâm'],
+ ['Địa điểm nào ở Đà Lạt có kiến trúc nhà ga cổ và đoàn tàu phục vụ du lịch?', 'Ga Đà Lạt', 'Ga Hà Nội', 'Ga Huế', 'Ga Đồng Hới'],
+ ['Loài hoa nào được trồng rất phổ biến trong các vườn hoa cắt cành ở Đà Lạt?', 'Hoa cúc', 'Hoa sen', 'Hoa súng', 'Hoa ban'],
+ ['Đà Lạt nổi tiếng với loại hoa nào thường được tặng trong dịp lễ tình nhân?', 'Hoa hồng', 'Hoa dã quỳ', 'Hoa súng', 'Hoa sen'],
+ ['Loài hoa có tên bắt đầu bằng chữ "cẩm", nhiều màu sắc, thường được trồng tại Đà Lạt?', 'Hoa cẩm tú cầu', 'Hoa cúc', 'Hoa hồng', 'Hoa ly'],
+ ['Loài hoa nào có tên giống đồng tiền dùng trong mua bán?', 'Hoa đồng tiền', 'Hoa mười giờ', 'Hoa ly', 'Hoa lay ơn'],
+ ['Một sản phẩm từ cây atisô thường được du khách mua làm quà là gì?', 'Trà atisô', 'Mứt gừng', 'Nước mắm', 'Bánh pía'],
+ ['Loại rau nào thường xuất hiện trong các món salad rau Đà Lạt?', 'Xà lách', 'Rau muống', 'Rau đay', 'Rau ngót'],
+ ['Loại củ màu cam nổi tiếng trong nông sản Đà Lạt là củ gì?', 'Cà rốt', 'Củ cải trắng', 'Củ dền', 'Khoai môn'],
+ ['Loại rau họ cải tạo thành những bông nhỏ, thường có màu xanh hoặc trắng?', 'Bông cải', 'Bắp cải', 'Su hào', 'Cải thìa'],
+ ['Món bánh mì chấm với chén xíu mại (thịt viên sốt) phổ biến vào buổi sáng ở Đà Lạt là món gì?', 'Bánh mì xíu mại', 'Bánh mì chảo', 'Bánh mì phá lấu', 'Bánh mì que'],
+ ['Loại mứt làm từ một loại quả mọng đỏ đặc trưng của Đà Lạt là gì?', 'Mứt dâu tây', 'Mứt gừng', 'Mứt dừa', 'Mứt me'],
+ ['Thức uống nào làm từ quả dâu tằm, thường được mua làm quà tại Đà Lạt?', 'Nước cốt dâu tằm', 'Nước mía', 'Nước dừa', 'Nước sâm'],
+ ['Món ăn nóng nào thường được nướng trên bếp than và ăn vào buổi tối se lạnh?', 'Khoai lang nướng', 'Gỏi cuốn', 'Chè đậu xanh', 'Nem chua'],
+ ['Làng hoa nào nằm trên tuyến đường Vạn Thành và nổi tiếng với nghề trồng hoa?', 'Làng hoa Vạn Thành', 'Làng hoa Thái Phiên', 'Làng hoa Hà Đông', 'Làng hoa Sa Đéc'],
+ ['Làng hoa nào nằm ở khu vực Trại Mát, gắn với nghề trồng hoa lâu đời?', 'Làng hoa Thái Phiên', 'Làng hoa Vạn Thành', 'Làng hoa Hà Đông', 'Làng hoa Sa Đéc'],
+ ['Làng hoa nào nổi tiếng ở khu vực gần Thung lũng Tình Yêu?', 'Làng hoa Hà Đông', 'Làng hoa Thái Phiên', 'Làng hoa Vạn Thành', 'Làng hoa Sa Đéc'],
+ ['Mùa hoa nào khiến những tuyến đường quanh Đà Lạt phủ sắc vàng khoảng tháng 10–12?', 'Mùa hoa dã quỳ', 'Mùa hoa mai anh đào', 'Mùa phượng tím', 'Mùa hoa bằng lăng'],
+ ['Tên gọi nào chỉ những vườn rau, hoa được trồng trong công trình có mái che ở Đà Lạt?', 'Nhà kính', 'Nhà sàn', 'Nhà rông', 'Nhà tranh'],
+ ['Nông sản nào ở Đà Lạt thường được trồng trên giá thể và thu hoạch theo chùm?', 'Cà chua', 'Bí đỏ', 'Khoai tây', 'Cà rốt'],
+ ['Bác sĩ, nhà thám hiểm nào đặt chân lên cao nguyên Lang Biang năm 1893?', 'Alexandre Yersin', 'Louis Pasteur', 'Paul Doumer', 'Ernest Hébrard'],
+ ['Ngày nào được ghi nhận là ngày Yersin đặt chân lên cao nguyên Lang Biang?', '21/6/1893', '20/4/1916', '2/9/1945', '1/1/1900'],
+ ['Yersin là nhà thám hiểm mang quốc tịch nào?', 'Thụy Sĩ, sau nhập quốc tịch Pháp', 'Anh', 'Đức', 'Bỉ'],
+ ['Năm 1916, triều đình nào ban hành dụ thành lập thị tứ Đà Lạt?', 'Nhà Nguyễn, thời vua Duy Tân', 'Nhà Nguyễn, thời vua Gia Long', 'Nhà Lê, thời vua Lê Thánh Tông', 'Nhà Trần'],
+ ['Đạo dụ thành lập thị tứ Đà Lạt được ban hành ngày nào?', '20/4/1916', '21/6/1893', '2/9/1945', '1/1/1923'],
+ ['Tên cao nguyên gắn liền với sự hình thành Đà Lạt là gì?', 'Cao nguyên Lâm Viên (Lang Biang)', 'Cao nguyên Mộc Châu', 'Cao nguyên Đồng Văn', 'Cao nguyên Pleiku'],
+ ['Những cộng đồng nào sinh sống trên cao nguyên Lâm Viên từ trước khi có đô thị Đà Lạt?', 'Người Lạch, Chil và Srê (dân tộc Cơ Ho)', 'Người Thái và người Mường', 'Người H\'Mông và người Dao', 'Người Chăm và người Raglai'],
+ ['Toàn quyền Đông Dương nào gắn với việc chọn vùng cao nguyên để xây nơi nghỉ dưỡng?', 'Paul Doumer', 'Ernest Hébrard', 'Alexandre Yersin', 'Louis Pasteur'],
+ ['Kiến trúc sư người Pháp nào hoàn thành đồ án quy hoạch Đà Lạt năm 1923?', 'Ernest Hébrard', 'Paul Doumer', 'Gustave Eiffel', 'Alexandre Yersin'],
+ ['Đồ án quy hoạch nổi tiếng của Ernest Hébrard hoàn thành năm nào?', 'Năm 1923', 'Năm 1893', 'Năm 1916', 'Năm 1945'],
+ ['Khách sạn lịch sử nổi tiếng nhìn về phía hồ Xuân Hương có tên là gì?', 'Dalat Palace', 'Continental Sài Gòn', 'Rex Sài Gòn', 'Sofitel Metropole Hà Nội'],
+ ['Dinh nào gắn với nơi nghỉ dưỡng, sinh hoạt của vua Bảo Đại và gia đình ở Đà Lạt?', 'Dinh III (Dinh Bảo Đại)', 'Dinh Độc Lập', 'Dinh Gia Long', 'Lăng Khải Định'],
+ ['Có bao nhiêu dinh thường được gọi là Dinh I, Dinh II và Dinh III tại Đà Lạt?', 'Ba dinh', 'Hai dinh', 'Bốn dinh', 'Năm dinh'],
+ ['Ga Đà Lạt xưa là điểm cuối của tuyến đường sắt nối từ đâu (thuộc Ninh Thuận cũ)?', 'Tháp Chàm', 'Phan Thiết', 'Nha Trang', 'Quy Nhơn'],
+ ['Loại đường sắt đặc biệt nào từng dùng trên đoạn dốc lớn của tuyến Tháp Chàm – Đà Lạt?', 'Đường sắt răng cưa', 'Tàu điện ngầm', 'Cáp treo', 'Đường sắt cao tốc'],
+ ['Nhà ga du lịch Đà Lạt hiện nay gắn với tuyến tàu ngắn đi đến khu vực nào?', 'Trại Mát', 'Hồ Tuyền Lâm', 'Langbiang', 'Tháp Chàm'],
+ ['Tên gọi "Ấp Ánh Sáng" ở Đà Lạt gắn với khu vực nào?', 'Khu dân cư gần hồ Xuân Hương và chợ Đà Lạt', 'Khu Trại Mát', 'Khu Tuyền Lâm', 'Khu Lạc Dương'],
+ ['Nhà thờ Domaine de Marie còn được gọi bằng tên nào?', 'Nhà thờ Mai Anh', 'Nhà thờ Con Gà', 'Nhà thờ Cam Ly', 'Nhà thờ Đức Bà'],
+ ['Công trình nào ở Đà Lạt được đặt tên theo nhà bác học Louis Pasteur?', 'Viện Pasteur Đà Lạt', 'Dinh III', 'Ga Đà Lạt', 'Khách sạn Dalat Palace'],
+ ['Trường học có kiến trúc cổ và tháp chuông ở Đà Lạt, mang tên một nhà khoa học, là trường nào?', 'Lycée Yersin (nay là CĐ Sư phạm Đà Lạt)', 'Trường Quốc Học Huế', 'Trường Chu Văn An', 'Trường Petrus Ký'],
+ ['Festival Hoa Đà Lạt lần đầu tiên được tổ chức vào năm nào?', 'Năm 2005', 'Năm 2000', 'Năm 2010', 'Năm 1995'],
+ ['Sự kiện hoa năm 2004 nào được xem là bước chuẩn bị cho Festival Hoa Đà Lạt?', 'Lễ hội Sắc hoa Đà Lạt', 'Lễ hội Trà', 'Ngày hội Cà phê', 'Lễ hội Đua voi'],
+ ['Festival Hoa Đà Lạt lần thứ II diễn ra năm nào?', 'Năm 2007', 'Năm 2006', 'Năm 2008', 'Năm 2010'],
+ ['Năm nào Đà Lạt được Thủ tướng Chính phủ công nhận là đô thị Festival Hoa?', 'Năm 2009', 'Năm 2005', 'Năm 2015', 'Năm 2019'],
+ ['Đà Lạt gia nhập Mạng lưới các Thành phố Sáng tạo UNESCO vào năm nào?', 'Năm 2023', 'Năm 2019', 'Năm 2021', 'Năm 2025'],
+ ['Đà Lạt gia nhập Mạng lưới các Thành phố Sáng tạo UNESCO trong lĩnh vực nào?', 'Âm nhạc', 'Ẩm thực', 'Thủ công mỹ nghệ', 'Văn học'],
+ ['Tên viết tắt tiếng Anh của Tổ chức Giáo dục, Khoa học và Văn hóa Liên Hợp Quốc là gì?', 'UNESCO', 'UNICEF', 'WHO', 'ASEAN'],
+ ['Tính từ năm Yersin đặt chân lên Lang Biang, năm 2026 đánh dấu bao nhiêu năm?', '133 năm', '123 năm', '110 năm', '143 năm'],
+ ['Tính từ đạo dụ thành lập thị tứ Đà Lạt năm 1916, năm 2026 là tròn bao nhiêu năm?', '110 năm', '100 năm', '103 năm', '133 năm'],
+ ['Festival Hoa Đà Lạt năm 2026 là kỳ tổ chức thứ mấy?', 'Lần thứ XI', 'Lần thứ IX', 'Lần thứ X', 'Lần thứ XII'],
+ ['Cây thuốc nổi tiếng có hình nụ hoa khổng lồ tại Quảng trường Lâm Viên là gì?', 'Atisô', 'Sâm Ngọc Linh', 'Đinh lăng', 'Bạc hà'],
+ ['Loài hoa nào làm hình tượng cho khối công trình màu vàng tại Quảng trường Lâm Viên?', 'Hoa dã quỳ', 'Hoa hồng', 'Hoa cúc', 'Hoa mai anh đào'],
+ ['Công trình hình nụ atisô và hoa dã quỳ nằm ở phía nào của hồ Xuân Hương?', 'Bờ Nam của hồ', 'Bờ Bắc của hồ', 'Bờ Đông của hồ', 'Giữa lòng hồ'],
+ ['Dòng suối nào được ngăn đập để tạo nên hồ nước trung tâm Đà Lạt?', 'Suối Cam Ly', 'Sông Đồng Nai', 'Sông Hương', 'Suối Vàng'],
+ ['Hồ Xuân Hương là hồ tự nhiên hoàn toàn hay hồ nhân tạo?', 'Hồ nhân tạo', 'Hồ tự nhiên hoàn toàn', 'Hồ miệng núi lửa', 'Một vịnh biển cũ'],
+ ['Tên gọi Trại Mát gắn liền với địa điểm tâm linh nổi tiếng nào?', 'Chùa Linh Phước', 'Thiền viện Trúc Lâm', 'Chùa Thiên Mụ', 'Chùa Bái Đính'],
+ ['Trong truyền thuyết địa phương, tên Langbiang gắn với hai nhân vật nào?', 'Chàng Lang và nàng Biang', 'Sơn Tinh và Thủy Tinh', 'Chử Đồng Tử và Tiên Dung', 'Lạc Long Quân và Âu Cơ'],
+ ['Địa danh nào mang tên "thung lũng" và gắn với biểu tượng tình yêu?', 'Thung lũng Tình Yêu', 'Thung lũng Mường Hoa', 'Thung lũng Mai Châu', 'Thung lũng Bắc Sơn'],
+ ['Nơi nào ở Đà Lạt nổi tiếng với một cây thông đứng riêng giữa cảnh quan hồ, đồi?', 'Cây thông cô đơn ở hồ Suối Vàng', 'Cây đa Tân Trào', 'Cây bàng vuông Trường Sa', 'Cây gạo Tây Bắc'],
+ ['Hai thế mạnh văn hóa nào tiêu biểu nhất để giới thiệu Đà Lạt với thế giới (UNESCO và lễ hội)?', 'Hoa và âm nhạc', 'Biển và đảo', 'Cà phê và lúa gạo', 'Hang động và núi đá']
+];
+const DV_N = DV_Q.length, DV_ROUND = 5;
+const DV_RANKS = [[0, 'Khách du lịch'], [10, 'Người yêu Đà Lạt'], [30, 'Hướng dẫn viên'], [60, 'Người Đà Lạt chính hiệu'], [90, 'Đại sứ Đà Lạt']];
+function dvS(){
+  if (!S.dv || typeof S.dv !== 'object') S.dv = {};
+  const d = S.dv; if (!d.ok) d.ok = {}; if (!Array.isArray(d.ids)) d.ids = [];
+  return d;
+}
+const dvKnown = () => Object.keys(dvS().ok).length;
+function dvRank(n){ let r = DV_RANKS[0][1]; DV_RANKS.forEach(([k, t]) => { if (n >= k) r = t; }); return r; }
+function dvShuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+/* chọn 5 câu: ưu tiên câu chưa trả lời đúng, mỗi câu kèm thứ tự đáp án đã xáo để mở lại vẫn giữ nguyên */
+function dvNewRound(extra){
+  const d = dvS(), fresh = [], old = [];
+  for (let i = 0; i < DV_N; i++) (d.ok[i] ? old : fresh).push(i);
+  const pick = dvShuffle(fresh).slice(0, DV_ROUND); dvShuffle(old); while (pick.length < DV_ROUND && old.length) pick.push(old.pop());
+  d.ids = pick.map(q => ({ q, o:dvShuffle([0, 1, 2, 3]), a:-1 })); d.i = 0; d.got = 0; d.extra = !!extra; d.done = false; d.res = null;
+  if (!extra) d.day = dateKey();
+}
+function dvDailyDone(){ const d = dvS(); return d.day === dateKey() && (d.extra || d.done); }
+function dvRender(){
+  const d = dvS();
+  if (d.day !== dateKey() && !(d.extra && !d.done)) dvNewRound(false);
+  const n = dvKnown();
+  let h = `<p>Mỗi ngày 5 câu hỏi về Đà Lạt. Trả lời đúng để nhận xu và sưu tầm đủ ${DV_N} câu, lên danh hiệu <b style="color:#d7ff6b">Đại sứ Đà Lạt</b>.</p>`;
+  h += row('Hiểu Đà Lạt: ' + dvRank(n), `Đã biết ${n}/${DV_N} câu<span class="pbar"><i style="width:${n / DV_N * 100}%"></i></span>`, '');
+  if (d.done){
+    h += `<div class="qbox ok"><b>${d.extra ? 'Xong lượt luyện thêm' : 'Xong 5 câu hôm nay'}: đúng ${d.got}/${DV_ROUND}</b><p>${d.extra ? 'Luyện thêm giúp mở khoá câu mới cho bộ sưu tập.' : 'Ngày mai có 5 câu mới với phần thưởng đầy đủ.'}</p>`;
+    h += `<button class="gbtn green" data-act="dvmore">Luyện thêm 5 câu<small>+150 xu mỗi câu đúng</small></button></div>`;
+    return h;
+  }
+  const cur = d.ids[d.i], Q = DV_Q[cur.q];
+  h += `<div class="qbox${cur.a >= 0 ? (cur.a === 0 ? ' ok' : ' no') : ''}"><small style="opacity:.75">${d.extra ? 'Luyện thêm' : 'Hôm nay'} · câu ${d.i + 1}/${DV_ROUND}</small><b>${Q[0]}</b>`;
+  if (cur.a < 0) h += cur.o.map(k => `<button class="qopt" data-act="dvans:${k}">${Q[1 + k]}</button>`).join('');
+  else {
+    h += cur.a === 0 ? `<p>Chính xác! ${d.res ? 'Thưởng: ' + rewardText(d.res) : ''}</p>` : `<p>Chưa đúng. Đáp án: <b>${Q[1]}</b></p>`;
+    h += `<button class="gbtn" data-act="dvnext">${d.i + 1 < DV_ROUND ? 'Câu tiếp theo' : 'Xem kết quả'}</button>`;
+  }
+  return h + '</div>';
+}
+function dvAct(a, id){
+  const d = dvS();
+  if (a === 'dvans'){
+    const cur = d.ids[d.i]; if (!cur || cur.a >= 0) return;
+    cur.a = +id; const ok = cur.a === 0, isNew = ok && !d.ok[cur.q];
+    if (ok){ d.got++; d.ok[cur.q] = 1; d.res = d.extra ? { coins:150, exp:3 } : { coins:800, exp:8 }; give(d.res); sfx('level'); if (isNew && [10, 30, 60, 90, DV_N].includes(dvKnown())) setTimeout(() => toast('Danh hiệu mới: ' + dvRank(dvKnown()), 'gold'), 400); }
+    else { d.res = null; sfx('bad'); }
+  } else if (a === 'dvnext'){
+    if (d.ids[d.i].a < 0) return;
+    if (d.i + 1 < DV_ROUND){ d.i++; d.res = null; return; }
+    d.done = true;
+    if (!d.extra){ const r = d.got === DV_ROUND ? { gems:5 } : d.got >= 3 ? { gems:2 } : null; if (r){ give(r); toast(`Đúng ${d.got}/${DV_ROUND} câu hôm nay: +${rewardText(r)}`, 'gold'); } }
+  } else if (a === 'dvmore'){ dvNewRound(true); }
+  dvHud();
+}
+function dvHud(){ const el = $('dotDv'); if (el) el.hidden = dvDailyDone(); }
 
 /* ================= Hành động quầy ================= */
 let nearId = null, T = 0, ctxKey = '', nearSeller = false;
@@ -2471,6 +2634,7 @@ function setWidth(id, pct){ const v = Math.round(pct * 1000) / 10 + '%'; if (hud
 function welfareReady(){ return S.lastDaily !== dateKey() || S.onlineAcc >= 300; }
 let modalTick = null;
 function updateHud(){
+  dvHud();
   lottoSettle();
   setText('hLv', 'Lv.' + S.level); setText('hName', S.name);
   setWidth('hSta', P.sta / 100); setWidth('hXp', S.exp / expNeed(S.level));
@@ -2573,7 +2737,7 @@ $('qGo').addEventListener('click', () => {
 
 /* ================= Hộp thoại ================= */
 let modalType = null, resetAsk = false;
-const TITLES = { veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
+const TITLES = { dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
 function openModal(type){ modalType = type; resetAsk = false; $('mTitle').textContent = TITLES[type]; $('modal').hidden = false; renderModal(); }
 function closeModal(){ $('modal').hidden = true; modalType = null; modalTick = null; quizRes = null; save(); if (pendingQuiz.length) setTimeout(() => { if (!modalType && pendingQuiz.length) openQuiz(pendingQuiz.shift()); }, 350); }
 function row(title, sub, btn, extra){ return `<div class="row">${extra || ''}<div class="rt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${btn || ''}</div>`; }
@@ -2649,6 +2813,8 @@ function renderModal(){
     own.forEach(d => { const s = st(d.id); h += row(`${d.name} · Cấp ${s.level}`, `Kho ${s.stock}/${maxStock(d)} · Giá ${fmt(lvlPrice(d))} xu · ${serveTime(d).toFixed(1)} giây/khách`, ''); });
     h += '<h3>Thống kê</h3><div class="kv">';
     h += `<span>Đã bán</span><b>${fmt(S.sold)} phần</b><span>Tổng thu</span><b>${fmt(S.stats.earned)} xu</b><span>Tự tay phục vụ</span><b>${fmt(S.stats.served)} khách</b><span>Khách bỏ đi vì hết hàng</span><b>${fmt(S.stats.missed)}</b><span>Trang phục</span><b>${S.outfits.length}/${OUTFITS.length}</b></div>`;
+  } else if (modalType === 'dovui'){
+    h += dvRender();
   } else if (modalType === 'quiz'){
     const Q = STAMP_QUIZ[quizIdx];
     h += `<p>Bạn vừa tìm thấy tem <b>${STAMPS[quizIdx].t}</b>. Trả lời đúng để nhận thêm thưởng.</p>`;
@@ -2695,6 +2861,7 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'gift'){ openGift(); }
   else if (a === 'quiz'){ openQuiz(+id); }
   else if (a === 'qa'){ if (!quizRes){ const [qi, qo] = id.split('-').map(Number); const ok = STAMP_QUIZ[qi].ok === qo, r = ok ? { coins:1500, exp:15 } : { coins:300, exp:5 }; S.quiz[qi] = ok ? 1 : 0; quizRes = { ok, r }; give(r); toast(ok ? 'Đúng rồi! +' + rewardText(r) : 'Chưa đúng, vẫn nhận thưởng an ủi: +' + rewardText(r), ok ? 'gold' : ''); sfx(ok ? 'level' : 'coin'); } }
+  else if (a === 'dvans' || a === 'dvnext' || a === 'dvmore'){ dvAct(a, id); }
   else if (a === 'qdone'){ closeModal(); }
   else if (a === 'event'){ if (now() >= S.eventReady && ownedCount()){ S.eventEnd = now() + 90000; S.eventReady = now() + 600000; toast('Giờ vàng chợ đêm bắt đầu! Khách x2, giá +20%', 'gold'); sfx('level'); } }
   save(); renderModal(); updateHud();
