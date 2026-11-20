@@ -405,13 +405,13 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '53f06c75'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '3688a858'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
 const MAP = window.MAP_ID || 'lv';   /* lv: Quảng trường Lâm Viên · cho: Chợ Đà Lạt – Khu Hòa Bình */
-if (MAP === 'cho'){ document.title = 'DalatEvent · Chợ Đà Lạt'; const ln = $('loadName'); if (ln) ln.textContent = 'Đang tải Chợ Đà Lạt – Khu Hòa Bình…'; }
+if (MAP === 'cho'){ document.title = 'DalatEvent · Chợ Đà Lạt'; const ln = $('loadName'); if (ln) ln.textContent = 'Đang tải Chợ Đà Lạt – Khu Hòa Bình… (dữ liệu bản đồ © OpenStreetMap contributors)'; }
 const TAU = Math.PI * 2;
 const fmt = n => Math.floor(n).toLocaleString('en-US');
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -1112,7 +1112,7 @@ function upgradePlayerSkinned(sc, img){
 }
 function loadModel(){
   const el = $('loading'), pct = $('loadPct');
-  loadBin(MAP === 'cho' ? 'market.glb' : 'model.glb', f => { pct.textContent = Math.min(99, Math.round(f * 100)) + '%'; }, MAP === 'cho' ? 8.4e6 : 4.7e6).then(parseGlb).then(g => {
+  loadBin(MAP === 'cho' ? 'market.glb' : 'model.glb', f => { pct.textContent = Math.min(99, Math.round(f * 100)) + '%'; }, MAP === 'cho' ? 4.0e6 : 4.7e6).then(parseGlb).then(g => {
     model = g.scene;
     model.traverse(o => {
       if (!o.isMesh) return; const m = o.material, nm = m.name || '';
