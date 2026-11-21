@@ -229,7 +229,7 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
 .stamp.ask{outline-style:solid;outline-color:#ffd23f}
 .flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none!important;z-index:9;transition:opacity .35s}
 .flash.on{opacity:.9;transition:none}
-.buffs [data-open]{pointer-events:auto!important}
+.buffs [data-open],.buffs [data-sky]{pointer-events:auto!important}
 
 /* giao diện kính trong suốt (glassmorphism) */
 :root{
@@ -960,11 +960,17 @@ let hourOverride = null;
 function hourNow(){ if (hourOverride !== null) return hourOverride; const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
 function nightOpenNow(){ const h = hourNow(); return h >= NIGHT_OPEN && h < NIGHT_CLOSE; }
 function stallOpen(d){ return !(d.cart && S.cartPush) && (!d.night || nightOpenNow()); }
-function dayK(){ const h = hourNow(); if (h >= 7 && h < 17) return 1; if (h < 5.5 || h >= 19.5) return 0; if (h < 7) return (h - 5.5) / 1.5; return (19.5 - h) / 2.5; }
+const SKY_NAME = { auto:'Theo giờ thật', day:'Luôn ban ngày', night:'Luôn ban đêm' };
+function skyToggle(){ const cur = S.sky === 'day' || S.sky === 'night' ? S.sky : 'auto', dark = cur === 'night' || (cur === 'auto' && dayK() < 0.5);
+  /* bấm một lần là đổi ngay sáng/tối; bấm lần nữa khi trùng với giờ thật thì trở về tự động */
+  const want = dark ? 'day' : 'night'; S.sky = 'auto'; const real = dayK() < 0.5 ? 'night' : 'day'; S.sky = want === real ? 'auto' : want;
+  toast(S.sky === 'auto' ? 'Cảnh ngày đêm: theo giờ thật.' : S.sky === 'day' ? 'Đã tắt ban đêm: cảnh luôn sáng như ban ngày.' : 'Đã bật ban đêm: cảnh luôn tối, lên đèn.', 'gold'); hudCache.buffs = ''; save(); updateHud(); }
+function dayK(){ if (typeof S !== 'undefined' && S){ if (S.sky === 'day') return 1; if (S.sky === 'night') return 0; } const h = hourNow(); if (h >= 7 && h < 17) return 1; if (h < 5.5 || h >= 19.5) return 0; if (h < 7) return (h - 5.5) / 1.5; return (19.5 - h) / 2.5; }
 function clockChip(){
   const h = hourNow(), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
   const name = h < 5.5 ? 'Ban đêm' : h < 7 ? 'Bình minh' : h < 17 ? 'Ban ngày' : h < 19.5 ? 'Hoàng hôn' : 'Ban đêm';
-  return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ' · ' + name;
+  const forced = typeof S !== 'undefined' && S && (S.sky === 'day' || S.sky === 'night');
+  return '<b data-sky="1" style="cursor:pointer;font-weight:inherit">' + String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ' · ' + (forced ? (S.sky === 'day' ? 'Xem ban ngày' : 'Xem ban đêm') : name) + ' · <u>' + (dayK() < 0.5 ? 'Tắt đêm' : 'Bật đêm') + '</u></b>';
 }
 const NIGHT_C = { fog:new THREE.Color(0x1b2843), hemi:new THREE.Color(0x3d5282), sky:new THREE.Color(0x3a4a78), sun:new THREE.Color(0x9fb4ff) };
 const DAY_C = { fog:new THREE.Color(0xc9dfee), hemi:new THREE.Color(0xdcecff), sky:new THREE.Color(0xffffff), sun:new THREE.Color(0xfff1d6) };
@@ -3412,6 +3418,7 @@ function renderModal(){
     h += `<div class="field"><label for="optName"><b>Tên nhân vật</b></label><input id="optName" maxlength="16" value="${S.name.replace(/"/g, '&quot;')}"></div>`;
     if (fbAuth && fbAuth.currentUser) h += row('Tài khoản', CLOUD.status, `<button class="gbtn blue" data-act="glogout">Đăng xuất</button>`);
     else if (fbAuth) h += `<h3>Tài khoản</h3><p class="qtext">${CLOUD.status}</p><div class="field"><label for="optEmail"><b>Email</b></label><input id="optEmail" type="email" autocomplete="email"></div><div class="field"><label for="optPass"><b>Mật khẩu (ít nhất 6 ký tự)</b></label><input id="optPass" type="password" autocomplete="current-password"></div><div class="ctx-btns"><button class="gbtn green" data-act="emailsignup">Đăng ký</button><button class="gbtn" data-act="emaillogin">Đăng nhập</button><button class="gbtn blue" data-act="emailreset">Quên mật khẩu</button></div><div class="ctx-btns" style="margin-top:.5rem"><button class="gbtn" data-act="glogin">Đăng nhập bằng Google</button></div>`;
+    h += row('Ban đêm', 'Cảnh nhìn: ' + SKY_NAME[S.sky === 'day' || S.sky === 'night' ? S.sky : 'auto'] + '. Quầy đêm và vé số vẫn theo giờ thật.', `<button class="gbtn blue" data-act="sky">${dayK() < 0.5 ? 'Tắt ban đêm' : 'Bật ban đêm'}</button>`);
     h += row('Âm thanh', S.sound ? 'Đang bật' : 'Đang tắt',`<button class="gbtn blue" data-act="sound">${S.sound ? 'Tắt' : 'Bật'}</button>`);
     h += row('Đồ họa', S.gfx !== 'low' ? 'Cao: có đổ bóng, nét hơn' : 'Thấp: mượt hơn trên máy yếu', `<button class="gbtn blue" data-act="gfx">${S.gfx !== 'low' ? 'Chuyển Thấp' : 'Chuyển Cao'}</button>`);
     h += `<h3>Điều khiển</h3><div class="keys">Điện thoại: kéo cần điều khiển để đi, vuốt trên màn hình để xoay góc nhìn, chạm vào mặt đất để tự đi tới đó.<br>Máy tính: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> để đi, kéo chuột để xoay góc nhìn, lăn chuột để phóng to thu nhỏ, <kbd>Shift</kbd> chạy, <kbd>Space</kbd> nhảy, <kbd>E</kbd> phục vụ hoặc mở quầy, <kbd>B</kbd> mở túi, <kbd>P</kbd> chụp ảnh bưu thiếp.</div>`;
@@ -3492,6 +3499,7 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'shop'){ const it = SHOP.find(s => s.id === id); if (it.can && !it.can()){ toast('Bạn cần có ít nhất một quầy.', 'bad'); } else if (S.gems < it.g){ toast(`Cần ${it.g} kim cương. Nhận thêm ở Phúc Lợi và Thành Tựu.`, 'bad'); sfx('bad'); } else { S.gems -= it.g; it.buy(); toast('Đã dùng ' + it.t, 'gold'); sfx('buy'); } }
   else if (a === 'outfit'){ const o = OUTFITS.find(x => x.id === id); if (S.gems < o.price){ toast(`Cần ${o.price} kim cương.`, 'bad'); sfx('bad'); } else { S.gems -= o.price; S.outfits.push(o.id); S.outfit = o.id; setAvatar(); toast('Đã mua ' + o.name, 'gold'); sfx('buy'); } }
   else if (a === 'wear'){ S.outfit = id; setAvatar(); }
+  else if (a === 'sky'){ skyToggle(); }
   else if (a === 'sound'){ S.sound = !S.sound; if (S.sound) sfx('coin'); bgmSync(); }
   else if (a === 'gfx'){ S.gfx = S.gfx !== 'low' ? 'low' : 'high'; applyGfx(); }
   else if (a === 'reset'){ resetAsk = true; }
@@ -3540,6 +3548,7 @@ function resetGame(){
   pendingQuiz.length = 0; quizRes = null; lastNight = null; ctxKey = ''; setAvatar(); initItems(); closeModal(); toast('Đã bắt đầu lại từ đầu.'); save();
 }
 $('mClose').addEventListener('click', closeModal);
+$('buffs').addEventListener('click', e => { if (e.target.closest('[data-sky]')) skyToggle(); });
 $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
 document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => openModal(b.dataset.open)));
 $('btnProfile').addEventListener('click', () => openModal('settings'));
@@ -3591,7 +3600,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, skyToggle, dayK, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
