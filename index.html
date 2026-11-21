@@ -3337,6 +3337,13 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'event'){ if (now() >= S.eventReady && ownedCount()){ S.eventEnd = now() + 90000; S.eventReady = now() + 600000; toast('Giờ vàng chợ đêm bắt đầu! Khách x2, giá +20%', 'gold'); sfx('level'); } }
   save(); renderModal(); updateHud();
 });
+/* Mã thử nghiệm của chủ game: mở game với ?thu=<mã> để tài khoản đang dùng lên cấp 30, có 50 triệu xu và 5.000 kim cương. Trong mã nguồn chỉ lưu dấu băm của mã. */
+(() => { const m = /[?&]thu=([\w-]{6,40})/.exec(location.search); if (!m || !window.crypto || !crypto.subtle) return;
+  crypto.subtle.digest('SHA-256', new TextEncoder().encode(m[1])).then(b => { if ([...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('') !== 'bd08373b8d35b668ec4eecaed208a39621be0638623ee3f0e49302bd86551d42') return;
+    const grant = () => { S.level = Math.max(S.level || 1, 30); S.coins = Math.max(S.coins || 0, 50000000); S.gems = Math.max(S.gems || 0, 5000); save(); updateHud(); ctxKey = ''; };
+    setTimeout(() => { grant(); toast('Tài khoản thử nghiệm: cấp 30, 50 triệu xu, 5.000 kim cương.', 'gold'); }, 1500); setTimeout(grant, 12000);   /* lần hai: sau khi dữ liệu đám mây tải xong */
+    try { history.replaceState(null, '', location.pathname + location.search.replace(/[?&]thu=[\w-]+/, '').replace(/^&/, '?')); } catch(e){}
+  }).catch(() => {}); })();
 function resetGame(){
   const gfx = S.gfx; S = freshState(); S.gfx = gfx; P.x = S.player.x; P.z = S.player.z; P.h = Math.max(0, hAt(P.x, P.z)); P.goto = null; people.forEach(q => { q.stall = q.state === 'wander' ? null : q.stall; }); P.sta = 100; yaw = 0;
   STALLS.forEach(d => { RT[d.id].queue.slice().forEach(p => setExit(p)); RT[d.id].queue = []; RT[d.id].prog = 0; buildStall(d); });
