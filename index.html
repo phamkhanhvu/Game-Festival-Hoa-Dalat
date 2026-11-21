@@ -1954,6 +1954,80 @@ function boothView(b){
   else { b.name = 'Gian ' + b.T.name + ' ' + b.k; b.color = '#8d96a3'; b.tag = 'Còn trống · cần cấp ' + b.T.lv; }
   return b;
 }
+/* ----- Trang trí gian thương hiệu: đồ mua bằng xu/kim cương, bày quanh gian. Mỗi món đang bày +5% thu nhập gian (tối đa +30%).
+   Đồ thuộc về người chơi (S.bdc), đổi gian vẫn giữ. Danh sách đang bày ghi vào bản ghi gian (dc) để người khác cũng thấy. ----- */
+const BD_ITEMS = [
+  { id:'tham', name:'Thảm đỏ', sub:'Thảm đỏ viền vàng trải từ cửa gian ra lối đi', cost:15000 },
+  { id:'hoa', name:'Bồn hoa cẩm tú cầu', sub:'Hai bồn hoa hai bên lối vào', cost:20000 },
+  { id:'standee', name:'Standee thương hiệu', sub:'Bảng đứng in tên và màu thương hiệu', cost:25000 },
+  { id:'den', name:'Dây đèn mái', sub:'Dây bóng đèn vàng dưới biển hiệu, sáng ban đêm', cost:30000 },
+  { id:'bong', name:'Chùm bóng bay', sub:'Hai chùm bóng bay theo màu thương hiệu trên cột', cost:40000 },
+  { id:'led', name:'Màn hình LED', sub:'Màn hình chào khách đặt trong gian', cost:80000 },
+  { id:'gau', name:'Linh vật gấu', sub:'Chú gấu đứng chào khách trước gian', gems:30 }
+];
+const BD_BONUS_MAX = 6, BD_IDS = BD_ITEMS.map(x => x.id);
+function bdS(){ if (!S.bdc || typeof S.bdc !== 'object') S.bdc = { own:{}, on:{} }; if (!S.bdc.own) S.bdc.own = {}; if (!S.bdc.on) S.bdc.on = {}; return S.bdc; }
+const bdMine = () => BD_IDS.filter(k => bdS().on[k]);
+/* đồ đang bày ở một gian: gian của mình lấy theo máy mình, gian người khác lấy theo máy chủ */
+function boothDc(b){ const o = BOWN[b.id]; if (!o) return []; const u = myUid(); if (u && o.uid === u) return bdMine(); return String(o.dc || '').split(',').filter(k => BD_IDS.includes(k)); }
+const boothBonus = b => Math.min(BD_BONUS_MAX, boothDc(b).length) * 0.05;
+const boothIncomeOf = b => Math.round(b.T.income * (1 + boothBonus(b)));
+function bdBuild(b, g, put, cm){
+  const dc = boothDc(b); if (!dc.length) return; const has = k => dc.includes(k), glow = c => new THREE.MeshBasicMaterial({ color:c, toneMapped:false }), flat = o => { o.castShadow = false; return o; };
+  if (has('tham')){ flat(put(new THREE.BoxGeometry(2.0, 0.03, 2.3), lamb('#b3261e'), 0, 0.02, 2.4)); [-1, 1].forEach(a => flat(put(new THREE.BoxGeometry(0.1, 0.034, 2.3), lamb('#f0b429'), a * 0.95, 0.022, 2.4))); }
+  if (has('hoa')) [-1.55, 1.55].forEach((x, i) => {
+    put(new THREE.BoxGeometry(0.62, 0.42, 0.46), lamb('#f4f2ec'), x, 0.21, 1.8); put(new THREE.BoxGeometry(0.66, 0.06, 0.5), cm, x, 0.44, 1.8);
+    const cols = ['#6f8fe8', '#e58ac0', '#9b7be0', '#8fb8f0'];
+    for (let k = 0; k < 5; k++) put(new THREE.SphereGeometry(0.15, 8, 6), lamb(cols[(k + i) % 4]), x - 0.2 + (k % 3) * 0.2, 0.6 + (k % 2) * 0.1, 1.72 + (k > 2 ? 0.17 : 0));
+    for (let k = 0; k < 3; k++) put(new THREE.SphereGeometry(0.1, 6, 5), lamb('#3f8a3c'), x - 0.24 + k * 0.24, 0.52, 1.95);
+  });
+  if (has('standee')){
+    const t = canvasTex(256, 640, (c, w, h) => { c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = b.color; c.fillRect(0, 0, w, 150); c.fillRect(0, h - 70, w, 70);
+      c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '800 54px "Baloo 2", "Trebuchet MS", sans-serif'; c.fillText('XIN CHÀO', w / 2, 78);
+      c.save(); c.translate(w / 2, 150 + (h - 220) / 2); c.rotate(-Math.PI / 2); c.fillStyle = b.color; let fs = 92; do { c.font = `800 ${fs}px "Baloo 2", "Trebuchet MS", sans-serif`; fs -= 4; } while (c.measureText(b.name).width > h - 260 && fs > 26); c.fillText(b.name, 0, 4); c.restore(); });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 2.0), new THREE.MeshBasicMaterial({ map:t })); m.position.set(-2.2, 1.12, 1.82); m.rotation.y = 0.25; g.add(m);
+    const bk = put(new THREE.BoxGeometry(0.84, 2.04, 0.03), lamb('#2b2f3a'), -2.2, 1.12, 1.8); bk.rotation.y = 0.25; put(new THREE.BoxGeometry(0.9, 0.08, 0.3), lamb('#2b2f3a'), -2.2, 0.06, 1.8).rotation.y = 0.25;
+  }
+  if (has('den')) for (let k = 0; k < 15; k++){ const u = k / 14, x = -2.5 + u * 5.0; flat(put(new THREE.SphereGeometry(0.075, 7, 6), glow(k % 2 ? 0xffd36a : 0xfff2c0), x, 3.06 - Math.sin(u * Math.PI * 3) ** 2 * 0.14, 1.3)); }
+  if (has('bong')) [-2.6, 2.6].forEach((x, i) => { const cols = [b.color, '#ffffff', '#ffd23f', b.color, '#ff8fb8'];
+    for (let k = 0; k < 5; k++){ const a = k * 1.26 + i; const s = put(new THREE.SphereGeometry(0.24, 10, 8), lamb(cols[k]), x + Math.cos(a) * 0.26, 3.95 + (k % 3) * 0.3, 1.2 + Math.sin(a) * 0.26); s.scale.y = 1.2; } });
+  if (has('led')){
+    const t = canvasTex(512, 288, (c, w, h) => { c.fillStyle = '#0d0e10'; c.fillRect(0, 0, w, h); c.fillStyle = b.color; c.fillRect(0, h - 22, w, 22); c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = '#ffd84a'; c.font = '700 40px "Be Vietnam Pro", system-ui, sans-serif'; c.fillText('Chào mừng quý khách', w / 2, 70);
+      c.fillStyle = '#fff'; let fs = 84; do { c.font = `800 ${fs}px "Baloo 2", "Trebuchet MS", sans-serif`; fs -= 4; } while (c.measureText(b.name).width > w - 40 && fs > 26); c.fillText(b.name, w / 2, 160); });
+    put(new THREE.BoxGeometry(0.08, 1.5, 0.08), lamb('#2b2f3a'), -1.9, 0.75, 0.5); put(new THREE.BoxGeometry(0.6, 0.06, 0.4), lamb('#2b2f3a'), -1.9, 0.06, 0.5);
+    put(new THREE.BoxGeometry(1.5, 0.9, 0.07), lamb('#15171c'), -1.9, 1.85, 0.5).rotation.y = 0.3;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.8), new THREE.MeshBasicMaterial({ map:t, toneMapped:false })); m.position.set(-1.9 + Math.sin(0.3) * 0.04, 1.85, 0.5 + Math.cos(0.3) * 0.04); m.rotation.y = 0.3; g.add(m);
+  }
+  if (has('gau')){ const br = lamb('#9a6238'), x = 2.25, z = 1.85; put(new THREE.SphereGeometry(0.36, 12, 10), br, x, 0.44, z).scale.y = 1.15; put(new THREE.SphereGeometry(0.29, 12, 10), br, x, 1.03, z);
+    [-0.21, 0.21].forEach(o => { put(new THREE.SphereGeometry(0.1, 8, 7), br, x + o, 1.29, z); put(new THREE.SphereGeometry(0.12, 8, 7), br, x + o * 1.7, 0.6, z + 0.12); });
+    put(new THREE.SphereGeometry(0.12, 8, 7), lamb('#e8cfa6'), x, 0.98, z + 0.23); put(new THREE.SphereGeometry(0.04, 6, 5), lamb('#1f1a17'), x, 1.02, z + 0.34); [-0.1, 0.1].forEach(o => put(new THREE.SphereGeometry(0.032, 6, 5), lamb('#1f1a17'), x + o, 1.12, z + 0.25));
+    put(new THREE.BoxGeometry(0.5, 0.1, 0.06), cm, x, 0.78, z + 0.3); }
+}
+/* ghi danh sách đồ đang bày lên máy chủ để người chơi khác thấy; máy chủ từ chối thì vẫn hiện trên máy mình */
+function bdSync(){
+  const b = myBooth(); if (!b) return; const dc = bdMine().join(',');
+  if (BO.local){ const r = S.bown[CUR_EVENT.key] && S.bown[CUR_EVENT.key][b.id]; if (r) r.dc = dc; if (BOWN[b.id]) BOWN[b.id].dc = dc; }
+  else if (BO.ref && BO.dcOk !== false && BOWN[b.id] && BOWN[b.id].dc !== dc){ BOWN[b.id].dc = dc; BO.ref.child(b.id).update({ dc }).then(() => { BO.dcOk = true; }).catch(e => { BO.dcOk = false; console.warn('trang trí gian: máy chủ chưa nhận', e && e.code); }); }
+  buildBooth(b); ctxKey = '';
+}
+function bdRender(){
+  const b = myBooth(); if (!b) return '<p>Bạn chưa có gian thương hiệu. Hãy mua một gian ở khu trung tâm trong mùa sự kiện, rồi quay lại trang trí.</p>';
+  const c = bdS(), n = bdMine().length;
+  let h = `<p><b>${escH(b.name)}</b> · Gian ${b.T.name} ${b.k}. Đang bày <b>${n} món</b>: thu nhập gian <b>+${Math.round(boothBonus(b) * 100)}%</b> = <b>${fmt(boothIncomeOf(b))} xu/phút</b> (mỗi món +5%, tối đa +${BD_BONUS_MAX * 5}%).</p>`;
+  BD_ITEMS.forEach(a => { const own = !!c.own[a.id], on = !!c.on[a.id], ok = a.gems ? S.gems >= a.gems : S.coins >= a.cost;
+    h += row(a.name, a.sub, own ? `<button class="gbtn${on ? '' : ' green'}" data-act="bdtog:${a.id}">${on ? 'Cất đi' : 'Bày ra'}<small>${on ? 'Đang bày ✓' : 'Đã mua'}</small></button>` : `<button class="gbtn ${ok ? 'green' : 'poor'}" data-act="bdbuy:${a.id}">Mua<small>${a.gems ? a.gems + ' kim cương' : fmt(a.cost) + ' xu'}</small></button>`); });
+  return h + '<button class="gbtn" data-act="bdname">Đổi tên và màu thương hiệu</button><p style="opacity:.75">Đồ trang trí là của bạn: nếu gian bị giành, bạn vẫn giữ đồ và bày lại ở gian mới.</p>';
+}
+function bdAct(a, id){
+  const it = BD_ITEMS.find(x => x.id === id), c = bdS(); if (!it || !myBooth()) return;
+  if (a === 'bdbuy'){ if (c.own[id]) return;
+    if (it.gems ? S.gems < it.gems : S.coins < it.cost){ toast(it.gems ? `Cần ${it.gems} kim cương.` : `Cần ${fmt(it.cost)} xu.`, 'bad'); sfx('bad'); return; }
+    if (it.gems) S.gems -= it.gems; else S.coins -= it.cost; c.own[id] = 1; c.on[id] = 1; S.stats.bdeco = (S.stats.bdeco || 0) + 1; sfx('buy');
+    toast(`Đã bày ${it.name} ở gian của bạn` + (bdMine().length <= BD_BONUS_MAX ? ': thu nhập +5%.' : '.'), 'gold');
+  } else if (a === 'bdtog'){ if (!c.own[id]) return; if (c.on[id]) delete c.on[id]; else c.on[id] = 1; sfx('buy'); }
+  bdSync();
+}
 function buildBooth(b){
   if (b.group) scene.remove(b.group);
   boothView(b);
@@ -1979,7 +2053,7 @@ function buildBooth(b){
   put(BG.desk, BM.wall, 1.5, 0.5, 0.2); const df = new THREE.Mesh(BG.deskF, cm); df.position.set(1.5, 0.5, 0.505); g.add(df);
   [1.25, 2.0].forEach(y => { put(BG.shelf, BM.trim, 1.55, y, -1.42); for (let k = 0; k < 4; k++) put(BG.box, k % 2 ? cm : BM.trim, 0.95 + k * 0.4, y + 0.21, -1.42); });
   /* hạng gian: ngôi sao màu kim cương/vàng/bạc trên mái */
-  if (b.T){ const sm = new THREE.MeshBasicMaterial({ color:b.T.color }); const s = new THREE.Mesh(BG.star, sm); s.position.set(0, 4.2, 1.2); g.add(s); b.star = s; }
+  if (b.T){ const sm = new THREE.MeshBasicMaterial({ color:b.T.color }); const s = new THREE.Mesh(BG.star, sm); s.position.set(0, 4.2, 1.2); g.add(s); b.star = s; bdBuild(b, g, put, cm); }
   g.position.set(b.x, b.y, b.z); g.rotation.y = b.face < 0 ? Math.PI : 0; scene.add(g); b.group = g;
 }
 BRANDS.forEach(buildBooth);
@@ -2003,11 +2077,13 @@ function boothsApply(data){
   BRANDS.forEach(b => {
     if (b.sponsor) return;
     const o = data && data[b.id] && typeof data[b.id] === 'object' ? data[b.id] : null, old = BOWN[b.id];
-    const same = (!o && !old) || (o && old && o.uid === old.uid && o.brand === old.brand && o.color === old.color && o.price === old.price);
-    if (o) BOWN[b.id] = { uid:String(o.uid || ''), owner:String(o.owner || ''), brand:String(o.brand || ''), color:String(o.color || ''), price:+o.price || b.T.price }; else delete BOWN[b.id];
+    const same = (!o && !old) || (o && old && o.uid === old.uid && o.brand === old.brand && o.color === old.color && o.price === old.price && String(o.dc || '') === String(old.dc || ''));
+    if (o) BOWN[b.id] = { uid:String(o.uid || ''), owner:String(o.owner || ''), brand:String(o.brand || ''), color:String(o.color || ''), price:+o.price || b.T.price, dc:String(o.dc || '').slice(0, 80) }; else delete BOWN[b.id];
     if (!same) buildBooth(b);
   });
   const now2 = myBooth(); BO.mine = now2 ? now2.id : null;
+  if (now2 && now2.id !== prevMine) buildBooth(now2);
+  if (now2 && !BO.local && BO.dcOk !== false && bdMine().join(',') !== String(BOWN[now2.id].dc || '')) setTimeout(bdSync, 400);   /* gian mới mua hoặc máy khác: đưa đồ đang bày lên máy chủ */
   if (prevMine && prevMine !== BO.mine && u){ const b = BRANDS.find(x => x.id === prevMine), o = b && BOWN[b.id]; if (o && o.uid !== u) toast(`${o.owner || 'Một người chơi'} vừa mua lại ${'Gian ' + b.T.name + ' ' + b.k} của bạn. Bạn được hoàn tiền khi nhận thông báo.`, 'bad'); }
   ctxKey = '';
 }
@@ -2050,7 +2126,7 @@ async function buyBooth(){
   }
   S.coins -= price; S.stats.booths = (S.stats.booths || 0) + 1;
   if (BO.local) boothsApply(S.bown[CUR_EVENT.key]);
-  toast(`Bạn đã sở hữu Gian ${T.name}! Đặt tên thương hiệu cho gian của mình.`, 'gold'); sfx('level');
+  toast(`Bạn đã sở hữu Gian ${T.name}! Đặt tên thương hiệu, rồi đứng trước gian để trang trí.`, 'gold'); sfx('level');
   save(); updateHud(); openModal('brand');
 }
 async function saveBrand(){
@@ -2069,15 +2145,16 @@ function brandRender(){
   h += `<div class="field"><label for="optBrand"><b>Tên thương hiệu</b></label><input id="optBrand" maxlength="24" value="${escH(BO.draft != null ? BO.draft : (S.brand || ('Thương hiệu ' + S.name)))}"></div>`;
   h += `<div class="field"><b>Màu thương hiệu</b><div class="swatches">${cols}</div></div>`;
   h += '<button class="gbtn green" data-act="brandsave">Lưu tên thương hiệu</button>';
-  if (b) h += `<p style="opacity:.75">Thu nhập gian: +${fmt(b.T.income)} xu mỗi phút khi bạn đang chơi trong sự kiện. Người khác có thể giành gian với giá ${fmt(boothPrice(b))} xu; khi đó bạn được hoàn ${fmt(Math.round(BOWN[b.id].price * BOOTH_REFUND))} xu.</p>`;
+  if (b) h += '<button class="gbtn" data-act="bdopen">Trang trí gian hàng</button>';
+  if (b) h += `<p style="opacity:.75">Thu nhập gian: +${fmt(boothIncomeOf(b))} xu mỗi phút khi bạn đang chơi trong sự kiện. Người khác có thể giành gian với giá ${fmt(boothPrice(b))} xu; khi đó bạn được hoàn ${fmt(Math.round(BOWN[b.id].price * BOOTH_REFUND))} xu.</p>`;
   return h;
 }
 /* thu nhập gian của mình mỗi phút khi đang chơi */
 function boothIncome(dt){
   const b = myBooth(); if (!b) { BO.incomeT = 0; return; }
   BO.incomeT += dt; if (BO.incomeT < 60) return; BO.incomeT = 0;
-  give({ coins:b.T.income }); S.stats.earned += b.T.income; const f = boothFront(b, 1.5); floatText(f.x, b.y + 3.4, f.z, '+' + fmt(b.T.income) + ' xu', '#ffd84a');
-  if (Math.hypot(P.x - b.x, P.z - b.z) > 30) toast(`${b.name}: +${fmt(b.T.income)} xu thu nhập`, 'gold');
+  const inc = boothIncomeOf(b); give({ coins:inc }); S.stats.earned += inc; const f = boothFront(b, 1.5); floatText(f.x, b.y + 3.4, f.z, '+' + fmt(inc) + ' xu', '#ffd84a');
+  if (Math.hypot(P.x - b.x, P.z - b.z) > 30) toast(`${b.name}: +${fmt(inc)} xu thu nhập`, 'gold');
   save(); updateHud();
 }
 
@@ -3113,18 +3190,18 @@ function updateCtx(){
     /* gian trưng bày thương hiệu hoặc sân khấu chính */
     el.hidden = false;
     if (nearBooth){
-      const b = nearBooth, seen = !!S.brands[b.id], o = BOWN[b.id], u = myUid(), mine = !!(o && u && o.uid === u), key = 'booth:' + b.id + ':' + seen + ':' + (o ? o.uid + o.brand + o.price : '') + ':' + S.level + ':' + (S.coins >= (b.T ? boothPrice(b) : 0)) + ':' + !!u;
+      const b = nearBooth, seen = !!S.brands[b.id], o = BOWN[b.id], u = myUid(), mine = !!(o && u && o.uid === u), key = 'booth:' + b.id + ':' + seen + ':' + (o ? o.uid + o.brand + o.price : '') + ':' + S.level + ':' + (S.coins >= (b.T ? boothPrice(b) : 0)) + ':' + !!u + ':' + (b.T ? boothDc(b).join('') : '');
       if (ctxKey !== key){ ctxKey = key; $('cName').textContent = b.name;
         const visit = seen ? '' : '<button class="gbtn" data-act="boothvisit">Tham quan<small>+200 xu · +10 EXP</small></button>';
         if (b.sponsor){ $('cLv').textContent = 'Nhà tài trợ · ' + CUR_EVENT.name; $('cStats').innerHTML = '<b>' + escH(b.tag) + '</b><br>' + escH(b.desc); $('cBtns').innerHTML = visit || '<button class="gbtn" disabled>Đã tham quan ✓<small>Cảm ơn bạn đã ghé</small></button>'; }
         else {
           const T = b.T, price = boothPrice(b);
           $('cLv').textContent = 'Gian ' + T.name + ' · ' + CUR_EVENT.name;
-          $('cStats').innerHTML = mine ? `Gian của bạn · thu nhập <b>+${fmt(T.income)} xu/phút</b><br>Người khác giành được với giá ${fmt(price)} xu (bạn được hoàn ${fmt(Math.round(o.price * BOOTH_REFUND))} xu)`
+          $('cStats').innerHTML = mine ? `Gian của bạn · thu nhập <b>+${fmt(boothIncomeOf(b))} xu/phút</b> · trang trí ${boothDc(b).length}/${BD_ITEMS.length} món (+${Math.round(boothBonus(b) * 100)}%)<br>Người khác giành được với giá ${fmt(price)} xu (bạn được hoàn ${fmt(Math.round(o.price * BOOTH_REFUND))} xu)`
             : o ? `Chủ gian: <b>${escH(o.owner || 'Người chơi')}</b> · đã trả ${fmt(o.price)} xu<br>Giành lại gian: <b>${fmt(price)} xu</b> · cần cấp ${T.lv}`
             : `Còn trống · cần <b>cấp ${T.lv}</b><br>Giá: <b>${fmt(price)} xu</b> · thu nhập +${fmt(T.income)} xu/phút trong sự kiện`;
           const ok = S.level >= T.lv && S.coins >= price;
-          const buy = mine ? '<button class="gbtn green" data-act="boothname">Đổi tên thương hiệu<small>Tên hiện trên biển gian</small></button>'
+          const buy = mine ? '<button class="gbtn green" data-act="boothdeco">Trang trí gian<small>Mua đồ bày cho đẹp · +5% mỗi món</small></button><button class="gbtn blue" data-act="boothname">Đổi tên thương hiệu<small>Tên và màu trên biển gian</small></button>'
             : `<button class="gbtn ${ok ? 'green' : 'poor'}" data-act="boothbuy">${o ? 'Giành gian' : 'Mua gian'}<small>${S.level < T.lv ? 'Cần cấp ' + T.lv : fmt(price) + ' xu'}</small></button>`;
           $('cBtns').innerHTML = buy + visit;
         }
@@ -3180,7 +3257,7 @@ function updateCtx(){
 }
 $('cBtns').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return; const a = b.dataset.act;
-  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
+  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'boothdeco') openModal('bdeco'); else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
   if (a === 'serve') serveNow(nearId); else if (a === 'restock') restock(nearId); else if (a === 'upgrade') upgrade(nearId); else if (a === 'buy') buyStall(nearId); else if (a === 'staff') hireStaff(nearId); else if (a === 'deco'){ decoId = nearId; dcDraft = null; openModal('deco'); }
   updateHud(); updateCtx();
 });
@@ -3195,7 +3272,7 @@ $('qGo').addEventListener('click', () => {
 
 /* ================= Hộp thoại ================= */
 let modalType = null, resetAsk = false;
-const TITLES = { quay:'Quầy Hàng Của Tôi', deco:'Trang Trí Quầy', brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
+const TITLES = { bdeco:'Trang Trí Gian Hàng', quay:'Quầy Hàng Của Tôi', deco:'Trang Trí Quầy', brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
 function openModal(type){ modalType = type; resetAsk = false; $('mTitle').textContent = TITLES[type]; $('modal').hidden = false; renderModal(); }
 function closeModal(){ $('modal').hidden = true; modalType = null; modalTick = null; quizRes = null; save(); if (pendingQuiz.length) setTimeout(() => { if (!modalType && pendingQuiz.length) openQuiz(pendingQuiz.shift()); }, 350); }
 function row(title, sub, btn, extra){ return `<div class="row">${extra || ''}<div class="rt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${btn || ''}</div>`; }
@@ -3272,6 +3349,8 @@ function renderModal(){
     own.forEach(d => { const s = st(d.id); h += row(`${d.name} · Cấp ${s.level}`, `Kho ${s.stock}/${maxStock(d)} · Giá ${fmt(lvlPrice(d))} xu · ${serveTime(d).toFixed(1)} giây/khách`, ''); });
     h += '<h3>Thống kê</h3><div class="kv">';
     h += `<span>Đã bán</span><b>${fmt(S.sold)} phần</b><span>Tổng thu</span><b>${fmt(S.stats.earned)} xu</b><span>Tự tay phục vụ</span><b>${fmt(S.stats.served)} khách</b><span>Khách bỏ đi vì hết hàng</span><b>${fmt(S.stats.missed)}</b><span>Trang phục</span><b>${S.outfits.length}/${OUTFITS.length}</b></div>`;
+  } else if (modalType === 'bdeco'){
+    h += bdRender();
   } else if (modalType === 'quay'){
     h += quayRender();
   } else if (modalType === 'deco'){
@@ -3330,6 +3409,9 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'dcback'){ openModal('quay'); return; }
   else if (a === 'qbuy'){ buyStall(id); }
   else if (a === 'dcu' || a === 'dcs' || a === 'dca' || a === 'dcname'){ dcAct(a, id); }
+  else if (a === 'bdbuy' || a === 'bdtog'){ bdAct(a, id); }
+  else if (a === 'bdname'){ openModal('brand'); return; }
+  else if (a === 'bdopen'){ BO.draft = null; openModal('bdeco'); return; }
   else if (a === 'brandsave'){ saveBrand(); return; }
   else if (a === 'brandcol'){ S.brandColor = '#' + id; BO.draft = ($('optBrand') || {}).value; }
   else if (a === 'dvans' || a === 'dvnext'){ dvAct(a, id); if (a === 'dvnext') return; }
