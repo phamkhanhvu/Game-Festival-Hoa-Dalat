@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>DalatEvent · Từ xe đẩy thành thương hiệu</title>
 <meta name="apple-mobile-web-app-title" content="DalatEvent">
 <meta name="application-name" content="DalatEvent">
@@ -167,7 +167,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .kv{display:grid;grid-template-columns:1fr auto;gap:.3rem 1rem;font-variant-numeric:tabular-nums}
 .kv span{color:var(--ink-dim)}
 .field{display:flex;flex-direction:column;gap:.3rem}
-.field input{font:inherit;font-size:1.05em;padding:.55em .7em;border-radius:.6rem;border:.1rem solid rgba(255,255,255,.25);background:#0c1830;color:#fff}
+.field input{font:inherit;font-size:max(16px,1.05em);padding:.55em .7em;border-radius:.6rem;border:.1rem solid rgba(255,255,255,.25);background:#0c1830;color:#fff}
 .keys{font-family:var(--font-body);color:var(--ink-dim);line-height:1.6}
 .keys kbd{background:#0c1830;border:.1rem solid rgba(255,255,255,.25);border-radius:.3rem;padding:0 .35em;font-family:inherit;color:#fff}
 
@@ -3344,6 +3344,15 @@ $('mBody').addEventListener('click', e => {
     setTimeout(() => { grant(); toast('Tài khoản thử nghiệm: cấp 30, 50 triệu xu, 5.000 kim cương.', 'gold'); }, 1500); setTimeout(grant, 12000);   /* lần hai: sau khi dữ liệu đám mây tải xong */
     try { history.replaceState(null, '', location.pathname + location.search.replace(/[?&]thu=[\w-]+/, '').replace(/^&/, '?')); } catch(e){}
   }).catch(() => {}); })();
+/* Giữ màn hình không bị phóng to: chặn chụm hai ngón, và tự thu về nếu Safari đã phóng (sau khi gõ tên quầy, tên thương hiệu). */
+(() => { const vm = document.querySelector('meta[name=viewport]'), base = vm ? vm.content : '';
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(e => document.addEventListener(e, ev => ev.preventDefault(), { passive:false }));
+  document.addEventListener('touchmove', ev => { if (ev.touches.length > 1 && !(ev.target.closest && ev.target.closest('#cv'))) ev.preventDefault(); }, { passive:false });
+  const unzoom = () => { const v = window.visualViewport; if (!vm || !v || v.scale < 1.02) return; const a = document.activeElement; if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+    vm.content = base + ',minimum-scale=1'; setTimeout(() => { vm.content = base; window.scrollTo(0, 0); }, 60); };
+  document.addEventListener('focusout', () => setTimeout(() => { window.scrollTo(0, 0); unzoom(); }, 120));
+  if (window.visualViewport) visualViewport.addEventListener('resize', () => setTimeout(unzoom, 250));
+  window.__unzoom = unzoom; })();
 function resetGame(){
   const gfx = S.gfx; S = freshState(); S.gfx = gfx; P.x = S.player.x; P.z = S.player.z; P.h = Math.max(0, hAt(P.x, P.z)); P.goto = null; people.forEach(q => { q.stall = q.state === 'wander' ? null : q.stall; }); P.sta = 100; yaw = 0;
   STALLS.forEach(d => { RT[d.id].queue.slice().forEach(p => setExit(p)); RT[d.id].queue = []; RT[d.id].prog = 0; buildStall(d); });
