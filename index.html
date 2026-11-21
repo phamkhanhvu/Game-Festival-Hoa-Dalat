@@ -207,6 +207,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .lbl.wait.out{background:var(--danger);color:#fff}
 .lbl.name{background:rgba(14,28,52,.72);border-radius:1rem;padding:0 .6rem;font-size:.95rem;font-weight:700}
 .act[hidden]{display:none}
+.swatch.lock{opacity:.6;border-style:dashed}
 .swatches{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem}.swatch{width:2.2rem;height:2.2rem;border-radius:50%;border:.15rem solid rgba(255,255,255,.35)}.swatch.on{border-color:#fff;box-shadow:0 0 0 .2rem #c8f03c}\n.lbl.name.other{background:rgba(40,96,40,.78);border:1px solid #c8f03c}
 .pill.online{padding:0 .8rem;gap:.5rem;pointer-events:auto}.pill.online[hidden]{display:none}.pill.online b{min-width:0;font-size:1.05rem}.odot{width:.7rem;height:.7rem;border-radius:50%;background:#5fe36a;box-shadow:0 0 .5rem #5fe36a}
 .lbl.float{font-size:1.4rem;font-weight:800;text-shadow:0 2px 0 rgba(40,25,0,.8),0 0 4px rgba(0,0,0,.6)}
@@ -309,6 +310,10 @@ button.stamp{font:inherit;color:#fff;border:0;cursor:pointer;padding:0}
     <button class="mbtn outline" data-open="welfare">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="9" width="36" height="33" rx="5" fill="#fff" stroke="#9aa6b8" stroke-width="2"/><path d="M6 14a5 5 0 0 1 5-5h26a5 5 0 0 1 5 5v5H6z" fill="#e2453b"/><rect x="13" y="4" width="4" height="10" rx="2" fill="#5b6576"/><rect x="31" y="4" width="4" height="10" rx="2" fill="#5b6576"/><g fill="#c7ced9"><rect x="11" y="24" width="6" height="5" rx="1"/><rect x="21" y="24" width="6" height="5" rx="1"/><rect x="31" y="24" width="6" height="5" rx="1"/><rect x="11" y="32" width="6" height="5" rx="1"/><rect x="31" y="32" width="6" height="5" rx="1"/></g><rect x="21" y="32" width="6" height="5" rx="1" fill="#e2453b"/></svg>
       Phúc Lợi<span class="dot" id="dotWelfare" hidden></span>
+    </button>
+    <button class="mbtn outline" data-open="quay">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 20 L24 6 L42 20 Z" fill="#e2382f" stroke="#8a1f18" stroke-width="2"/><path d="M15 20 L24 6 L33 20 Z" fill="#fff4e6"/><rect x="22.5" y="20" width="3" height="10" fill="#8d9299"/><rect x="9" y="30" width="30" height="11" rx="2" fill="#d9a868" stroke="#8a5a2b" stroke-width="2"/></svg>
+      Quầy
     </button>
     <button class="mbtn outline" data-open="shop">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="20" width="30" height="22" rx="2" fill="#fff" stroke="#9aa6b8" stroke-width="2"/><rect x="20" y="28" width="9" height="14" fill="#4f8fd8"/><path d="M5 18l4-11h30l4 11z" fill="#fff"/><path d="M9 7h6l-2 11H5zM21 7h6v11h-7zM33 7h6l4 11h-8z" fill="#e2453b"/><path d="M5 18h38v3a4.8 4.8 0 0 1-9.5 0 4.8 4.8 0 0 1-9.5 0 4.8 4.8 0 0 1-9.5 0A4.8 4.8 0 0 1 5 21z" fill="#e2453b" stroke="#fff" stroke-width="1"/></svg>
@@ -774,7 +779,7 @@ const RECIPES = [
   { id:'thong', name:'Bánh Thông Dã Quỳ', need:{ thong:3, daquy:1 }, reward:() => ({ coins: 250 + 60 * S.level, gems: 1 }) },
 ];
 const STAFF_COST = 25, DECO_COST = 8, DECO_MAX = 3;
-const decoCount = id => st(id).deco || 0;
+const decoCount = id => Math.min(DC_BONUS_MAX, Object.keys(dcS(id).acc).length);
 const salePrice = d => Math.round(lvlPrice(d) * (eventOn() ? 1.2 : 1) * (1 + 0.05 * decoCount(d.id)) * seasonInfo().sale * wxSale(d.id) * (festOn() ? 1.15 : 1));
 const serveTime = d => d.serve * Math.pow(0.9, st(d.id).level - 1);
 const maxStock = d => 20 + 10 * st(d.id).level;
@@ -1528,6 +1533,85 @@ function attachVendor(d, g){
   const tmp = personMesh({ shirt:d.vendor, pants:'#33363d', hair:'#2b1d14', hat:true }); tmp.position.set(0.55, 0, -1.25); g.add(tmp);
   tplChar(d.nv).then(t => { if (RT[d.id].group !== g) return; g.remove(tmp); const v = realPerson(t, true); v.position.set(2.9, 0, 0.1); v.rotation.y = -0.25; g.add(v); }).catch(e => { console.warn('vendor', d.nv, e); });
 }
+/* ===== Trang trí quầy: màu dù, màu và tên biển hiệu, phụ kiện. Mỗi phụ kiện +5% giá bán (tối đa +20%) ===== */
+const DC_UMB = [null, ['#e2382f', '#fff4e6'], ['#2f6fc0', '#fff4e6'], ['#2f8f5b', '#fff4e6'], ['#f0b429', '#fff4e6'], ['#7a55c0', '#f3e9ff'], ['#e86aa6', '#fff0f6'], ['#1f2430', '#c8f03c']];
+const DC_SIGN = [null, '#b3261e', '#1f5fae', '#1f7a4d', '#1f2430', '#c2185b', '#b8860b'];
+const DC_COLOR_COST = 1500, DC_NAME_COST = 2000, DC_BONUS_MAX = 4;
+const DC_ACC = [
+  { id:'hoa', name:'Chậu hoa', sub:'Hai chậu hoa hai bên quầy', cost:3000 },
+  { id:'tham', name:'Thảm chào', sub:'Thảm đỏ đón khách trước quầy', cost:2000 },
+  { id:'menu', name:'Bảng thực đơn', sub:'Bảng đứng chữ A cạnh quầy', cost:4000 },
+  { id:'denlong', name:'Đèn lồng', sub:'Hai đèn lồng đỏ treo dưới dù, sáng ban đêm', cost:5000 },
+  { id:'daylight', name:'Dây đèn', sub:'Dây bóng đèn vàng quanh mép dù', cost:8000 },
+  { id:'gau', name:'Linh vật gấu', sub:'Chú gấu đứng chào khách', gems:15 }
+];
+let decoId = null, dcDraft = null;
+function dcS(id){
+  const s = st(id);
+  if (!s.dc || typeof s.dc !== 'object'){ s.dc = { umb:0, sign:0, name:'', own:{}, acc:{} }; ['hoa', 'denlong', 'menu'].slice(0, Math.min(3, s.deco || 0)).forEach(k => { s.dc.acc[k] = 1; }); }   /* đổi 3 món trang trí kiểu cũ sang phụ kiện */
+  if (!s.dc.own) s.dc.own = {}; if (!s.dc.acc) s.dc.acc = {};
+  return s.dc;
+}
+const dcUmb = d => DC_UMB[dcS(d.id).umb] || d.umb;
+const dcSign = d => DC_SIGN[dcS(d.id).sign] || d.sign;
+const dcName = d => (dcS(d.id).name || d.short).toUpperCase();
+function dcBuild(d, g, put, metal){
+  const acc = dcS(d.id).acc, glow = c => new THREE.MeshBasicMaterial({ color:c });
+  if (acc.hoa) [[-1.95, 0.45], [1.95, 0.45]].forEach(([sx, sz], i) => {
+    put(new THREE.CylinderGeometry(0.22, 0.16, 0.36, 12), std('#b5652b'), sx, 0.18, sz); put(new THREE.SphereGeometry(0.2, 7, 6), std('#3f8a3c'), sx, 0.42, sz);
+    for (let k = 0; k < 6; k++){ const a = k * 1.05; put(new THREE.SphereGeometry(0.07, 6, 5), std(['#f06ba8', '#ffd23f', '#e8453c'][(k + i) % 3]), sx + Math.cos(a) * 0.15, 0.56 + (k % 2) * 0.05, sz + Math.sin(a) * 0.15); }
+  });
+  if (acc.tham){ const m = put(new THREE.BoxGeometry(2.6, 0.03, 1.3), std('#b3261e'), 0, 0.02, 1.75); m.castShadow = false; const e = put(new THREE.BoxGeometry(2.6, 0.032, 0.1), std('#f0b429'), 0, 0.022, 2.35); e.castShadow = false; }
+  if (acc.menu){ const b1 = put(new THREE.BoxGeometry(0.7, 1.1, 0.05), std('#2b2f3a'), 2.35, 0.55, 1.25); b1.rotation.x = -0.22; const b2 = put(new THREE.BoxGeometry(0.7, 1.1, 0.05), std('#8a5a2b'), 2.35, 0.55, 0.95); b2.rotation.x = 0.22;
+    for (let k = 0; k < 3; k++){ const l = put(new THREE.BoxGeometry(0.46 - k * 0.08, 0.05, 0.01), glow(0xffffff), 2.35, 0.82 - k * 0.2, 1.33 - (0.82 - k * 0.2 - 0.55) * 0.22); l.castShadow = false; } }
+  if (acc.denlong) [-1.55, 1.55].forEach(sx => { put(new THREE.CylinderGeometry(0.012, 0.012, 0.45, 5), metal, sx, 3.12, 0.55); const l = put(new THREE.SphereGeometry(0.2, 12, 10), glow(0xff5a3c), sx, 2.78, 0.55); l.scale.y = 1.2; l.castShadow = false; put(new THREE.CylinderGeometry(0.09, 0.09, 0.05, 8), std('#f0b429'), sx, 3.02, 0.55); put(new THREE.CylinderGeometry(0.09, 0.09, 0.05, 8), std('#f0b429'), sx, 2.54, 0.55); });
+  if (acc.daylight) for (let k = 0; k < 12; k++){ const a = k / 12 * TAU, b = put(new THREE.SphereGeometry(0.065, 7, 6), glow(k % 2 ? 0xffd36a : 0xfff2c0), Math.cos(a) * 2.3, 3.3, -0.25 + Math.sin(a) * 2.3); b.castShadow = false; }
+  if (acc.gau){ const br = std('#9a6238'), x = -2.4, z = 1.3; put(new THREE.SphereGeometry(0.34, 12, 10), br, x, 0.42, z).scale.y = 1.15; put(new THREE.SphereGeometry(0.27, 12, 10), br, x, 0.98, z);
+    [-0.2, 0.2].forEach(o => { put(new THREE.SphereGeometry(0.1, 8, 7), br, x + o, 1.22, z); put(new THREE.SphereGeometry(0.11, 8, 7), br, x + o * 1.6, 0.55, z + 0.12); });
+    put(new THREE.SphereGeometry(0.11, 8, 7), std('#e8cfa6'), x, 0.93, z + 0.22); put(new THREE.SphereGeometry(0.035, 6, 5), std('#1f1a17'), x, 0.97, z + 0.32); [-0.09, 0.09].forEach(o => put(new THREE.SphereGeometry(0.03, 6, 5), std('#1f1a17'), x + o, 1.06, z + 0.24)); }
+}
+/* ----- bảng "Quầy Hàng Của Tôi": mua quầy từ xa và mở trang trí ----- */
+function quayRender(){
+  let h = `<p>Mua thêm quầy khi đủ cấp, rồi trang trí để bán được giá hơn. ${MAP === 'cho' ? 'Đây là các sạp ở Chợ Đà Lạt.' : 'Đây là các quầy ở Quảng trường Lâm Viên.'}</p>`;
+  STALLS.forEach(d => {
+    const s = st(d.id);
+    if (s.owned) h += row(d.name, `Cấp ${s.level} · kho ${s.stock}/${maxStock(d)} · giá ${fmt(salePrice(d))} xu · trang trí +${decoCount(d.id) * 5}%`, `<button class="gbtn green" data-act="dcopen:${d.id}">Trang trí</button>`);
+    else { const ok = S.level >= d.lv && S.coins >= d.cost; h += row(d.name, `Giá bán ${fmt(d.price)} xu mỗi phần${d.night ? ' · chỉ mở 18:00–23:00' : ''}`, `<button class="gbtn ${ok ? 'green' : 'poor'}" data-act="qbuy:${d.id}">${S.level < d.lv ? 'Cần cấp ' + d.lv : 'Mua'}<small>${fmt(d.cost)} xu</small></button>`); }
+  });
+  return h;
+}
+function dcRender(){
+  const d = byId[decoId]; if (!d || !st(d.id).owned) return '<p>Hãy mua quầy trước khi trang trí.</p>';
+  const c = dcS(d.id), n = Object.keys(c.acc).length;
+  let h = `<p><b>${d.name}</b> · giá bán đang được cộng <b>+${decoCount(d.id) * 5}%</b> nhờ ${n} phụ kiện (mỗi phụ kiện +5%, tối đa +${DC_BONUS_MAX * 5}%).</p>`;
+  h += `<div class="field"><label for="optStallName"><b>Tên trên biển hiệu</b></label><input id="optStallName" maxlength="14" value="${escH(dcDraft != null ? dcDraft : (c.name || d.short))}"></div>`;
+  h += `<button class="gbtn" data-act="dcname">Đổi tên biển<small>${c.named ? 'Miễn phí' : fmt(DC_NAME_COST) + ' xu lần đầu'}</small></button>`;
+  const sw = (list, cur, act, bg) => list.map((v, i) => `<button class="swatch${cur === i ? ' on' : ''}${i && !c.own[act + i] ? ' lock' : ''}" data-act="${act}:${i}" style="background:${bg(v, i)}" aria-label="mẫu ${i}"></button>`).join('');
+  h += `<div class="field"><b>Màu dù</b> <small>mẫu mới ${fmt(DC_COLOR_COST)} xu, đã mua thì đổi tự do</small><div class="swatches">${sw(DC_UMB, c.umb, 'dcu', v => { const u = v || d.umb; return `conic-gradient(${u[0]} 0 25%, ${u[1]} 0 50%, ${u[0]} 0 75%, ${u[1]} 0)`; })}</div></div>`;
+  h += `<div class="field"><b>Màu biển hiệu</b> <small>mẫu mới ${fmt(DC_COLOR_COST)} xu</small><div class="swatches">${sw(DC_SIGN, c.sign, 'dcs', v => v || d.sign)}</div></div>`;
+  h += '<h3>Phụ kiện</h3>';
+  DC_ACC.forEach(a => { const has = !!c.acc[a.id], ok = a.gems ? S.gems >= a.gems : S.coins >= a.cost;
+    h += row(a.name, a.sub, has ? '<button class="gbtn" disabled>Đã có ✓</button>' : `<button class="gbtn ${ok ? 'green' : 'poor'}" data-act="dca:${a.id}">Mua<small>${a.gems ? a.gems + ' kim cương' : fmt(a.cost) + ' xu'}</small></button>`); });
+  return h + '<button class="gbtn" data-act="dcback">Xem tất cả quầy</button>';
+}
+function dcAct(a, id){
+  const d = byId[decoId]; if (!d || !st(d.id).owned) return; const c = dcS(d.id), inp = $('optStallName'); dcDraft = inp ? inp.value : dcDraft;
+  if (a === 'dcu' || a === 'dcs'){
+    const i = +id, key = a + i, list = a === 'dcu' ? DC_UMB : DC_SIGN; if (!(i >= 0 && i < list.length)) return;
+    if (i && !c.own[key]){ if (S.coins < DC_COLOR_COST){ toast(`Cần ${fmt(DC_COLOR_COST)} xu để mua mẫu màu này.`, 'bad'); sfx('bad'); return; } S.coins -= DC_COLOR_COST; c.own[key] = 1; sfx('buy'); toast('Đã mua mẫu màu mới.', 'gold'); }
+    if (a === 'dcu') c.umb = i; else c.sign = i;
+  } else if (a === 'dca'){
+    const it = DC_ACC.find(x => x.id === id); if (!it || c.acc[id]) return;
+    if (it.gems ? S.gems < it.gems : S.coins < it.cost){ toast(it.gems ? `Cần ${it.gems} kim cương.` : `Cần ${fmt(it.cost)} xu.`, 'bad'); sfx('bad'); return; }
+    if (it.gems) S.gems -= it.gems; else S.coins -= it.cost; c.acc[id] = 1; sfx('buy');
+    toast(`Đã thêm ${it.name} cho ${d.name}` + (Object.keys(c.acc).length <= DC_BONUS_MAX ? ': giá bán +5%.' : '.'), 'gold');
+  } else if (a === 'dcname'){
+    const nm = (dcDraft || '').trim().replace(/\s+/g, ' ').slice(0, 14); if (nm.length < 2){ toast('Tên biển cần ít nhất 2 ký tự.', 'bad'); return; }
+    if (!c.named){ if (S.coins < DC_NAME_COST){ toast(`Cần ${fmt(DC_NAME_COST)} xu để đổi tên biển.`, 'bad'); sfx('bad'); return; } S.coins -= DC_NAME_COST; c.named = 1; }
+    c.name = nm; dcDraft = null; toast('Đã đổi tên biển: ' + nm.toUpperCase(), 'gold'); sfx('buy');
+  }
+  buildStall(d); ctxKey = '';
+}
 function buildStall(d){
   const rt = RT[d.id]; if (rt.group) scene.remove(rt.group);
   const own = st(d.id).owned, g = new THREE.Group(); const gy = hAt(d.x, d.z); g.position.set(d.x, gy > -50 ? gy : 0, d.z);
@@ -1537,11 +1621,11 @@ function buildStall(d){
   [[-1.05, 0.5], [1.05, 0.5], [-1.05, -0.5], [1.05, -0.5]].forEach(w => { const wh = put(new THREE.CylinderGeometry(0.34, 0.34, 0.1, 16), dark, w[0], 0.34, w[1] * 1.2); wh.rotation.x = Math.PI / 2; });
   put(new THREE.CylinderGeometry(0.04, 0.04, 2.5, 8), metal, 0, 2.5, -0.25);
   const ug = new THREE.ConeGeometry(2.35, 0.85, 12, 1, true).toNonIndexed(), cnt = ug.attributes.position.count, col = new Float32Array(cnt * 3);
-  const ca = C(own ? d.umb[0] : '#9aa0a6'), cb = C(own ? d.umb[1] : '#d7dbe0');
+  const ca = C(own ? dcUmb(d)[0] : '#9aa0a6'), cb = C(own ? dcUmb(d)[1] : '#d7dbe0');
   for (let i = 0; i < cnt; i++){ const c = (Math.floor(i / 6) % 2) ? cb : ca; col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   ug.setAttribute('color', new THREE.BufferAttribute(col, 3));
   put(ug, new THREE.MeshStandardMaterial({ vertexColors:true, side:THREE.DoubleSide, roughness:0.75 }), 0, 3.75, -0.25);
-  const signTex = canvasTex(512, 112, (c, w, h) => { c.fillStyle = own ? d.sign : '#6d6a66'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 5; c.strokeRect(8, 8, w - 16, h - 16); c.fillStyle = '#fff'; c.font = '800 64px "Baloo 2", "Trebuchet MS", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(d.short, w / 2, h / 2 + 4); });
+  const signTex = canvasTex(512, 112, (c, w, h) => { c.fillStyle = own ? dcSign(d) : '#6d6a66'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 5; c.strokeRect(8, 8, w - 16, h - 16); c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; const tx = own ? dcName(d) : d.short; let fs = 64; do { c.font = `800 ${fs}px "Baloo 2", "Trebuchet MS", sans-serif`; fs -= 4; } while (c.measureText(tx).width > w - 40 && fs > 24); c.fillText(tx, w / 2, h / 2 + 4); });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.5), new THREE.MeshBasicMaterial({ map:signTex })); sign.position.set(0, 0.8, 0.56); g.add(sign);
   if (own){
     if (d.id === 'banhtrang'){ put(new THREE.BoxGeometry(1.2, 0.16, 0.7), dark, -0.6, 1.34, 0); for (let i = 0; i < 3; i++) put(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 14), std('#e8902f'), -1.0 + i * 0.4, 1.44, 0.02); put(new THREE.BoxGeometry(0.5, 0.3, 0.5), std('#f2efe6'), 0.75, 1.41, 0); }
@@ -1551,13 +1635,7 @@ function buildStall(d){
     else { for (let i = 0; i < 4; i++){ put(new THREE.BoxGeometry(0.58, 0.1, 0.8), std('#c9a66b'), -1.02 + i * 0.68, 1.31, 0); for (let k = 0; k < 12; k++) put(new THREE.SphereGeometry(0.075, 7, 6), std(k % 5 ? '#d92b2b' : '#e8554a'), -1.22 + i * 0.68 + (k % 3) * 0.2, 1.41, -0.28 + Math.floor(k / 3) * 0.19); } }
     attachVendor(d, g);
   }
-  if (own){
-    const n = st(d.id).deco || 0, slots = [[-1.95, 0.45], [1.95, 0.45], [0, -0.85]];
-    for (let i = 0; i < n; i++){ const sx = slots[i][0], sz = slots[i][1];
-      if (i % 2 === 0){ put(new THREE.CylinderGeometry(0.22, 0.16, 0.36, 12), std('#b5652b'), sx, 0.18, sz); put(new THREE.SphereGeometry(0.2, 7, 6), std('#3f8a3c'), sx, 0.42, sz); for (let k = 0; k < 6; k++) put(new THREE.SphereGeometry(0.1, 7, 6), std(['#f06ba8', '#ffd23f', '#ffffff'][k % 3]), sx + Math.cos(k) * 0.16, 0.56 + (k % 2) * 0.08, sz + Math.sin(k) * 0.16); }
-      else { put(new THREE.CylinderGeometry(0.02, 0.02, 1.4, 6), metal, sx, 0.7, sz); put(new THREE.SphereGeometry(0.2, 12, 10), new THREE.MeshBasicMaterial({ color:0xffc070 }), sx, 1.6, sz); }
-    }
-  }
+  if (own) dcBuild(d, g, put, metal);
   if (d.cart){ g.scale.setScalar(0.82); if (S.cartPush) g.rotation.y = P.ang; }
   scene.add(g); rt.group = g;
   if (!rt.ring){ const r = new THREE.Mesh(new THREE.RingGeometry(3.0, 3.35, 48), new THREE.MeshBasicMaterial({ color:0xffd23f, transparent:true, opacity:0.6, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4 })); r.rotation.x = -Math.PI / 2; r.position.set(d.x, d.y + 0.06, d.z + 0.7); r.renderOrder = 3; scene.add(r); rt.ring = r; }
@@ -3091,8 +3169,7 @@ function updateCtx(){
     if (s.staff){ setHTML('cStaff', 'Có nhân viên<small>Đang làm việc</small>'); $('cStaff').disabled = true; }
     else { setHTML('cStaff', `Thuê nhân viên<small>${STAFF_COST} kim cương</small>`); $('cStaff').disabled = false; $('cStaff').classList.toggle('poor', S.gems < STAFF_COST); }
     const nd = decoCount(nearId);
-    if (nd >= DECO_MAX){ setHTML('cDeco', 'Trang trí đủ<small>3/3 món</small>'); $('cDeco').disabled = true; }
-    else { setHTML('cDeco', `Trang trí<small>${nd}/${DECO_MAX} · ${DECO_COST} kim cương</small>`); $('cDeco').disabled = false; $('cDeco').classList.toggle('poor', S.gems < DECO_COST); }
+    setHTML('cDeco', `Trang trí<small>Dù, biển, phụ kiện · +${nd * 5}%</small>`); $('cDeco').disabled = false; $('cDeco').classList.remove('poor');
   } else {
     const okLv = S.level >= d.lv;
     setHTML('cLv', okLv ? 'Chưa mở' : `Cần cấp ${d.lv}`);
@@ -3104,7 +3181,7 @@ function updateCtx(){
 $('cBtns').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return; const a = b.dataset.act;
   if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
-  if (a === 'serve') serveNow(nearId); else if (a === 'restock') restock(nearId); else if (a === 'upgrade') upgrade(nearId); else if (a === 'buy') buyStall(nearId); else if (a === 'staff') hireStaff(nearId); else if (a === 'deco') addDeco(nearId);
+  if (a === 'serve') serveNow(nearId); else if (a === 'restock') restock(nearId); else if (a === 'upgrade') upgrade(nearId); else if (a === 'buy') buyStall(nearId); else if (a === 'staff') hireStaff(nearId); else if (a === 'deco'){ decoId = nearId; dcDraft = null; openModal('deco'); }
   updateHud(); updateCtx();
 });
 $('qGo').addEventListener('click', () => {
@@ -3118,7 +3195,7 @@ $('qGo').addEventListener('click', () => {
 
 /* ================= Hộp thoại ================= */
 let modalType = null, resetAsk = false;
-const TITLES = { brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
+const TITLES = { quay:'Quầy Hàng Của Tôi', deco:'Trang Trí Quầy', brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
 function openModal(type){ modalType = type; resetAsk = false; $('mTitle').textContent = TITLES[type]; $('modal').hidden = false; renderModal(); }
 function closeModal(){ $('modal').hidden = true; modalType = null; modalTick = null; quizRes = null; save(); if (pendingQuiz.length) setTimeout(() => { if (!modalType && pendingQuiz.length) openQuiz(pendingQuiz.shift()); }, 350); }
 function row(title, sub, btn, extra){ return `<div class="row">${extra || ''}<div class="rt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${btn || ''}</div>`; }
@@ -3195,6 +3272,10 @@ function renderModal(){
     own.forEach(d => { const s = st(d.id); h += row(`${d.name} · Cấp ${s.level}`, `Kho ${s.stock}/${maxStock(d)} · Giá ${fmt(lvlPrice(d))} xu · ${serveTime(d).toFixed(1)} giây/khách`, ''); });
     h += '<h3>Thống kê</h3><div class="kv">';
     h += `<span>Đã bán</span><b>${fmt(S.sold)} phần</b><span>Tổng thu</span><b>${fmt(S.stats.earned)} xu</b><span>Tự tay phục vụ</span><b>${fmt(S.stats.served)} khách</b><span>Khách bỏ đi vì hết hàng</span><b>${fmt(S.stats.missed)}</b><span>Trang phục</span><b>${S.outfits.length}/${OUTFITS.length}</b></div>`;
+  } else if (modalType === 'quay'){
+    h += quayRender();
+  } else if (modalType === 'deco'){
+    h += dcRender();
   } else if (modalType === 'brand'){
     h += brandRender();
   } else if (modalType === 'dovui'){
@@ -3245,6 +3326,10 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'gift'){ openGift(); }
   else if (a === 'quiz'){ openQuiz(+id); }
   else if (a === 'qa'){ if (!quizRes){ const [qi, qo] = id.split('-').map(Number); const ok = STAMP_QUIZ[qi].ok === qo, r = ok ? { coins:1500, exp:15 } : { coins:300, exp:5 }; S.quiz[qi] = ok ? 1 : 0; quizRes = { ok, r }; give(r); toast(ok ? 'Đúng rồi! +' + rewardText(r) : 'Chưa đúng, vẫn nhận thưởng an ủi: +' + rewardText(r), ok ? 'gold' : ''); sfx(ok ? 'level' : 'coin'); } }
+  else if (a === 'dcopen'){ decoId = id; dcDraft = null; openModal('deco'); return; }
+  else if (a === 'dcback'){ openModal('quay'); return; }
+  else if (a === 'qbuy'){ buyStall(id); }
+  else if (a === 'dcu' || a === 'dcs' || a === 'dca' || a === 'dcname'){ dcAct(a, id); }
   else if (a === 'brandsave'){ saveBrand(); return; }
   else if (a === 'brandcol'){ S.brandColor = '#' + id; BO.draft = ($('optBrand') || {}).value; }
   else if (a === 'dvans' || a === 'dvnext'){ dvAct(a, id); if (a === 'dvnext') return; }
@@ -3310,7 +3395,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
