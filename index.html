@@ -863,9 +863,11 @@ const SONGS = [
   { src:'music/4.mp3', title:'Lời Chia Tay Dễ Nói Thế Sao Anh', artist:'Thu Thủy' },
 ];
 const BGM = new Audio(); BGM.preload = 'auto';
+const SQ = []; let songReqd = false;   /* hàng chờ bài được yêu cầu; songReqd: bài đang phát là bài yêu cầu */
+function songNext(){ if (SQ.length){ songReqd = true; loadSong(SQ.shift()); } else { songReqd = false; loadSong(songIdx + 1); } }
 let AC = null, songIdx = 0, songPlays = 0, bgmGain = null, bgmVol = 0.5, songErr = 0;
 function loadSong(i){ songIdx = ((i % SONGS.length) + SONGS.length) % SONGS.length; songPlays++; BGM.src = SONGS[songIdx].src; }   /* màn hình LED tự vẽ lại khi thấy bài đổi (updateExpo) */
-BGM.addEventListener('ended', () => { songErr = 0; loadSong(songIdx + 1); bgmSync(); });
+BGM.addEventListener('ended', () => { songErr = 0; songNext(); bgmSync(); });
 BGM.addEventListener('error', () => { if (++songErr <= SONGS.length) setTimeout(() => { loadSong(songIdx + 1); bgmSync(); }, 2500); });
 function setBgmVol(v){ bgmVol = v; if (bgmGain) bgmGain.gain.value = v; else BGM.volume = v; }
 function bgmSync(){
@@ -2163,7 +2165,37 @@ const STAGE = WORLD.stage || null;
 const STAGE_NAME = 'Music Festival', STAGE_HOST = 'Sense Acoustic Cafe';
 /* tiết mục = bài hát đang phát; mỗi lượt phát một bài được cổ vũ một lần */
 const showSlot = () => songPlays;
-const curSong = () => SONGS[songIdx], nextSong = () => SONGS[(songIdx + 1) % SONGS.length];
+const curSong = () => SONGS[songIdx], nextSong = () => SONGS[SQ.length ? SQ[0] : (songIdx + 1) % SONGS.length];
+/* ----- danh sách bài hát và yêu cầu bài (có phí): xếp hàng hát kế tiếp bằng xu, hát ngay bằng kim cương ----- */
+const SONG_FEE = 2000, SONG_NOW_GEMS = 10, SONG_QUEUE_MAX = 3;
+function songsRender(){
+  if (!STAGE) return '<p>Sân khấu Music Festival ở Quảng trường Lâm Viên. Hãy qua đó để nghe nhạc và yêu cầu bài hát.</p>';
+  let h = `<p>Sân khấu <b>${STAGE_NAME}</b> · ${STAGE_HOST}. Yêu cầu bài: <b>${fmt(SONG_FEE)} xu</b> để ban nhạc hát kế tiếp (xếp hàng tối đa ${SONG_QUEUE_MAX} bài), hoặc <b>${SONG_NOW_GEMS} kim cương</b> để hát ngay.</p>`;
+  SONGS.forEach((sg, i) => {
+    const cur = i === songIdx, q = SQ.indexOf(i), okC = S.coins >= SONG_FEE, okG = S.gems >= SONG_NOW_GEMS;
+    const sub = escH(sg.artist) + (cur ? ' · <b>đang diễn</b>' + (songReqd ? ' theo yêu cầu' : '') : q >= 0 ? ` · <b>đã xếp hàng, thứ ${q + 1}</b>` : '');
+    const btn = cur ? '<button class="gbtn" disabled>Đang diễn ♪</button>'
+      : (q >= 0 ? '<button class="gbtn" disabled>Đã yêu cầu ✓</button>' : `<button class="gbtn ${okC && SQ.length < SONG_QUEUE_MAX ? 'green' : 'poor'}" data-act="sq:${i}">Hát kế tiếp<small>${fmt(SONG_FEE)} xu</small></button>`)
+        + `<button class="gbtn ${okG ? 'blue' : 'poor'}" data-act="sn:${i}">Hát ngay<small>${SONG_NOW_GEMS} kim cương</small></button>`;
+    h += row((i + 1) + '. ' + escH(sg.title), sub, cur ? btn : '<div style="display:flex;flex-direction:column;gap:.4em;flex:none">' + btn + '</div>');
+  });
+  if (!S.sound) h += '<p style="opacity:.75">Âm thanh đang tắt. Bật trong Cài Đặt để nghe nhạc.</p>';
+  return h + '<p style="opacity:.75">Nhạc chỉ nghe được khi đứng gần sân khấu; càng xa càng nhỏ.</p>';
+}
+function songReq(a, i){
+  i = +i; const sg = SONGS[i]; if (!STAGE || !sg || i === songIdx) return;
+  if (a === 'sq'){
+    if (SQ.includes(i)) return;
+    if (SQ.length >= SONG_QUEUE_MAX){ toast(`Hàng chờ đã đủ ${SONG_QUEUE_MAX} bài. Chờ ban nhạc hát bớt rồi yêu cầu tiếp.`, 'bad'); sfx('bad'); return; }
+    if (S.coins < SONG_FEE){ toast(`Cần ${fmt(SONG_FEE)} xu để yêu cầu bài.`, 'bad'); sfx('bad'); return; }
+    S.coins -= SONG_FEE; SQ.push(i); toast(`Đã yêu cầu “${sg.title}”: ${SQ.length === 1 ? 'ban nhạc sẽ hát kế tiếp' : 'xếp thứ ' + SQ.length + ' trong hàng chờ'}.`, 'gold');
+  } else {
+    if (S.gems < SONG_NOW_GEMS){ toast(`Cần ${SONG_NOW_GEMS} kim cương để hát ngay.`, 'bad'); sfx('bad'); return; }
+    S.gems -= SONG_NOW_GEMS; const q = SQ.indexOf(i); if (q >= 0) SQ.splice(q, 1);
+    songReqd = true; songErr = 0; loadSong(i); bgmSync(); toast(`Ban nhạc hát ngay “${sg.title}” theo yêu cầu của bạn.`, 'gold');
+  }
+  S.stats.songreq = (S.stats.songreq || 0) + 1; sfx('buy'); stageFx.slot = -1; ctxKey = '';
+}
 const stageFx = { beams:[], bulbs:[], performers:[], screen:null, slot:-1, noteT:0 };
 function drawStageScreen(){
   if (!STAGE || !stageFx.screen) return; const slot = showSlot(); stageFx.slot = slot;
@@ -2176,7 +2208,7 @@ function drawStageScreen(){
   c.font = '800 150px "Baloo 2", "Trebuchet MS", sans-serif'; c.fillStyle = LIME; c.fillText('MUSIC FESTIVAL', w / 2 + 7, h * 0.27 + 7); c.fillStyle = '#ffffff'; c.fillText('MUSIC FESTIVAL', w / 2, h * 0.27);
   c.font = '700 56px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = LIME; c.fillText('Sense Acoustic Cafe', w / 2, h * 0.5);
   c.font = '600 50px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = '#ffffff'; { const t = 'Đang diễn: ' + curSong().title; let fs = 50; do { c.font = `600 ${fs}px "Be Vietnam Pro", system-ui, sans-serif`; fs -= 2; } while (c.measureText(t).width > w - 80 && fs > 24); c.fillText(t, w / 2, h * 0.68); }
-  c.font = '500 38px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText('Tiếp theo: ' + nextSong().title, w / 2, h * 0.84);
+  c.font = '500 38px "Be Vietnam Pro", system-ui, sans-serif'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText((songReqd ? 'Theo yêu cầu của ' + String(S.name).slice(0, 16) + '  ·  ' : '') + 'Tiếp theo: ' + nextSong().title, w / 2, h * 0.84);
   stageFx.screen.needsUpdate = true;
 }
 if (STAGE){
@@ -3207,9 +3239,9 @@ function updateCtx(){
         }
       }
     } else {
-      const slot = showSlot(), done = S.stage.slot === slot, key = 'stage:' + slot + ':' + done;
-      if (ctxKey !== key){ ctxKey = key; $('cName').textContent = STAGE_NAME; $('cLv').textContent = STAGE_HOST; $('cStats').innerHTML = 'Đang diễn: <b>' + escH(curSong().title) + '</b> (' + escH(curSong().artist) + ')<br>Tiếp theo: ' + escH(nextSong().title);
-        $('cBtns').innerHTML = done ? '<button class="gbtn" disabled>Đã cổ vũ ✓<small>Chờ tiết mục sau</small></button>' : '<button class="gbtn green" data-act="cheer">Cổ vũ<small>+' + fmt(100 * S.level) + ' xu · +8 EXP</small></button>'; }
+      const slot = showSlot(), done = S.stage.slot === slot, key = 'stage:' + slot + ':' + done + ':' + SQ.join('');
+      if (ctxKey !== key){ ctxKey = key; $('cName').textContent = STAGE_NAME; $('cLv').textContent = STAGE_HOST; $('cStats').innerHTML = 'Đang diễn: <b>' + escH(curSong().title) + '</b> (' + escH(curSong().artist) + ')' + (songReqd ? ' · theo yêu cầu' : '') + '<br>Tiếp theo: ' + escH(nextSong().title) + (SQ.length ? ' (đã có ' + SQ.length + ' bài yêu cầu)' : '');
+        $('cBtns').innerHTML = (done ? '<button class="gbtn" disabled>Đã cổ vũ ✓<small>Chờ tiết mục sau</small></button>' : '<button class="gbtn green" data-act="cheer">Cổ vũ<small>+' + fmt(100 * S.level) + ' xu · +8 EXP</small></button>') + '<button class="gbtn blue" data-act="songs">Danh sách bài hát<small>Yêu cầu bài · ' + fmt(SONG_FEE) + ' xu</small></button>'; }
     }
     return;
   }
@@ -3257,7 +3289,7 @@ function updateCtx(){
 }
 $('cBtns').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return; const a = b.dataset.act;
-  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'boothdeco') openModal('bdeco'); else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
+  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'boothdeco') openModal('bdeco'); else if (a === 'songs') openModal('songs'); else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
   if (a === 'serve') serveNow(nearId); else if (a === 'restock') restock(nearId); else if (a === 'upgrade') upgrade(nearId); else if (a === 'buy') buyStall(nearId); else if (a === 'staff') hireStaff(nearId); else if (a === 'deco'){ decoId = nearId; dcDraft = null; openModal('deco'); }
   updateHud(); updateCtx();
 });
@@ -3272,7 +3304,7 @@ $('qGo').addEventListener('click', () => {
 
 /* ================= Hộp thoại ================= */
 let modalType = null, resetAsk = false;
-const TITLES = { bdeco:'Trang Trí Gian Hàng', quay:'Quầy Hàng Của Tôi', deco:'Trang Trí Quầy', brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
+const TITLES = { songs:'Danh Sách Bài Hát', bdeco:'Trang Trí Gian Hàng', quay:'Quầy Hàng Của Tôi', deco:'Trang Trí Quầy', brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
 function openModal(type){ modalType = type; resetAsk = false; $('mTitle').textContent = TITLES[type]; $('modal').hidden = false; renderModal(); }
 function closeModal(){ $('modal').hidden = true; modalType = null; modalTick = null; quizRes = null; save(); if (pendingQuiz.length) setTimeout(() => { if (!modalType && pendingQuiz.length) openQuiz(pendingQuiz.shift()); }, 350); }
 function row(title, sub, btn, extra){ return `<div class="row">${extra || ''}<div class="rt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${btn || ''}</div>`; }
@@ -3349,6 +3381,8 @@ function renderModal(){
     own.forEach(d => { const s = st(d.id); h += row(`${d.name} · Cấp ${s.level}`, `Kho ${s.stock}/${maxStock(d)} · Giá ${fmt(lvlPrice(d))} xu · ${serveTime(d).toFixed(1)} giây/khách`, ''); });
     h += '<h3>Thống kê</h3><div class="kv">';
     h += `<span>Đã bán</span><b>${fmt(S.sold)} phần</b><span>Tổng thu</span><b>${fmt(S.stats.earned)} xu</b><span>Tự tay phục vụ</span><b>${fmt(S.stats.served)} khách</b><span>Khách bỏ đi vì hết hàng</span><b>${fmt(S.stats.missed)}</b><span>Trang phục</span><b>${S.outfits.length}/${OUTFITS.length}</b></div>`;
+  } else if (modalType === 'songs'){
+    h += songsRender();
   } else if (modalType === 'bdeco'){
     h += bdRender();
   } else if (modalType === 'quay'){
@@ -3409,6 +3443,7 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'dcback'){ openModal('quay'); return; }
   else if (a === 'qbuy'){ buyStall(id); }
   else if (a === 'dcu' || a === 'dcs' || a === 'dca' || a === 'dcname'){ dcAct(a, id); }
+  else if (a === 'sq' || a === 'sn'){ songReq(a, id); }
   else if (a === 'bdbuy' || a === 'bdtog'){ bdAct(a, id); }
   else if (a === 'bdname'){ openModal('brand'); return; }
   else if (a === 'bdopen'){ BO.draft = null; openModal('bdeco'); return; }
@@ -3493,7 +3528,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
