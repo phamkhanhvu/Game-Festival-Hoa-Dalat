@@ -726,7 +726,7 @@ function cloudPush(){
 }
 function save(){
   if (CLOUD.adopting) return;
-  try { S.savedAt = now(); S.player = { x:P.x, z:P.z }; S.pos = S.pos || {}; S.pos[MAP] = S.player; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
+  try { S.savedAt = now(); S.player = (typeof DANCE !== 'undefined' && DANCE.on && DANCE.back) ? { x:DANCE.back.x, z:DANCE.back.z } : { x:P.x, z:P.z }; S.pos = S.pos || {}; S.pos[MAP] = S.player; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
   cloudPush(); boardPush();
 }
 try { const hot = window.claude && window.claude.hot; if (hot && hot.snapshot) hot.snapshot(() => { S.player = { x:P.x, z:P.z }; return { S }; }); } catch(e){}
@@ -857,10 +857,30 @@ const SHOP = [
    Âm lượng theo khoảng cách tới sân khấu; đi qua Web Audio (GainNode) vì iPhone không cho chỉnh audio.volume.
    Trình duyệt chỉ cho phát sau lần chạm đầu tiên, nên thử phát ở mỗi lần chạm đến khi được. */
 const SONGS = [
-  { src:'music/1.mp3', title:'Anh Tin Mình Đã Cho Nhau Một Kỷ Niệm', artist:'Thu Thủy, Lương Bằng Quang' },
-  { src:'music/2.mp3', title:'Sao Em Vẫn Yêu', artist:'Thu Thủy' },
-  { src:'music/3.mp3', title:'Mong Anh Quay Về', artist:'Thu Thủy' },
-  { src:'music/4.mp3', title:'Lời Chia Tay Dễ Nói Thế Sao Anh', artist:'Thu Thủy' },
+  { src:"music/1.mp3", title:"Anh Tin Mình Đã Cho Nhau Một Kỷ Niệm", artist:"Thu Thủy, Lương Bằng Quang", bpm:86.0, off:0.297 },
+  { src:"music/2.mp3", title:"Sao Em Vẫn Yêu", artist:"Thu Thủy", bpm:88.03, off:0.613 },
+  { src:"music/3.mp3", title:"Mong Anh Quay Về", artist:"Thu Thủy", bpm:84.99, off:0.032 },
+  { src:"music/4.mp3", title:"Lời Chia Tay Dễ Nói Thế Sao Anh", artist:"Thu Thủy", bpm:120.04, off:0.354 },
+  { src:"music/5.mp3", title:"Gee", artist:"Girls' Generation", bpm:99.99, off:0.138 },
+  { src:"music/6.mp3", title:"Baby One More Time", artist:"Chưa rõ ca sĩ", bpm:92.98, off:0.14 },
+  { src:"music/7.mp3", title:"Be My Lover", artist:"La Bouche", bpm:134.8, off:0.098 },
+  { src:"music/8.mp3", title:"Hoa Trong Mộng", artist:"Trương Thiều Hàm", bpm:148.08, off:0.213 },
+  { src:"music/9.mp3", title:"Love Paradise", artist:"Trần Tuệ Lâm (Kelly Chen)", bpm:80.0, off:0.203 },
+  { src:"music/10.mp3", title:"Get The Party Started", artist:"Chưa rõ ca sĩ", bpm:128.93, off:0.01 },
+  { src:"music/11.mp3", title:"A Public Affair", artist:"Chưa rõ ca sĩ", bpm:123.99, off:0.355 },
+  { src:"music/12.mp3", title:"Baby And Dear", artist:"Trương Hàm Vận", bpm:77.39, off:0.504 },
+  { src:"music/13.mp3", title:"Lúc Mới Yêu", artist:"Phương Vy", bpm:112.0, off:0.527 },
+  { src:"music/14.mp3", title:"Nếu", artist:"Noo Phước Thịnh", bpm:128.0, off:0.648 },
+  { src:"music/15.mp3", title:"Chồng Xa (Remix)", artist:"Cẩm Ly", bpm:148.1, off:0.692 },
+  { src:"music/16.mp3", title:"Tiếng Gió Xôn Xao", artist:"Đàm Vĩnh Hưng", bpm:92.0, off:0.011 },
+  { src:"music/17.mp3", title:"Đồng Thoại", artist:"Quang Lương (Michael Wong)", bpm:136.04, off:0.537 },
+  { src:"music/18.mp3", title:"Hair Like Snow", artist:"Châu Kiệt Luân (Jay Chou)", bpm:115.99, off:0.075 },
+  { src:"music/19.mp3", title:"Endless Love", artist:"Thành Long, Kim Hee Sun", bpm:130.0, off:0.208 },
+  { src:"music/20.mp3", title:"My Love", artist:"Justin Timberlake", bpm:90.0, off:0.622 },
+  { src:"music/21.mp3", title:"What Goes Around... Comes Around", artist:"Justin Timberlake", bpm:75.99, off:0.145 },
+  { src:"music/22.mp3", title:"Sorry Seems To Be The Hardest Word", artist:"Blue", bpm:79.0, off:0.392 },
+  { src:"music/23.mp3", title:"Fiction", artist:"Chưa rõ ca sĩ", bpm:128.01, off:0.439 },
+  { src:"music/24.mp3", title:"Dead And Gone", artist:"Chưa rõ ca sĩ", bpm:135.0, off:0.272 },
 ];
 const BGM = new Audio(); BGM.preload = 'auto';
 const SQ = []; let songReqd = false;   /* hàng chờ bài được yêu cầu; songReqd: bài đang phát là bài yêu cầu */
@@ -2903,12 +2923,140 @@ function setGoto(x, z){
   if (path && path.length){ const n = path.shift(); P.goto = { x:n.x, z:n.z, path, fx:x, fz:z }; } else P.goto = { x, z, path:[], fx:x, fz:z };
   P.stuck = 0;
 }
+/* ================= Nhảy trên sân khấu (kiểu Audition) =================
+   Mỗi lượt dài 8 phách: bấm đúng dãy mũi tên, rồi bấm NHẢY đúng lúc viên bi chạy tới vạch đích (phách thứ 8).
+   Nhịp lấy theo bài đang phát trên sân khấu (bpm và off trong SONGS: nhịp và độ lệch phách đầu đã đo sẵn cho từng bài). */
+const DN_ROUNDS = 10, DN_BEATS = 8, DN_HIT = 7, DN_KEYS = ['l', 'u', 'r', 'd'], DN_SYM = { l:'←', u:'↑', r:'→', d:'↓' };
+const DN_RATE = [['PERFECT', 0.075, 1000, '#ffd84a'], ['GREAT', 0.14, 700, '#7dffa0'], ['COOL', 0.22, 400, '#8fd0ff'], ['BAD', 0.32, 150, '#ffb3a0']];
+const DANCE = { on:false, back:null, el:null };
+(() => { const st = document.createElement('style'); st.textContent = `
+body.dancing #hud > *:not(.toasts):not(.flash){display:none!important}
+body.dancing #labels{display:none}
+#dn{position:fixed;inset:0;z-index:40;pointer-events:none;font-family:var(--font-body);color:#fff;-webkit-user-select:none;user-select:none}
+#dn .dntop{position:absolute;top:calc(env(safe-area-inset-top,0px) + .8rem);left:.8rem;right:.8rem;display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;text-shadow:0 .1rem .3rem rgba(0,0,0,.7)}
+#dn .dntop b{font-size:2.4rem;display:block;line-height:1.1} #dn .dntop small{font-size:1.45rem;opacity:.95}
+#dn .dnx{pointer-events:auto;width:3.4rem;height:3.4rem;border-radius:50%;background:rgba(10,20,45,.7);border:.15rem solid rgba(255,255,255,.6);color:#fff;font-size:1.8rem;font-weight:800;flex:none}
+#dn .dnrate{position:absolute;left:0;right:0;top:30%;text-align:center;font:800 4rem/1 "Baloo 2","Trebuchet MS",sans-serif;text-shadow:0 .2rem .6rem rgba(0,0,0,.6);opacity:0;transform:scale(.6);transition:opacity .12s,transform .18s}
+#dn .dnrate.show{opacity:1;transform:scale(1)} #dn .dnrate small{display:block;font-size:1.5rem;margin-top:.3rem}
+#dn .dnpanel{position:absolute;left:0;right:0;bottom:0;pointer-events:auto;padding:.9rem 1rem calc(env(safe-area-inset-bottom,0px) + 1.1rem);background:linear-gradient(rgba(10,18,44,0),rgba(10,18,44,.88) 16%,rgba(10,18,44,.96));touch-action:none}
+#dn .dnseq{display:flex;justify-content:center;gap:.45rem;min-height:4.2rem;margin:.9rem 0 .6rem;flex-wrap:wrap}
+#dn .dnseq i{font-style:normal;width:4.6rem;height:4.6rem;border-radius:.8rem;display:flex;align-items:center;justify-content:center;font-size:3rem;font-weight:800;background:rgba(255,255,255,.14);border:.14rem solid rgba(255,255,255,.5)}
+#dn .dnseq i.ok{background:#35c26b;border-color:#c9ffd9;color:#06301a} #dn .dnseq.shake{animation:dnshake .25s}
+@keyframes dnshake{25%{transform:translateX(-.5rem)}75%{transform:translateX(.5rem)}}
+#dn .dnbar{position:relative;height:1.8rem;border-radius:1rem;background:rgba(255,255,255,.16);border:.12rem solid rgba(255,255,255,.45);margin:0 .4rem .9rem}
+#dn .dnbar .dnzone{position:absolute;top:-.35rem;bottom:-.35rem;left:calc(87.5% - 1.1rem);width:2.2rem;border-radius:.6rem;background:rgba(255,216,74,.4);border:.14rem solid #ffd84a}
+#dn .dnbar .dnball{position:absolute;top:50%;width:1.9rem;height:1.9rem;margin:-.95rem 0 0 -.95rem;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#ff5fa2);box-shadow:0 0 .7rem #ff8fc0;left:0}
+#dn .dnpad{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+#dn .dnarws{display:grid;grid-template-columns:repeat(3,6rem);grid-template-rows:repeat(2,6rem);gap:.5rem}
+#dn .dnarws button,#dn .dngo{border-radius:1rem;border:.16rem solid rgba(255,255,255,.75);color:#fff;font-weight:800;box-shadow:0 .25rem 0 rgba(0,0,0,.35)}
+#dn .dnarws button{background:linear-gradient(#5aa2ff,#2c66d8);font-size:3.2rem} #dn .dnarws button:active,#dn .dngo:active{transform:translateY(.2rem);box-shadow:none}
+#dn .dnarws [data-k=u]{grid-column:2;grid-row:1} #dn .dnarws [data-k=l]{grid-column:1;grid-row:2} #dn .dnarws [data-k=d]{grid-column:2;grid-row:2} #dn .dnarws [data-k=r]{grid-column:3;grid-row:2}
+#dn .dngo{flex:1;max-width:15rem;height:12.5rem;background:linear-gradient(#ffd84a,#f08a1f);color:#4a2500;font:800 3rem "Baloo 2","Trebuchet MS",sans-serif}
+#dn .dngo small{display:block;font:600 1.25rem var(--font-body)}
+#dn .dnres{position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);width:min(30rem,calc(100vw - 2.4rem));pointer-events:auto;background:var(--panel,rgba(20,34,70,.96));border:.15rem solid #ffd84a;border-radius:1.1rem;padding:1.2rem 1.3rem;text-align:center;box-shadow:0 .5rem 1.6rem rgba(0,0,0,.45)}
+#dn .dnres h2{margin:0 0 .3rem;font:800 2.3rem "Baloo 2","Trebuchet MS",sans-serif;color:#ffd84a} #dn .dnres .dnbig{font:800 3.6rem/1 "Baloo 2","Trebuchet MS",sans-serif;margin:.4rem 0}
+#dn .dnres p{margin:.35rem 0;font-size:1.25rem} #dn .dnres .dnbtns{display:flex;gap:.7rem;margin-top:.9rem} #dn .dnres .dnbtns button{flex:1}`; document.head.appendChild(st); })();
+function danceBeat(){ const d = DANCE; return (performance.now() / 1000 - d.t0) / d.spb; }
+function danceStart(){
+  if (DANCE.on || !STAGE) return;
+  const d = DANCE, sb = curSong().bpm ? curSong() : { bpm:100, off:0 }; d.spb = 60 / sb.bpm;
+  const playing = S.sound && !BGM.paused && BGM.currentTime > 0;
+  d.t0 = performance.now() / 1000 - (playing ? BGM.currentTime - sb.off : 0);
+  let c = Math.floor(danceBeat() / DN_BEATS) + 1; if ((c * DN_BEATS - danceBeat()) * d.spb < 1.6) c++;
+  Object.assign(d, { on:true, c0:c, round:-1, score:0, combo:0, maxCombo:0, len:3, streak:0, seq:[], idx:0, hit:false, cnt:{ PERFECT:0, GREAT:0, COOL:0, BAD:0, MISS:0 }, done:false, move:null, moveT:0, spin:0, song:curSong().title,
+    back:{ x:P.x, z:P.z, h:P.h, ang:P.ang, yaw, pitch, camDist } });
+  P.x = STAGE.x - 1.9; P.z = STAGE.z + 2.7; P.h = STAGE.y + 1.06; P.j = 0; P.vy = 0; P.goto = null; P.ang = 0; yaw = 0; pitch = 0.3; camDist = innerHeight > innerWidth ? 14 : 10;
+  if (typeof runOn !== 'undefined' && runOn){ runOn = false; setRunBtn(); }
+  const el = document.createElement('div'); el.id = 'dn';
+  el.innerHTML = `<div class="dntop"><div><b id="dnScore">0</b><small id="dnInfo"></small></div><button class="dnx" data-dn="quit" aria-label="Thoát nhảy">×</button></div>
+<div class="dnrate" id="dnRate"></div>
+<div class="dnpanel"><div class="dnseq" id="dnSeq"></div><div class="dnbar"><div class="dnzone"></div><div class="dnball" id="dnBall"></div></div>
+<div class="dnpad"><div class="dnarws">${DN_KEYS.map(k => `<button data-dn="k" data-k="${k}" aria-label="mũi tên ${k}">${DN_SYM[k]}</button>`).join('')}</div><button class="dngo" data-dn="go">NHẢY!<small>bấm khi bi tới vạch vàng</small></button></div></div>`;
+  document.body.appendChild(el); document.body.classList.add('dancing'); d.el = el;
+  el.addEventListener('pointerdown', e => { const b = e.target.closest('[data-dn]'); if (!b) return; e.preventDefault(); const a = b.dataset.dn; if (a === 'k') danceKey(b.dataset.k); else if (a === 'go') danceHit(); else if (a === 'quit' || a === 'close') danceEnd(); else if (a === 'again'){ danceEnd(); danceStart(); } });
+  danceSeqDraw(); ctxKey = '';
+  if (!playing) toast('Âm thanh đang tắt hoặc nhạc chưa phát: bạn vẫn nhảy được theo viên bi.', '');
+}
+function danceSeqDraw(){
+  const d = DANCE, box = d.el && d.el.querySelector('#dnSeq'); if (!box) return;
+  box.innerHTML = d.round < 0 ? '<span style="font-size:1.5rem;align-self:center">Chuẩn bị… bấm đúng dãy mũi tên, rồi bấm NHẢY ở vạch vàng</span>' : d.seq.map((k, i) => `<i class="${i < d.idx ? 'ok' : ''}">${DN_SYM[k]}</i>`).join('');
+  d.el.querySelector('#dnScore').textContent = fmt(d.score) + ' điểm';
+  d.el.querySelector('#dnInfo').textContent = (d.round < 0 ? 'Sắp bắt đầu' : 'Lượt ' + Math.min(d.round + 1, DN_ROUNDS) + '/' + DN_ROUNDS) + (d.combo > 1 ? ' · chuỗi x' + d.combo : '') + ' · ' + d.song;
+}
+function danceRate(name, col, sub){ const d = DANCE, r = d.el && d.el.querySelector('#dnRate'); if (!r) return; r.innerHTML = name + (sub ? '<small>' + sub + '</small>' : ''); r.style.color = col; r.classList.add('show'); clearTimeout(d.rt); d.rt = setTimeout(() => r.classList.remove('show'), 650); }
+function danceKey(k){
+  const d = DANCE; if (!d.on || d.done || d.round < 0 || d.hit || d.idx >= d.seq.length) return;
+  if (d.seq[d.idx] === k){ d.idx++; d.move = k; d.moveT = 0.45; }
+  else { d.idx = 0; sfx('bad'); const s = d.el.querySelector('#dnSeq'); s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake'); }
+  danceSeqDraw();
+}
+function danceJudge(name, pts, col){
+  const d = DANCE; d.hit = true; d.cnt[name]++;
+  if (name === 'MISS' || name === 'BAD'){ d.combo = 0; d.streak = 0; if (name === 'MISS') d.len = Math.max(3, d.len - 1); }
+  else { d.combo++; d.maxCombo = Math.max(d.maxCombo, d.combo); if (++d.streak >= 2){ d.streak = 0; d.len = Math.min(8, d.len + 1); } }
+  const gain = Math.round(pts * (d.seq.length / 4) * Math.min(2, 1 + (d.combo - 1) * 0.1) / 10) * 10; d.score += Math.max(0, gain);
+  danceRate(name, col, gain > 0 ? '+' + fmt(gain) : ''); if (name === 'PERFECT'){ d.spin = 1; P.vy = 5.2; sfx('level'); } else if (name === 'MISS') sfx('bad'); else sfx('coin');
+  danceSeqDraw();
+}
+function danceHit(){
+  const d = DANCE; if (!d.on || d.done || d.round < 0 || d.hit) return;
+  if (d.idx < d.seq.length){ danceJudge('MISS', 0, '#ff8a8a'); return; }
+  const dt = Math.abs(danceBeat() - ((d.c0 + d.round) * DN_BEATS + DN_HIT)) * d.spb, r = DN_RATE.find(x => dt <= x[1]);
+  if (r) danceJudge(r[0], r[2], r[3]); else danceJudge('MISS', 0, '#ff8a8a');
+}
+function danceFinish(){
+  const d = DANCE; d.done = true; const max = DN_ROUNDS * 1000 * 1.6, ratio = d.score / max, grade = ratio > 0.8 ? 'S' : ratio > 0.55 ? 'A' : ratio > 0.3 ? 'B' : 'C';
+  const coins = Math.round(d.score / 10 * (1 + S.level / 20) / 10) * 10, exp = 6 + d.cnt.PERFECT * 2 + d.cnt.GREAT;
+  S.dance = S.dance || { best:0, plays:0 }; S.dance.plays++; const rec = d.score > S.dance.best; if (rec) S.dance.best = d.score; S.stats.dance = (S.stats.dance || 0) + 1;
+  give({ coins, exp }); save(); updateHud(); if (coins) sfx('level');
+  const p = d.el.querySelector('.dnpanel'); if (p) p.remove();
+  const res = document.createElement('div'); res.className = 'dnres';
+  res.innerHTML = `<h2>Kết quả · hạng ${grade}</h2><div class="dnbig">${fmt(d.score)} điểm</div><p>${rec ? '<b style="color:#ffd84a">Kỷ lục mới!</b>' : 'Kỷ lục của bạn: ' + fmt(S.dance.best) + ' điểm'}</p>
+<p>Perfect ${d.cnt.PERFECT} · Great ${d.cnt.GREAT} · Cool ${d.cnt.COOL} · Bad ${d.cnt.BAD} · Miss ${d.cnt.MISS}<br>Chuỗi dài nhất: x${d.maxCombo}</p><p>Thưởng: <b>+${fmt(coins)} xu</b> · +${exp} EXP</p>
+<div class="dnbtns"><button class="gbtn green" data-dn="again">Nhảy lại</button><button class="gbtn" data-dn="close">Xuống sân khấu</button></div>`;
+  d.el.appendChild(res);
+}
+function danceEnd(){
+  const d = DANCE; if (!d.on) return; d.on = false; clearTimeout(d.rt);
+  if (d.el) d.el.remove(); d.el = null; document.body.classList.remove('dancing');
+  const b = d.back; if (b){ P.x = b.x; P.z = b.z; P.h = b.h; P.ang = b.ang; yaw = b.yaw; pitch = b.pitch; camDist = b.camDist; } d.back = null; P.j = 0; P.vy = 0;
+  const u = playerMesh.userData; ['armL', 'armR', 'legL', 'legR'].forEach(k => { if (u[k]){ u[k].rotation.x = 0; u[k].rotation.z = k === 'armL' ? (u.real ? 0 : -0.07) : k === 'armR' ? (u.real ? 0 : 0.07) : 0; } }); if (u.pose) u.pose();
+  ctxKey = ''; updateHud();
+}
+/* gọi mỗi khung hình sau khi nhân vật đã được đặt tư thế đi bộ: chạy nhịp, đổi lượt và đặt tư thế nhảy */
+function danceUpdate(dt){
+  const d = DANCE; if (!d.on) return;
+  const bf = danceBeat(), cyc = Math.floor(bf / DN_BEATS), ph = bf / DN_BEATS - cyc, r = cyc - d.c0;
+  if (!d.done){
+    if (r !== d.round && r >= 0){
+      if (d.round >= 0 && !d.hit) danceJudge('MISS', 0, '#ff8a8a');
+      if (r >= DN_ROUNDS){ d.round = DN_ROUNDS; danceFinish(); }
+      else { d.round = r; d.hit = false; d.idx = 0; d.seq = Array.from({ length:d.len }, () => DN_KEYS[Math.floor(Math.random() * 4)]); danceSeqDraw(); }
+    }
+    const ball = d.el && d.el.querySelector('#dnBall'); if (ball) ball.style.left = (ph * 100).toFixed(2) + '%';
+  }
+  /* tư thế: nhún theo phách, mỗi mũi tên một động tác, Perfect thì xoay một vòng */
+  const u = playerMesh.userData, beat = bf - Math.floor(bf), bounce = Math.abs(Math.sin(beat * Math.PI)), sw = Math.sin(bf * Math.PI);
+  d.moveT = Math.max(0, d.moveT - dt); if (d.spin > 0) d.spin = Math.max(0, d.spin - dt * 1.6);
+  let aLx = -0.5 + sw * 0.5, aRx = -0.5 - sw * 0.5, aLz = -0.25, aRz = 0.25, lL = sw * 0.3, lR = -sw * 0.3, drop = bounce * 0.07, lean = sw * 0.1;
+  if (d.moveT > 0){ const m = d.move;
+    if (m === 'u'){ aLx = aRx = -2.9; aLz = -0.35; aRz = 0.35; }
+    else if (m === 'd'){ aLx = aRx = -1.2; drop += 0.22; lL = 0.5; lR = 0.5; }
+    else if (m === 'l'){ aLz = -1.5; aLx = 0; aRx = -1.9; lean = -0.28; lL = 0; lR = -0.45; }
+    else { aRz = 1.5; aRx = 0; aLx = -1.9; lean = 0.28; lR = 0; lL = -0.45; } }
+  if (u.armL && u.armR){ u.armL.rotation.x = aLx; u.armR.rotation.x = aRx; u.armL.rotation.z = aLz; u.armR.rotation.z = aRz; }
+  if (u.legL && u.legR){ u.legL.rotation.x = lL; u.legR.rotation.x = lR; }
+  if (u.pose) u.pose();
+  playerMesh.position.set(P.x + lean * 0.5, P.y - drop, P.z); playerMesh.rotation.y = P.ang + lean + (1 - d.spin) * 0 + d.spin * TAU;
+}
+addEventListener('keydown', e => { if (!DANCE.on) return; const k = { ArrowLeft:'l', ArrowUp:'u', ArrowRight:'r', ArrowDown:'d' }[e.code]; if (k){ danceKey(k); e.preventDefault(); } else if (e.code === 'Space'){ danceHit(); e.preventDefault(); e.stopImmediatePropagation(); } else if (e.code === 'Escape') danceEnd(); }, true);
 function update(dt){
   T += dt;
   let mx = 0, my = 0;
   if (keys.KeyA || keys.ArrowLeft) mx--; if (keys.KeyD || keys.ArrowRight) mx++;
   if (keys.KeyW || keys.ArrowUp) my--; if (keys.KeyS || keys.ArrowDown) my++;
   mx += J.x; my += J.y;
+  if (DANCE.on){ mx = 0; my = 0; P.goto = null; }
   let ml = Math.hypot(mx, my); if (ml > 1){ mx /= ml; my /= ml; ml = 1; }
   let wx = 0, wz = 0;
   if (ml > 0.12){
@@ -2929,6 +3077,7 @@ function update(dt){
   if (P.goto){ const moved = Math.hypot(P.x - px, P.z - pz); if (moved < sp * dt * 0.25){ P.stuck += dt; if (P.stuck > 0.5){ P.goto = null; P.stuck = 0; } } else P.stuck = 0; }
   const gh = hAt(P.x, P.z); if (gh > -50) P.h += (gh - P.h) * Math.min(1, dt * 16);
   if (P.j > 0 || P.vy !== 0){ P.vy -= 16 * dt; P.j += P.vy * dt; if (P.j <= 0){ P.j = 0; P.vy = 0; } }
+  if (DANCE.on) P.h = STAGE.y + 1.06;
   P.y = P.h + P.j;
   if (S.quest === 0 && !S.flags.explored && Math.hypot(P.x - EXPLORE.x, P.z - EXPLORE.z) < 4){ S.flags.explored = true; toast('Bạn đã khám phá Quảng trường Lâm Viên! Nhận thưởng ở bảng nhiệm vụ.', 'gold'); sfx('buy'); }
   nearSeller = people.some(p => p.seller && Math.hypot(P.x - p.x, P.z - p.z) < 3.2);
@@ -2983,7 +3132,7 @@ function update(dt){
   questRing.visible = !!(qt && !qt.stall); if (questRing.visible){ questRing.position.set(qt.x, hAt(qt.x, qt.z) + 0.08, qt.z); questRing.material.opacity = 0.6 + Math.sin(T * 5) * 0.3; questRing.scale.setScalar(1 + Math.sin(T * 3) * 0.08); }
   gotoRing.visible = !!P.goto; if (P.goto) gotoRing.position.set(P.goto.fx, Math.max(0, hAt(P.goto.fx, P.goto.fz)) + 0.1, P.goto.fz);
   playerRing.visible = false; playerRing.position.set(P.x, P.h + 0.1, P.z);
-  playerMesh.position.set(P.x, P.y, P.z); playerMesh.rotation.y = P.ang; animPerson(playerMesh, P.walk, P.moving);
+  playerMesh.position.set(P.x, P.y, P.z); playerMesh.rotation.y = P.ang; animPerson(playerMesh, P.walk, P.moving); danceUpdate(dt);
 
   balloons.forEach((b, i) => { b.position.y = b.userData.y0 + Math.sin(T * 1.4 + i) * 0.06; });
   sun.position.set(P.x + 45, P.h + 75, P.z + 35); sun.target.position.set(P.x, P.h, P.z); sun.target.updateMatrixWorld();
@@ -3310,7 +3459,7 @@ function updateCtx(){
     } else {
       const slot = showSlot(), done = S.stage.slot === slot, key = 'stage:' + slot + ':' + done + ':' + SQ.join('');
       if (ctxKey !== key){ ctxKey = key; $('cName').textContent = STAGE_NAME; $('cLv').textContent = STAGE_HOST; $('cStats').innerHTML = 'Đang diễn: <b>' + escH(curSong().title) + '</b> (' + escH(curSong().artist) + ')' + (songReqd ? ' · theo yêu cầu' : '') + '<br>Tiếp theo: ' + escH(nextSong().title) + (SQ.length ? ' (đã có ' + SQ.length + ' bài yêu cầu)' : '');
-        $('cBtns').innerHTML = (done ? '<button class="gbtn" disabled>Đã cổ vũ ✓<small>Chờ tiết mục sau</small></button>' : '<button class="gbtn green" data-act="cheer">Cổ vũ<small>+' + fmt(100 * S.level) + ' xu · +8 EXP</small></button>') + '<button class="gbtn blue" data-act="songs">Danh sách bài hát<small>Yêu cầu bài · ' + fmt(SONG_FEE) + ' xu</small></button>'; }
+        $('cBtns').innerHTML = (done ? '<button class="gbtn" disabled>Đã cổ vũ ✓<small>Chờ tiết mục sau</small></button>' : '<button class="gbtn green" data-act="cheer">Cổ vũ<small>+' + fmt(100 * S.level) + ' xu · +8 EXP</small></button>') + '<button class="gbtn" data-act="dance">Lên sân khấu nhảy<small>Bấm mũi tên theo nhạc · thưởng xu</small></button><button class="gbtn blue" data-act="songs">Danh sách bài hát<small>Yêu cầu bài · ' + fmt(SONG_FEE) + ' xu</small></button>'; }
     }
     return;
   }
@@ -3358,7 +3507,7 @@ function updateCtx(){
 }
 $('cBtns').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return; const a = b.dataset.act;
-  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'boothdeco') openModal('bdeco'); else if (a === 'songs') openModal('songs'); else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
+  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'boothdeco') openModal('bdeco'); else if (a === 'songs') openModal('songs'); else if (a === 'dance'){ danceStart(); return; } else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
   if (a === 'serve') serveNow(nearId); else if (a === 'restock') restock(nearId); else if (a === 'upgrade') upgrade(nearId); else if (a === 'buy') buyStall(nearId); else if (a === 'staff') hireStaff(nearId); else if (a === 'deco'){ decoId = nearId; dcDraft = null; openModal('deco'); }
   updateHud(); updateCtx();
 });
@@ -3600,7 +3749,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, skyToggle, dayK, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, DANCE, danceStart, danceKey, danceHit, danceEnd, danceBeat, danceUpdate, skyToggle, dayK, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
