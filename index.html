@@ -2030,6 +2030,27 @@ function bdAct(a, id){
   } else if (a === 'bdtog'){ if (!c.own[id]) return; if (c.on[id]) delete c.on[id]; else c.on[id] = 1; sfx('buy'); }
   bdSync();
 }
+/* hoa trang trí có sẵn ở mọi gian (không cần mua): tràng hoa trên biển hiệu, bó hoa hai góc mái, dây hoa quấn cột và cụm hoa chân cột.
+   Mỗi gian một InstancedMesh có màu theo từng bông, nên chỉ thêm một lượt vẽ cho mỗi gian. */
+const BF_COL = ['#ff5fa2', '#e0218a', '#ffd23f', '#ff8a1f', '#e8322d', '#9b5de5', '#fff7f0', '#5b8def'].map(c => new THREE.Color(c)), BF_LEAF = new THREE.Color('#3f8a3c');
+const BF_GEO = new THREE.IcosahedronGeometry(1, 0), BF_MAT = new THREE.MeshLambertMaterial({ color:0xffffff });
+function boothFlowers(b, g){
+  let sd = 31 + b.no * 97; const fr = () => (sd = (sd * 16807) % 2147483647) / 2147483647, L = [], add = (x, y, z, r, c) => L.push([x, y, z, r, c]), fc = () => BF_COL[Math.floor(fr() * 8)];
+  const main = BF_COL[(b.no * 3) % 8], alt = BF_COL[(b.no * 3 + 2) % 8];
+  /* tràng hoa hai hàng trên biển hiệu */
+  for (let k = 0; k <= 30; k++){ const x = -2.7 + k * 0.18; add(x, 3.95 + fr() * 0.05, 1.24, 0.16 + fr() * 0.03, k % 5 === 4 ? BF_LEAF : (k % 2 ? main : alt)); add(x + 0.09, 4.1 + fr() * 0.06, 1.14, 0.14, k % 3 === 0 ? BF_LEAF : fc()); }
+  /* hàng hoa trên đỉnh vách sau và dải hoa dọc chân hai vách bên */
+  for (let k = 0; k <= 20; k++) add(-2.5 + k * 0.25, 3.08, -1.68, 0.15, k % 4 === 3 ? BF_LEAF : fc());
+  [-1, 1].forEach(a => {
+    for (let k = 0; k < 9; k++){ const an = k / 9 * TAU, rr = k < 3 ? 0.12 : 0.3; add(a * 2.62 + Math.cos(an) * rr, 4.2 + (k % 3) * 0.13, 1.2 + Math.sin(an) * rr, 0.21, k === 4 ? BF_LEAF : fc()); }
+    for (let k = 0; k < 14; k++){ const t = k / 14, an = t * 12; add(a * 2.6 + Math.cos(an) * 0.16, 0.5 + t * 2.7, 1.2 + Math.sin(an) * 0.16, 0.13, k % 3 === 2 ? BF_LEAF : (k % 2 ? main : alt)); }
+    for (let k = 0; k < 9; k++){ const an = k / 9 * TAU; add(a * 2.6 + Math.cos(an) * 0.3, 0.17 + (k % 2) * 0.15, 1.25 + Math.sin(an) * 0.3, 0.17, k % 4 === 3 ? BF_LEAF : fc()); }
+    for (let k = 0; k < 9; k++) add(a * 2.78, 0.16 + (k % 2) * 0.1, -1.6 + k * 0.3, 0.16, k % 3 === 2 ? BF_LEAF : fc());
+  });
+  const im = new THREE.InstancedMesh(BF_GEO, BF_MAT, L.length), dm = new THREE.Object3D();
+  L.forEach((f, i) => { dm.position.set(f[0], f[1], f[2]); dm.scale.setScalar(f[3]); dm.updateMatrix(); im.setMatrixAt(i, dm.matrix); im.setColorAt(i, f[4]); });
+  im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.frustumCulled = false; g.add(im);
+}
 function buildBooth(b){
   if (b.group) scene.remove(b.group);
   boothView(b);
@@ -2056,6 +2077,7 @@ function buildBooth(b){
   [1.25, 2.0].forEach(y => { put(BG.shelf, BM.trim, 1.55, y, -1.42); for (let k = 0; k < 4; k++) put(BG.box, k % 2 ? cm : BM.trim, 0.95 + k * 0.4, y + 0.21, -1.42); });
   /* hạng gian: ngôi sao màu kim cương/vàng/bạc trên mái */
   if (b.T){ const sm = new THREE.MeshBasicMaterial({ color:b.T.color }); const s = new THREE.Mesh(BG.star, sm); s.position.set(0, 4.2, 1.2); g.add(s); b.star = s; bdBuild(b, g, put, cm); }
+  boothFlowers(b, g);
   g.position.set(b.x, b.y, b.z); g.rotation.y = b.face < 0 ? Math.PI : 0; scene.add(g); b.group = g;
 }
 BRANDS.forEach(buildBooth);
