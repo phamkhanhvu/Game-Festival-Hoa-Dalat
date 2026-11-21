@@ -1945,6 +1945,16 @@ const BRANDS = !CUR_EVENT ? [] : (WORLD.booths || []).map((b, i) => {
 });
 const BG = { floor:new THREE.BoxGeometry(5.2, 0.06, 3), back:new THREE.BoxGeometry(5.2, 3, 0.12), side:new THREE.BoxGeometry(0.12, 3, 1.7), post:new THREE.BoxGeometry(0.12, 3.5, 0.12), fascia:new THREE.BoxGeometry(5.4, 0.72, 0.16), face:new THREE.PlaneGeometry(5.3, 0.66), panel:new THREE.PlaneGeometry(2.6, 1.7), desk:new THREE.BoxGeometry(1.7, 1.0, 0.6), deskF:new THREE.PlaneGeometry(1.6, 0.9), shelf:new THREE.BoxGeometry(1.6, 0.08, 0.4), box:new THREE.BoxGeometry(0.3, 0.34, 0.26), star:new THREE.OctahedronGeometry(0.28) };
 const BM = { wall:lamb('#f4f2ec'), trim:lamb('#d8d4ca') };
+/* mái che gian: trần phẳng và mái bạt chóp bốn mặt sọc màu thương hiệu, có diềm hai bên và chóp trang trí */
+BG.ceil = new THREE.BoxGeometry(5.5, 0.08, 3.0); BG.valance = new THREE.BoxGeometry(0.06, 0.3, 2.9); BG.finial = new THREE.SphereGeometry(0.16, 10, 8);
+BG.roof = (() => { let q = new THREE.ConeGeometry(1, 1, 4, 1, true); q.rotateY(Math.PI / 4); q = q.toNonIndexed(); q.scale(2.95 / 0.7071, 2.0, 1.6 / 0.7071); q.computeVertexNormals(); return q; })();
+function boothRoof(b, g, put, cm){
+  const t = canvasTex(256, 16, (c, w, h) => { c.fillStyle = '#fbfaf6'; c.fillRect(0, 0, w, h); c.fillStyle = b.color; for (let k = 0; k < 8; k++) c.fillRect(k * 32, 0, 16, h); });
+  t.wrapS = THREE.RepeatWrapping; t.repeat.set(2, 1);
+  const rm = new THREE.MeshLambertMaterial({ map:t, side:THREE.DoubleSide }); rm.emissive = new THREE.Color(0xffffff); rm.emissiveMap = t; rm.emissiveIntensity = BM.wall.emissiveIntensity || 0; BOOTH_GLOW.push(rm);
+  put(BG.ceil, BM.wall, 0, 3.04, -0.3); put(BG.roof, rm, 0, 3.08 + 1.0, -0.4); put(BG.finial, cm, 0, 5.16, -0.4);
+  [-1, 1].forEach(a => put(BG.valance, cm, a * 2.76, 2.93, -0.3));
+}
 const BOOTH_GLOW = [BM.wall, BM.trim];   /* vật liệu gian hàng tự sáng nhẹ ban đêm (như có đèn trong gian) */
 BOOTH_GLOW.forEach(m => { m.emissive = m.color.clone(); m.emissiveIntensity = 0; });
 /* chủ gian hiện tại (theo máy chủ khi có đăng nhập, hoặc lưu trên máy khi chơi thử) */
@@ -2077,7 +2087,7 @@ function buildBooth(b){
   [1.25, 2.0].forEach(y => { put(BG.shelf, BM.trim, 1.55, y, -1.42); for (let k = 0; k < 4; k++) put(BG.box, k % 2 ? cm : BM.trim, 0.95 + k * 0.4, y + 0.21, -1.42); });
   /* hạng gian: ngôi sao màu kim cương/vàng/bạc trên mái */
   if (b.T){ const sm = new THREE.MeshBasicMaterial({ color:b.T.color }); const s = new THREE.Mesh(BG.star, sm); s.position.set(0, 4.2, 1.2); g.add(s); b.star = s; bdBuild(b, g, put, cm); }
-  boothFlowers(b, g);
+  boothRoof(b, g, put, cm); boothFlowers(b, g);
   g.position.set(b.x, b.y, b.z); g.rotation.y = b.face < 0 ? Math.PI : 0; scene.add(g); b.group = g;
 }
 BRANDS.forEach(buildBooth);
