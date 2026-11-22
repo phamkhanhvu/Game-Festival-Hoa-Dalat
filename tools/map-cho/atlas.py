@@ -144,13 +144,80 @@ while y<T:
         x+=w
     y+=hgt
 tiles[(3,7)]=noise(t.filter(ImageFilter.GaussianBlur(0.5)),5)
+
+# ================= Ô mới cho khu đầu cầu Khu Hòa Bình (cột 4..7; atlas rộng 2048) =================
+def streaks(img,n=26,amt=26,seed=3):
+    r=np.random.RandomState(seed); a=np.asarray(img).astype(np.int16).copy()
+    for _ in range(n):
+        x=r.randint(0,T); w=r.randint(3,14); y0=r.randint(0,T//2); ln=r.randint(40,200); k=r.randint(6,amt)
+        for yy in range(y0,min(T,y0+ln)):
+            f=1-(yy-y0)/ln; a[yy,max(0,x-w//2):x+w//2]-=int(k*f)
+    return Image.fromarray(np.clip(a,0,255).astype(np.uint8))
+def greywall():
+    t=Image.new('RGB',(T,T),(178,178,172)); d=ImageDraw.Draw(t)
+    for y in range(0,T,32): d.line([(0,y),(T,y)],fill=(150,150,146),width=2); d.line([(0,y+2),(T,y+2)],fill=(192,192,186),width=1)
+    return t
+# (5,0) tường xám cũ có cửa sổ hai cánh ô kính nhỏ và ô văng
+t=greywall(); d=ImageDraw.Draw(t)
+d.rectangle([54,50,202,60],fill=(200,200,194)); d.rectangle([54,60,202,64],fill=(120,120,116))
+d.rectangle([68,66,188,198],fill=(214,214,206)); d.rectangle([62,198,194,206],fill=(196,196,190)); d.rectangle([62,206,194,209],fill=(126,126,122))
+for lx in (74,131):
+    d.rectangle([lx,72,lx+51,192],fill=(232,232,226))
+    for cx in range(2):
+        for cy in range(3):
+            x0=lx+4+cx*24; y0=76+cy*39; glass(d,x0,y0,x0+20,y0+34,(84,100,114),(124,142,156))
+tiles[(5,0)]=noise(streaks(t,30,30,5).filter(ImageFilter.GaussianBlur(0.4)),5)
+# (6,0) tường xám cũ trơn
+tiles[(6,0)]=noise(streaks(greywall(),34,30,9).filter(ImageFilter.GaussianBlur(0.4)),5)
+# (7,0) mảng lam đứng giữa mặt tiền: nền vàng, năm thanh lam xám
+t=Image.new('RGB',(T,T),(206,172,84)); d=ImageDraw.Draw(t)
+for k in range(5):
+    x=22+k*46; d.rectangle([x,0,x+24,T],fill=(176,176,170)); d.rectangle([x+24,0,x+30,T],fill=(124,112,70)); d.line([(x,0),(x,T)],fill=(206,206,200),width=2)
+d.rectangle([0,0,T,8],fill=(170,170,164)); d.rectangle([0,T-8,T,T],fill=(170,170,164))
+tiles[(7,0)]=noise(streaks(t,22,26,11).filter(ImageFilter.GaussianBlur(0.4)),5)
+# (4,1) băng ô thoáng trên mái hiên: dãy khe đứng
+t=Image.new('RGB',(T,T),(108,106,100)); d=ImageDraw.Draw(t)
+d.rectangle([0,0,T,40],fill=(128,126,120)); d.rectangle([0,T-44,T,T],fill=(88,86,82))
+for x in range(8,T,22): d.rectangle([x,56,x+11,T-60],fill=(28,28,30)); d.line([(x+11,56),(x+11,T-60)],fill=(150,148,142),width=1)
+tiles[(4,1)]=noise(t,5)
+# (5,1) tường tấm bê tông màu be (khối rạp)
+t=Image.new('RGB',(T,T),(214,200,168)); d=ImageDraw.Draw(t)
+for i in range(2):
+    for j in range(2):
+        c=rng.randint(-7,8); d.rectangle([i*128+2,j*128+2,i*128+125,j*128+125],fill=(214+c,200+c,168+c))
+for v in (0,128,255): d.line([(v,0),(v,T)],fill=(150,138,112),width=3); d.line([(0,v),(T,v)],fill=(150,138,112),width=3)
+tiles[(5,1)]=noise(streaks(t,18,18,13).filter(ImageFilter.GaussianBlur(0.4)),4)
+# (6,1) mặt bồn hoa: lá xanh, hoa tím hồng vàng
+t=Image.new('RGB',(T,T),(64,124,58)); d=ImageDraw.Draw(t)
+for _ in range(260):
+    x=rng.randint(0,T); y=rng.randint(0,T); r=rng.randint(4,10); c=rng.randint(-18,19); d.ellipse([x-r,y-r,x+r,y+r],fill=(64+c,124+c,58+c))
+for _ in range(210):
+    x=rng.randint(0,T); y=rng.randint(0,T); r=rng.randint(3,7); col=[(150,92,196),(232,120,172),(244,214,84),(250,246,240),(196,74,150)][rng.randint(0,5)]
+    d.ellipse([x-r,y-r,x+r,y+r],fill=col)
+tiles[(6,1)]=noise(t,4)
+# (4,0) biển chữ chung: TIỆM ẢNH (nền xanh), GIẢI KHÁT (nền kem), CÀ PHÊ và KI-ỐT SỐ 1 (nền than)
+t=Image.new('RGB',(T,T),(30,64,150)); d=ImageDraw.Draw(t)
+d.rectangle([3,3,T-4,72],outline=(236,236,244),width=2)
+fit(d,'TIỆM ẢNH',(18,8,238,46),(255,214,90),F,60)
+fit(d,'chụp ảnh thẻ · chân dung · phục hồi ảnh',(12,48,244,68),(240,240,248),FC,20)
+d.rectangle([0,76,T,127],fill=(246,236,214)); d.rectangle([2,78,T-3,125],outline=(196,40,40),width=2)
+fit(d,'GIẢI KHÁT · CÀ PHÊ',(10,82,246,122),(196,40,40),FC,44)
+d.rectangle([0,128,T,T],fill=(34,34,38)); d.line([(0,191),(T,191)],fill=(70,70,76),width=2)
+fit(d,'CÀ PHÊ',(40,134,216,186),(246,244,236),F,60)
+fit(d,'KI-ỐT SỐ 1',(24,198,232,250),(246,244,236),F,56)
+tiles[(4,0)]=t
+# (4,2) biển BÃI ĐẬU XE
+t=Image.new('RGB',(T,T),(28,84,170)); d=ImageDraw.Draw(t)
+d.rectangle([4,4,T-5,80],outline=(240,240,248),width=3); fit(d,'BÃI ĐẬU XE',(16,12,240,74),(255,255,255),F,60)
+d.rectangle([0,86,T,T],fill=(236,232,224))
+tiles[(4,2)]=t
 def build(old_path,out_path):
     old=Image.open(old_path).convert('RGB'); assert old.size==(1024,1024)
-    A=Image.new('RGB',(1024,2048),(255,255,255)); A.paste(old,(0,0))
+    A=Image.new('RGB',(2048,2048),(236,232,224)); A.paste(old,(0,0))
     for (c,r),im in tiles.items(): A.paste(im.resize((T,T)),(c*T,r*T))
     A.save(out_path,quality=88,optimize=True)
     return A
 if __name__=='__main__':
     A=build('/home/claude/work/atlas.jpg','/home/claude/work/build/atlas2.jpg')
     import os; print(os.path.getsize('/home/claude/work/build/atlas2.jpg'))
-    A.crop((0,1024,1024,2048)).save('/home/claude/work/build/atlas_new_half.png')
+    A.crop((1024,0,2048,768)).save('/home/claude/work/build/atlas_new_cols.png')

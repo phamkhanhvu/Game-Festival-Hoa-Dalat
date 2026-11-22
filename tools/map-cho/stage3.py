@@ -11,7 +11,7 @@ OUT=sys.argv[2] if len(sys.argv)>2 else '/home/claude/work/srv/world_cho_test.js
 j,h,top,k,pre,post=worldio.load('/home/claude/work/world_cho_orig.js')
 gx0,gz0,gs,gnx,gnz=j['x0'],j['z0'],j['step'],j['nx'],j['nz']
 # vùng tính lại
-RX0,RX1,RZ0,RZ1=-112.0,58.0,-102.0,80.0
+RX0,RX1,RZ0,RZ1=-112.0,58.0,-126.0,80.0
 i0=int(round((RX0-gx0)/gs)); i1=int(round((RX1-gx0)/gs)); j0=int(round((RZ0-gz0)/gs)); j1=int(round((RZ1-gz0)/gs)); rnx=i1-i0+1; rnz=j1-j0+1
 Xg,Zg=np.meshgrid(gx0+np.arange(i0,i1+1)*gs, gz0+np.arange(j0,j1+1)*gs); Ug,Vg=w2l(Xg,Zg)
 def pmask(poly): return poly_mask(poly,rnx,rnz,RX0,RZ0,gs)
@@ -67,6 +67,13 @@ blk|=(Sg>=-1.15)&(Sg<=17.0)&(np.abs(Tg)>=BR.HW-0.25)&(np.abs(Tg)<=WB_+0.3)
 for sp in BR.PIERS:
     c=BR.BW(sp,0.0); blk|=disc(float(c[0]),float(c[1]),0.95)
 for (x,z) in BR.columns(): blk|=disc(float(x),float(z),0.5)
+# ---- khu đầu cầu Khu Hòa Bình: nhà xám, ki-ốt, đảo cây, cột, dù ----
+import plaza as PZ
+PL=json.load(open('/home/claude/work/build/plaza.json'))
+for r_ in PL['rects']:
+    dx=Xg-r_['c'][0]; dz=Zg-r_['c'][1]; uu=dx*r_['u'][0]+dz*r_['u'][1]; vv=-dx*r_['u'][1]+dz*r_['u'][0]
+    blk|=(np.abs(uu)<=r_['hu'])&(np.abs(vv)<=r_['hv'])
+for (x,z,r_) in PL['discs']: blk|=disc(x,z,r_)
 valid&=~blk
 valid&=~np.isnan(hn)
 # chỉ ghi các ô thuộc vùng chỉnh hoặc nằm dưới mảng/vật mới
@@ -144,6 +151,14 @@ for pz in range(mm.shape[0]):
         elif k[gj,gi]==1: mm[pz,px]=GR
         else:
             v=int(round(186+2.13*hv/100.0)); mm[pz,px]=(v,v-6,v-16)
+# sân nhựa trước cầu: màu đường trên bản đồ nhỏ
+im=Image.fromarray(mm); dr=ImageDraw.Draw(im)
+for poly in PL['asphalt']: dr.polygon([((x-gx0)/(2*gs),(z-gz0)/(2*gs)) for x,z in poly],fill=tuple(int(v) for v in AS))
+mm=np.asarray(im).copy()
+for pz in range(mm.shape[0]):
+    for px in range(mm.shape[1]):
+        gi=px*2; gj=pz*2
+        if gi<gnx and gj<gnz and i0<=gi<=i1 and j0<=gj<=j1 and blk[gj-j0,gi-i0] and h[gj,gi]<=-32000: mm[pz,px]=BL
 # tầng trên: cầu đi bộ, cầu thang, sân thượng
 j['decks']=DK['decks']; j['deckPath']=DK['path']; j['deckProps']=DK['props']
 im=Image.fromarray(mm); dr=ImageDraw.Draw(im)
@@ -166,7 +181,7 @@ while dq:
         c,d=a+da,b_+db
         if 0<=c<gnz and 0<=d<gnx and ok[c,d] and not reach[c,d] and abs(int(h[c,d])-hc)<=52: reach[c,d]=True; dq.append((c,d))
 def rc(x,z): return bool(reach[int(round((z-gz0)/gs)),int(round((x-gx0)/gs))])
-pts={'đầu cầu':BR.BW(-2.5,0),'dốc lên cầu':BR.BW(0.5,0),'gầm cầu s=24':BR.BW(24,0),'đường dưới cầu':BR.BW(52.4,2),'sân chợ dưới thang':BR.FW(9,6),'đỉnh thang':l2w(0.5,0),'giữa thang':l2w(16,2),'chân thang':l2w(UF+1,0),'sân chân thang':(2,32),'sân thượng':l2w(5,-18),'sân trên':(-47,10),'cỏ nam thang':(-30,42),'trước cửa hàng':l2w(UF+1.5,10),'trước toà trắng':l2w(32,-18),'bùng binh tây':(18,12),'bùng binh':(31.5,25),'bồn liễu':(-44.5,61),'vỉa hè LĐH':(-41,33)}
+pts={'trước nhà xám':PZ.GW(6,-3.2),'trước ki-ốt':PZ.KW(0,-3.6),'bãi xe':(-27.0,-80.0),'ngã ba':(-33.5,-108.5),'đầu cầu':BR.BW(-2.5,0),'dốc lên cầu':BR.BW(0.5,0),'gầm cầu s=24':BR.BW(24,0),'đường dưới cầu':BR.BW(52.4,2),'sân chợ dưới thang':BR.FW(9,6),'đỉnh thang':l2w(0.5,0),'giữa thang':l2w(16,2),'chân thang':l2w(UF+1,0),'sân chân thang':(2,32),'sân thượng':l2w(5,-18),'sân trên':(-47,10),'cỏ nam thang':(-30,42),'trước cửa hàng':l2w(UF+1.5,10),'trước toà trắng':l2w(32,-18),'bùng binh tây':(18,12),'bùng binh':(31.5,25),'bồn liễu':(-44.5,61),'vỉa hè LĐH':(-41,33)}
 for nm,(x,z) in pts.items(): print(' tới được %-16s'%nm, rc(float(x),float(z)), 'h=%.2f'%(h[int(round((float(z)-gz0)/gs)),int(round((float(x)-gx0)/gs))]/100.0))
 for c in j['checkins']: print(' check-in',c['id'],rc(c['x'],c['z']))
 for nm,sv in j['stalls'].items(): print(' quầy',nm,rc(sv['x'],sv['z']+2.9))

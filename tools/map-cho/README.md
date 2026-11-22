@@ -6,12 +6,14 @@ Không cần cho game chạy; giữ lại để lần sau sửa tiếp khu này 
 Thứ tự chạy (cần `numpy`, `scipy`, `pillow`; đường dẫn làm việc đặt ở đầu mỗi tệp):
 
 1. `glbio.py`: giải mã `market.glb` (đỉnh lượng tử hoá) thành mảng số và tách atlas.
-2. `atlas.py`: mở rộng atlas 1024×1024 thành 1024×2048, thêm 16 ô vân mới (cửa sổ, kính, biển hiệu, tán cây, đá kè).
+2. `atlas.py`: mở rộng atlas 1024×1024 thành 2048×2048, thêm các ô vân mới (cửa sổ, kính, biển hiệu, tán cây, đá kè, tường xám cũ, mảng lam, tấm bê tông, bồn hoa).
 3. `stage1.py`: xoá công trình cũ trong vùng, tính lại địa hình (cao độ thiết kế + nội suy điều hoà), dời mặt đường theo địa hình.
 4. `stage2.py`: dựng hình khối mới (`geom.py`, thông số trong `design.py`) và ghi `market.glb`.
 5. `stage3.py`: tính lại lưới đi lại `h`, lưới `top`, loại nền `k`, cao độ tuyến xe, điểm check-in và bản đồ nhỏ trong `world_cho.js`.
 
 `bridge.py` (gọi từ `stage1.py`, `stage2.py`, `stage3.py`) dựng cầu đi bộ từ Khu Hòa Bình sang tầng trên chợ: mặt cầu lát gạch, lan can trắng, cột đèn, cửa chợ có mái bạt sọc dưới chữ CHỢ ĐÀ LẠT, cầu thang trắng hai nhịp lên sân thượng và nhà sân thượng cửa vòm.
+
+`plaza.py` dựng khu đầu cầu phía Khu Hòa Bình theo 7 ảnh góc nhìn quanh số 31 Khu Hòa Bình: nhà xám cũ ba tầng có hàng quán dưới mái hiên, ki-ốt bên phải lối lên cầu, đảo cây bách có hàng rào cắt tỉa, cột đèn, cột điện, sân nhựa trước cầu, băng lam và tường tấm bê tông của khối rạp Hòa Bình. Atlas mở rộng thành 2048×2048 (8×8 ô), các ô mới nằm ở cột 4 đến 7.
 
 Lưới `h` chỉ có một tầng (mặt đất, kể cả đường dưới gầm cầu). Lối đi nằm phía trên mặt đất được ghi riêng trong `world_cho.js`:
 

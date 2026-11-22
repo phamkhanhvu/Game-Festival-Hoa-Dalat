@@ -1,6 +1,6 @@
 # Bộ dựng lưới tam giác (vị trí, pháp tuyến phẳng, UV theo ô atlas, màu đỉnh tuyến tính) và ghi GLB lượng tử hoá như tệp gốc
 import numpy as np, json, struct
-COLS,ROWS=4,8            # atlas mới 1024x2048: 4 cột x 8 hàng ô 256px
+COLS,ROWS=8,8            # atlas 2048x2048: 8 cột x 8 hàng ô 256px (cột 0..3 là atlas trước, cột 4..7 thêm cho khu đầu cầu)
 INS=2.0/256              # lề trong ô để khỏi lem màu ô bên cạnh
 def lin(hexs, k=1.0):
     hexs=hexs.lstrip('#'); c=np.array([int(hexs[i:i+2],16) for i in (0,2,4)])/255.0

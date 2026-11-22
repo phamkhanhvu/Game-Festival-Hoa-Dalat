@@ -13,6 +13,7 @@ BLEN=float(_r[0]); O=A+_d0*BLEN; D=_d0; LB=np.array([D[1],-D[0]])
 QW=-float(_r[1]); QE=FLEN+QW                      # mép tây và mép đông của mặt đứng
 HW=3.5; PT=0.25; PH=1.05; SLAB=0.45
 D1=12.8; RT=16.8; YA=15.7; SF0,SF1=2.0,42.0; F1=8.76; APR=-3.6
+PL0,PL1,PLL,PLG=1.4,38.6,3.0,1.65       # bồn hoa: từ s, tới s, dài mỗi bồn, khe giữa hai bồn
 def deck_y(s):
     s=np.asarray(s,float); return np.where(s<=SF0,YA,np.where(s>=SF1,D1,YA+(D1-YA)*(s-SF0)/(SF1-SF0)))
 def BW(s,t): return A+D*s+LB*t
@@ -91,11 +92,27 @@ def build(solid, deco, gfn, walk=None):
         for sgn in (-1,1):
             c=BW(sp,sgn*(HW+PT/2)); lantern(deco,c[0],c[1],float(deck_y(sp))+PH)
     for (x,z,y,sc) in pots(): palm_pot(deco,x,z,y,sc)
-    # mảng đi được: mặt cầu
-    HI=HW-0.3
+    # bồn hoa dọc hai mép cầu (theo ảnh tháng 3/2025) và đèn cầu trắng
+    PLT=lin('#e4e1d8'); FLOWER=(6,1); PW_=0.5; PH_=0.42; s0=PL0
+    while s0+PLL<=PL1+1e-6:
+        a0,a1=s0,s0+PLL; ya,yb_=float(deck_y(a0)),float(deck_y(a1)); sm=(a0+a1)/2
+        for sgn in (-1,1):
+            ti=sgn*(HW-PW_); to=sgn*(HW-0.02); nin=-sgn*np.array([LB[0],0,LB[1]])
+            solid.quad([B3(a0,ti,ya),B3(a1,ti,yb_),B3(a1,ti,yb_+PH_),B3(a0,ti,ya+PH_)],PLAIN,PLT,nin)
+            solid.quad([B3(a0,to,ya),B3(a0,ti,ya),B3(a0,ti,ya+PH_),B3(a0,to,ya+PH_)],PLAIN,PLT,-np.array([D[0],0,D[1]]))
+            solid.quad([B3(a1,ti,yb_),B3(a1,to,yb_),B3(a1,to,yb_+PH_),B3(a1,ti,yb_+PH_)],PLAIN,PLT,np.array([D[0],0,D[1]]))
+            solid.quad([B3(a0,ti,ya+PH_-0.04),B3(a1,ti,yb_+PH_-0.04),B3(a1,to,yb_+PH_-0.04),B3(a0,to,ya+PH_-0.04)],FLOWER,WHITE,UP)
+            c=BW(sm,sgn*(HW-PW_/2-0.02)); deco.prism((c[0],c[1]),0.24,0.0,float(deck_y(sm))+PH_-0.04,float(deck_y(sm))+PH_+0.95,5,lin('#2f6a3a'),NOISE,cap=False)
+        s0+=PLL+PLG
+    import plaza as _PZ
+    for sp in (-1.3,6.0,16.0,26.0,36.0):
+        for sgn in (-1,1):
+            c=BW(sp,sgn*(HW-0.25) if sp>0 else sgn*(HW+PT+0.35)); _PZ.globe_post(deco,float(c[0]),float(c[1]),float(deck_y(sp))+(PH_-0.04 if sp>0 else -0.15),3.0 if sp<0 else 2.4)
+    # mảng đi được: mặt cầu (hẹp hơn mép bồn hoa)
+    HI=HW-PW_-0.25
     patch([BW(-1.0,-HI),BW(-1.0,HI),BW(SF0,HI),BW(SF0,-HI)],lambda x,z:YA,(0,1))
     patch([BW(SF0,-HI),BW(SF0,HI),BW(SF1,HI),BW(SF1,-HI)],lambda x,z:deck_y(w2b(x,z)[0]),(1,1))
-    patch([BW(SF1,-HI),BW(SF1,HI),BW(s_end(HI,0.35),HI),BW(s_end(-HI,0.35),-HI)],lambda x,z:D1,(1,2))
+    patch([BW(SF1,-HI),BW(SF1,HI),BW(s_end(HI,0.35),HI),BW(s_end(-HI,0.35),-HI)],lambda x,z:D1,(1,3))
     # ---------- mặt đứng chợ phía cầu ----------
     def fw(q0,q1,y0,y1,tile=PLAIN,col=WHITE,sub=None,bays=1,p=0.0):
         wall(solid,FW(q1,p),FW(q0,p),y0,y1,tile,col,sub,bays)        # nhìn từ ngoài: trái là q lớn
@@ -181,11 +198,11 @@ def build(solid, deco, gfn, walk=None):
         c=FW(q,p); gy=float(gfn(c[0],c[1])); solid.obox(c,E,NO,0.2,0.2,gy-0.5,yt,WHT,top=False)
     # mảng đi được: chiếu chân thang, hai nhịp, chiếu nghỉ, chiếu trên
     I_=0.25
-    patch([FW(PF['q0']-0.9,0.35),FW(PF['q1']-I_,0.35),FW(PF['q1']-I_,PF['p1']-I_),FW(PF['q0']-0.9,PF['p1']-I_)],lambda x,z:D1,(2,3))
-    patch([FW(SQ0-I_,LANE_L[0]+I_),FW(SQ1,LANE_L[0]+I_),FW(SQ1,LANE_L[1]-I_),FW(SQ0-I_,LANE_L[1]-I_)],lambda x,z:D1+np.clip((w2f(x,z)[0]-SQ0)/(SQ1-SQ0),0,1)*(YM-D1),(4,4))
-    patch([FW(ML['q0'],ML['p0']+I_),FW(ML['q1']-I_,ML['p0']+I_),FW(ML['q1']-I_,ML['p1']-I_),FW(ML['q0'],ML['p1']-I_)],lambda x,z:YM,(5,7))
-    patch([FW(SQ0,LANE_U[0]+I_),FW(SQ1,LANE_U[0]+I_),FW(SQ1,LANE_U[1]-I_),FW(SQ0,LANE_U[1]-I_)],lambda x,z:RT+np.clip((w2f(x,z)[0]-SQ0)/(SQ1-SQ0),0,1)*(YM-RT),(8,8))
-    patch([FW(TLD['q0']+I_,-0.9),FW(TLD['q1'],-0.9),FW(TLD['q1'],LANE_U[1]-I_),FW(TLD['q0']+I_,LANE_U[1]-I_)],lambda x,z:RT,(9,10))
+    patch([FW(PF['q0']-1.6,0.35),FW(PF['q1']-I_,0.35),FW(PF['q1']-I_,PF['p1']-I_),FW(PF['q0']-1.6,PF['p1']-I_)],lambda x,z:D1,(3,4))
+    patch([FW(SQ0-I_,LANE_L[0]+I_),FW(SQ1,LANE_L[0]+I_),FW(SQ1,LANE_L[1]-I_),FW(SQ0-I_,LANE_L[1]-I_)],lambda x,z:D1+np.clip((w2f(x,z)[0]-SQ0)/(SQ1-SQ0),0,1)*(YM-D1),(5,5))
+    patch([FW(ML['q0'],ML['p0']+I_),FW(ML['q1']-I_,ML['p0']+I_),FW(ML['q1']-I_,ML['p1']-I_),FW(ML['q0'],ML['p1']-I_)],lambda x,z:YM,(6,8))
+    patch([FW(SQ0,LANE_U[0]+I_),FW(SQ1,LANE_U[0]+I_),FW(SQ1,LANE_U[1]-I_),FW(SQ0,LANE_U[1]-I_)],lambda x,z:RT+np.clip((w2f(x,z)[0]-SQ0)/(SQ1-SQ0),0,1)*(YM-RT),(9,9))
+    patch([FW(TLD['q0']+I_,-0.9),FW(TLD['q1'],-0.9),FW(TLD['q1'],LANE_U[1]-I_),FW(TLD['q0']+I_,LANE_U[1]-I_)],lambda x,z:RT,(10,11))
     # ---------- sân thượng: nền lát, nhà sân thượng ----------
     RFC=lin('#e2ddd1')
     pf=PAV['p1']+0.2; sl=1.0/2.95                                   # mép đông của mái lùi dần vào theo chiều sâu
@@ -194,7 +211,7 @@ def build(solid, deco, gfn, walk=None):
            [(PAV['q1']+0.35,pf),(QE-0.6+sl*(pf+0.35),pf),(QE-4.3,-11.2),(PAV['q1']+0.35,-11.2)]]
     for poly in roofp:
         pts=[F3(q,p,RT+0.03) for q,p in poly]; solid.poly(pts,PLAIN,RFC,UP)
-        patch([FW(q,p) for q,p in poly],lambda x,z:RT+0.03,(11,11))
+        patch([FW(q,p) for q,p in poly],lambda x,z:RT+0.03,(12,12))
     # nhà sân thượng: trắng, cửa vòm, lan can mái
     q0,q1,p0,p1,h=PAV['q0'],PAV['q1'],PAV['p0'],PAV['p1'],PAV['h']; PW=lin('#f7f6f2')
     nbay=int(round((q1-q0)/2.5))
@@ -239,7 +256,7 @@ def deck_path(gfn):
     def f(q,p,y):
         w=FW(q,p); out.append([round(float(w[0]),2),round(float(w[1]),2),round(float(y),2)])
     w=BW(APR-1.4,0.0); out.append([round(float(w[0]),2),round(float(w[1]),2),round(float(gfn(w[0],w[1])),2)])
-    b(0.0,0.0); b(SF1,0.0); f(2.9,2.6,D1); f(5.5,ll,D1); f(SQ1,ll,YM); f(ML['q0']+0.9,ll,YM); f(ML['q0']+0.9,lu,YM); f(SQ1,lu,YM); f(SQ0,lu,RT); f(5.1,lu,RT); f(5.1,-0.6,RT); f(5.1,-1.9,RT+0.03)
+    b(0.0,0.0); b(SF1,0.0); b(BLEN-4.3,0.8); f(1.7,2.6,D1); f(5.5,ll,D1); f(SQ1,ll,YM); f(ML['q0']+0.9,ll,YM); f(ML['q0']+0.9,lu,YM); f(SQ1,lu,YM); f(SQ0,lu,RT); f(5.1,lu,RT); f(5.1,-0.6,RT); f(5.1,-1.9,RT+0.03)
     return out
 
 def pots():
