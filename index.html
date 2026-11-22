@@ -199,6 +199,11 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .lbl.tag{background:rgba(38,33,30,.88);border-radius:.55rem;padding:.2rem .7rem .3rem;text-align:center;font-size:1.05rem;line-height:1.15;margin-top:-.5rem}
 .lbl.tag::after{content:"";position:absolute;left:50%;bottom:-.45rem;margin-left:-.45rem;border:.45rem solid transparent;border-top-color:rgba(38,33,30,.88);border-bottom:0}
 .lbl.tag b{display:block;font-weight:700}
+.lbl.tag.ck{background:rgba(250,246,236,.92);color:#3a2f22;border:1px solid rgba(226,179,84,.75);border-radius:999px;padding:.26rem .95rem .32rem;font-size:1rem;box-shadow:0 2px 10px rgba(40,28,10,.18);text-shadow:none}
+.lbl.tag.ck::after{display:none}
+.lbl.tag.ck b{font-weight:700;letter-spacing:.01em}
+.lbl.tag.ck .s{font-size:.8rem;color:#8a7a62;font-weight:600}.lbl.tag.ck .s.gold{color:#b07a12}
+.lbl.tag.ck.done{background:rgba(244,248,244,.82);border-color:rgba(140,190,165,.7);color:#4a5a50;font-size:.84rem}
 .lbl.tag .s{display:block;font-size:.88rem;color:var(--ink-dim);font-weight:600}
 .lbl.tag .s.gold{color:#ffd84a}.lbl.tag .s.red{color:#ff9f94}
 .lbl.tag .pb{display:block;height:.3rem;border-radius:1rem;background:rgba(255,255,255,.2);margin-top:.15rem;overflow:hidden}
@@ -410,7 +415,7 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'd7a3e915'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'e1b84c26'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
@@ -2819,19 +2824,37 @@ function updatePortal(dt){
   if (portalFx.armed && d < 1.3 && !modalType && !S.cartPush) portalGo();
 }
 function placePortal(){ if (portalFx.lbl) place(portalFx.lbl, PORTAL.x, PORTAL.y + 3.7, PORTAL.z, 90); }
-/* ===== Điểm check-in (map Chợ Đà Lạt): đi tới biển xanh chanh là check-in, mỗi điểm thưởng một lần ===== */
+/* ===== Điểm check-in (map Chợ Đà Lạt): đi tới cột mốc là check-in, mỗi điểm thưởng một lần =====
+   Cột mốc: đế đá tròn, trụ đồng mảnh, vòng tròn vàng ôm một viên đá nhỏ xoay chậm, vành sáng trên mặt đất.
+   Chưa check-in thì vàng ấm và vành sáng nhịp nhẹ; check-in rồi thì chuyển xanh ngọc nhạt và đứng yên. */
 const CHECKINS = (WORLD.checkins || []).map(c => Object.assign({}, c));
 if (CHECKINS.length){
-  const sm = lamb('#c8f03c'), pm = lamb('#2b2f3a');
+  const stone = new THREE.MeshStandardMaterial({ color:0xe9e3d6, roughness:0.85 }), bronze = new THREE.MeshStandardMaterial({ color:0x4a4038, roughness:0.5, metalness:0.4 });
   CHECKINS.forEach(c => {
-    const g = new THREE.Group(), post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), pm), board = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.08), sm);
-    post.position.y = 1.1; board.position.y = 2.2; post.castShadow = board.castShadow = true; g.add(post, board); g.position.set(c.x, c.y, c.z); scene.add(g);
-    c.lbl = mkLabel('tag', ''); ckLabel(c);
+    const g = new THREE.Group();
+    c.gold = new THREE.MeshStandardMaterial({ color:0xd9a53a, roughness:0.45, metalness:0.15, emissive:0x7a5210, emissiveIntensity:0.7 });
+    c.ringM = new THREE.MeshBasicMaterial({ color:0xf1cf7a, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false });
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.1, 24), stone), step = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.12, 16), stone);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.05, 1.45, 10), bronze), cap = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), c.gold);
+    base.position.y = 0.05; step.position.y = 0.16; post.position.y = 0.94; cap.position.y = 1.67;
+    c.top = new THREE.Group(); c.top.position.y = 2.06;
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.034, 10, 40), c.gold), gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.13), c.gold);
+    c.top.add(hoop, gem); c.gem = gem;
+    c.ring = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.82, 40), c.ringM); c.ring.rotation.x = -Math.PI / 2; c.ring.position.y = 0.04;
+    [base, step, post, cap, hoop, gem].forEach(m => { m.castShadow = true; });
+    g.add(base, step, post, cap, c.top, c.ring); g.position.set(c.x, c.y, c.z); g.scale.setScalar(1.5); scene.add(g);
+    c.lbl = mkLabel('tag ck', ''); ckLabel(c);
   });
 }
+function ckLook(c){ const d = ckDone(c); c.gold.color.setHex(d ? 0x9fc7b0 : 0xd9a53a); c.gold.emissive.setHex(d ? 0x1f3a30 : 0x7a5210); c.ringM.color.setHex(d ? 0xb6d8c6 : 0xf1cf7a); }
 function ckDone(c){ S.cho = S.cho || {}; S.cho.ck = S.cho.ck || {}; return !!S.cho.ck[c.id]; }
-function ckLabel(c){ c.lbl.innerHTML = '<b>' + (ckDone(c) ? '✓ ' : '📷 ') + c.name + '</b>' + (ckDone(c) ? '' : '<span class="s gold">Check-in +500 xu</span>'); }
+function ckLabel(c){ const d = ckDone(c); c.lbl.classList.toggle('done', d); c.lbl.innerHTML = '<b>' + c.name + '</b>' + (d ? '<span class="s">Đã check-in</span>' : '<span class="s gold">Check-in · +500 xu</span>'); if (c.gold) ckLook(c); }
 function updateCheckins(){
+  const t = performance.now() / 1000;
+  for (const c of CHECKINS){
+    const d = ckDone(c); c.top.rotation.y = d ? 0.6 : t * 0.7; c.top.position.y = 2.06 + (d ? 0 : Math.sin(t * 1.6 + c.x) * 0.045); c.gem.rotation.y = d ? 0 : -t * 1.5;
+    const k = d ? 0 : 0.5 + 0.5 * Math.sin(t * 2.2 + c.z); c.ring.scale.setScalar(1 + k * 0.16); c.ringM.opacity = d ? 0.22 : 0.55 - k * 0.3;
+  }
   for (const c of CHECKINS){
     if (ckDone(c) || Math.hypot(P.x - c.x, P.z - c.z) > 2.6 || Math.abs(P.h - c.y) > 2) continue;
     S.cho.ck[c.id] = 1; give({ coins:500, exp:15 }); sfx('buy'); floatText(c.x, c.y + 2.8, c.z, '+500 xu', '#ffd84a'); ckLabel(c);
@@ -2840,7 +2863,7 @@ function updateCheckins(){
     save(); updateHud();
   }
 }
-function placeCheckins(){ CHECKINS.forEach(c => place(c.lbl, c.x, c.y + 2.95, c.z, 70)); }
+function placeCheckins(){ CHECKINS.forEach(c => place(c.lbl, c.x, c.y + 3.85, c.z, ckDone(c) ? 16 : 34)); }   /* nhãn chỉ hiện khi tới gần; điểm đã check-in thì gần hơn nữa mới hiện */
 
 /* ================= Hành động quầy ================= */
 let nearId = null, T = 0, ctxKey = '', nearSeller = false;
