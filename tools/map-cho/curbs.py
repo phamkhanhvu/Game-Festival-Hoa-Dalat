@@ -10,7 +10,7 @@ from scipy import ndimage
 from mb import lin, tile_uv, PLAIN
 from rast import raster
 import design
-BRICK=(2,2); BUF=0.6; OFF=0.14; DR=14.0; DB=16.0; THICK=4.5
+BRICK=(2,2); BUF=0.6; OFF=0.14; DR=14.0; DB=16.0; FADE=6.0; THICK=4.5
 GX0,GZ0,GS,GNX,GNZ=-130.0,-165.0,0.5,661,861          # lưới 0,5 m trùng lưới đi lại
 MNX,MNZ=331,431                                         # lưới 1 m trùng bản đồ nhỏ
 ASPH=np.array([0.106,0.114,0.125]); CREAM=np.array([0.729,0.686,0.604]); CURB=lin('#b8b2a5'); BEIGE=np.array([0.55,0.51,0.45])
@@ -33,7 +33,7 @@ def _fp(tris):
     if len(tris)<=80: return MultiPoint([(float(a),float(b)) for a,b in tris.reshape(-1,3)[:,[0,2]]]).convex_hull
     ps=[Polygon(t[:,[0,2]]) for t in tris]; ps=[p for p in ps if p.area>1e-3]
     return unary_union(ps).buffer(0.1).buffer(-0.1).simplify(0.1) if ps else None
-def analyse(P,I,tl,C,UV):
+def analyse(P,I,tl,C,UV,extra=()):
     """Trả về: sw = tam giác lề/bạt cần bỏ, terr_v = đỉnh địa hình đổi sang màu nhựa, bld = đường bao công trình, keep = đa giác sân lát giữ lại"""
     global _G
     tri=P[I]; cen=tri.mean(1); col=C[I[:,0]][:,:3]
@@ -62,11 +62,17 @@ def analyse(P,I,tl,C,UV):
     isb=(cnt>=12)&((ymx-ymn)>=4.5)&(ff<=0.85)&~((cm[:,1]>cm[:,0]*1.25)&(cm[:,1]>cm[:,2]*1.25)); isb[98]=False
     rm=~np.isnan(raster(tri[road],GX0,GZ0,1.0,MNX,MNZ)); bm=~np.isnan(raster(tri[isb[tl]],GX0,GZ0,1.0,MNX,MNZ))
     X,Z=np.meshgrid(GX0+np.arange(MNX)*1.0,GZ0+np.arange(MNZ)*1.0)
-    asph=(ndimage.distance_transform_edt(~rm)<=DR)&(ndimage.distance_transform_edt(~bm)<=DB)&~shapely.contains_xy(PROT,X,Z)
+    for e in extra: bm|=shapely.contains_xy(e,X,Z)                               # công trình dựng mới (nhà xám, ki-ốt)
+    # mức hoá nhựa w (0..1): đủ gần đường và gần nhà thì là nhựa, ra xa thì nhạt dần trong FADE mét; sát khu giữ nguyên cũng nhạt dần.
+    # Chuyển màu thoai thoải thay vì đổi màu đột ngột theo ô lưới địa hình 2,5 m (đổi đột ngột sinh ra các mảng răng cưa trên nền).
+    pm=shapely.contains_xy(PROT,X,Z)
+    w=np.clip((DR-ndimage.distance_transform_edt(~rm))/FADE,0,1)*np.clip((DB-ndimage.distance_transform_edt(~bm))/FADE,0,1)*np.clip(ndimage.distance_transform_edt(~pm)/FADE,0,1)
+    asph=w>0.5
     tv=np.unique(I[tl==98]); p=P[tv]; c=C[tv][:,:3]
     vi=np.clip(np.round(p[:,0]-GX0).astype(int),0,MNX-1); vj=np.clip(np.round(p[:,2]-GZ0).astype(int),0,MNZ-1)
     inl=(p[:,0]>=GX0)&(p[:,0]<=GX0+MNX-1)&(p[:,2]>=GZ0)&(p[:,2]<=GZ0+MNZ-1)        # ngoài lưới bản đồ thì không đổi màu
-    terr_v=tv[(np.abs(c-BEIGE).max(1)<0.08)&asph[vj,vi]&inl]
+    sel=(np.abs(c-BEIGE).max(1)<0.08)&(w[vj,vi]>0.01)&inl
+    terr_v=tv[sel]; wv=w[vj,vi][sel][:,None]; terr_c=c[sel]*(1-wv)+ASPH*wv
     # đường bao công trình (bỏ công trình đã có nền, hiên riêng và công trình trong khu giữ nguyên)
     own=np.bincount(tl,weights=(flat&cream),minlength=L)
     bld=[]
@@ -77,7 +83,7 @@ def analyse(P,I,tl,C,UV):
         bld.append(f)
     kf=flat&gl[tl]&near&~road&~sw&(tl!=98)
     np.save('/home/claude/work/build/curb_del.npy',tri[sw]); np.save('/home/claude/work/build/curb_asph.npy',asph); np.save('/home/claude/work/build/curb_keepflat.npy',tri[kf])
-    return dict(sw=sw|aw,nsw=int(sw.sum()),naw=int(aw.sum()),terr_v=terr_v,bld=bld,keep=keep)
+    return dict(sw=sw|aw,nsw=int(sw.sum()),naw=int(aw.sum()),terr_v=terr_v,terr_c=terr_c,bld=bld,keep=keep)
 def _dens(co):
     """chia nhỏ cạnh chỉ ở chỗ mặt đất cong (lệch quá 6 cm so với đường thẳng nối hai đầu)"""
     out=[]

@@ -9,7 +9,10 @@ d=np.load('stage1.npz'); P,N,UV,C,I,tl=[d[k] for k in ('P','N','UV','C','I','tl'
 C=C[:,:3].copy()
 # ---- lề đường khu Hòa Bình: bỏ lề chạy theo đường, mặt đất thành nhựa (curbs.py) ----
 import curbs as CB
-_an=CB.analyse(P,I,tl,C,UV); I=I[~_an['sw']]; tl=tl[~_an['sw']]; C[_an['terr_v']]=CB.ASPH
+import plaza as PZ
+from shapely.geometry import Polygon as _Poly
+_nb=[_Poly([tuple(PZ.GW(u,v)) for u,v in ((0,0),(PZ.GLEN,0),(PZ.GLEN,PZ.GDEP),(0,PZ.GDEP))]),_Poly([tuple(PZ.KW(u,v)) for u,v in ((-PZ.KL/2,-PZ.KD/2),(PZ.KL/2,-PZ.KD/2),(PZ.KL/2,PZ.KD/2),(-PZ.KL/2,PZ.KD/2))])]
+_an=CB.analyse(P,I,tl,C,UV,_nb); I=I[~_an['sw']]; tl=tl[~_an['sw']]; C[_an['terr_v']]=_an['terr_c']
 print('lề toàn bản đồ: bỏ',_an['nsw'],'tam giác lề,',_an['naw'],'tam giác bạt xanh quanh rạp; đổi màu nhựa',len(_an['terr_v']),'đỉnh địa hình;',len(_an['bld']),'công trình')
 UV=UV.copy(); UV[:,1]*=0.5; UV[:,0]*=0.5
 Tnew=np.load('Tnew.npy')
