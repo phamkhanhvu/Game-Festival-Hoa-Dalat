@@ -9,8 +9,8 @@ d=np.load('stage1.npz'); P,N,UV,C,I,tl=[d[k] for k in ('P','N','UV','C','I','tl'
 C=C[:,:3].copy()
 # ---- lề đường khu Hòa Bình: bỏ lề chạy theo đường, mặt đất thành nhựa (curbs.py) ----
 import curbs as CB
-_an=CB.analyse(P,I,tl,C,UV); np.save('curb_del.npy',P[I[_an['sw']]]); I=I[~_an['sw']]; tl=tl[~_an['sw']]; C[_an['terr_v']]=CB.ASPH
-print('lề khu Hòa Bình: bỏ',int(_an['sw'].sum()),'tam giác lề; đổi màu nhựa',len(_an['terr_v']),'đỉnh địa hình;',len(_an['bld']),'công trình')
+_an=CB.analyse(P,I,tl,C,UV); I=I[~_an['sw']]; tl=tl[~_an['sw']]; C[_an['terr_v']]=CB.ASPH
+print('lề toàn bản đồ: bỏ',_an['nsw'],'tam giác lề,',_an['naw'],'tam giác bạt xanh quanh rạp; đổi màu nhựa',len(_an['terr_v']),'đỉnh địa hình;',len(_an['bld']),'công trình')
 UV=UV.copy(); UV[:,1]*=0.5; UV[:,0]*=0.5
 Tnew=np.load('Tnew.npy')
 gfn=lambda x,z: samp(Tnew,x,z)
@@ -92,7 +92,7 @@ n0=solid.ntri; n1=deco.ntri; _tp=_T[(_T[:,:,0].max(1)>-45)&(_T[:,:,0].min(1)<-8)
 _r=PZ.build(walk,solid,deco,gfnB,_tp); print('khu đầu cầu Khu Hòa Bình:',solid.ntri-n0,'+',deco.ntri-n1,'tam giác; sân nhựa',_r['walk_tris'])
 from shapely.geometry import Polygon as _Poly
 _nb=[_Poly([tuple(PZ.GW(u,v)) for u,v in ((0,0),(PZ.GLEN,0),(PZ.GLEN,PZ.GDEP),(0,PZ.GDEP))]),_Poly([tuple(PZ.KW(u,v)) for u,v in ((-PZ.KL/2,-PZ.KD/2),(PZ.KL/2,-PZ.KD/2),(PZ.KL/2,PZ.KD/2),(-PZ.KL/2,PZ.KD/2))])]
-_nt,_nc=CB.build(walk,solid,gfnB,_an['bld']+_nb); print('viền lề quanh công trình:',_nt,'tam giác mặt lát +',_nc,'tam giác bó vỉa')
+_nt,_nc=CB.build(walk,solid,_an,_nb); print('viền lề quanh công trình:',_nt,'tam giác mặt lát +',_nc,'tam giác bó vỉa')
 # toà nhà lớn phía nam (khách sạn trắng trong ảnh): sơn lại màu trắng
 v1371=np.unique(I[tl==1371]); c=C[v1371]; wallv=(c.max(1)>0.3)&(np.abs(c[:,0]-c[:,1])<0.12)
 C[v1371[wallv]]=lin('#f3f1eb')

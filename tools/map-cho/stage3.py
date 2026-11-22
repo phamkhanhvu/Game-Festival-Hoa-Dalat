@@ -9,9 +9,9 @@ import bridge as BR
 SRC='/home/claude/phamkhanhvu/game-festival-hoa-dalat/world_cho.js' if len(sys.argv)<2 else sys.argv[1]
 OUT=sys.argv[2] if len(sys.argv)>2 else '/home/claude/work/srv/world_cho_test.js'
 j,h,top,k,pre,post=worldio.load('/home/claude/work/world_cho_orig.js')
-gx0,gz0,gs,gnx,gnz=j['x0'],j['z0'],j['step'],j['nx'],j['nz']
+gx0,gz0,gs,gnx,gnz=j['x0'],j['z0'],j['step'],j['nx'],j['nz']; h0=h.copy()
 # vùng tính lại
-RX0,RX1,RZ0,RZ1=-112.0,58.0,-126.0,80.0
+RX0,RX1,RZ0,RZ1=-130.0,200.0,-165.0,265.0      # cả bản đồ (lề đường làm lại toàn bản đồ)
 i0=int(round((RX0-gx0)/gs)); i1=int(round((RX1-gx0)/gs)); j0=int(round((RZ0-gz0)/gs)); j1=int(round((RZ1-gz0)/gs)); rnx=i1-i0+1; rnz=j1-j0+1
 Xg,Zg=np.meshgrid(gx0+np.arange(i0,i1+1)*gs, gz0+np.arange(j0,j1+1)*gs); Ug,Vg=w2l(Xg,Zg)
 def pmask(poly): return poly_mask(poly,rnx,rnz,RX0,RZ0,gs)
@@ -25,9 +25,7 @@ gset=set([98,1452])|set(l for l,d in info.items() if d['ground'])
 is_g=np.isin(tl,list(gset))
 Hk=R(tri[inreg&is_g]); Hw=R(Pw)
 hn=np.fmax(Hk,Hw)
-# ---- lề khu Hòa Bình đã gỡ: ô dưới lề cũ lấy cao độ mặt còn lại (địa hình, đường, vạch, sân) ----
-import curbs as CB, shapely
-from shapely.geometry import Point as _Pt
+# ---- lề đã gỡ (curbs.py): ô dưới lề cũ lấy cao độ mặt còn lại (địa hình, đường, vạch, sân) ----
 CD=np.load('curb_del.npy'); swm=tmask(CD) if len(CD) else np.zeros(Hk.shape,bool)
 Ht=R(tri[inreg&(tl==98)]); _n=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]); _flat=np.abs(_n[:,1])>0.9*(np.linalg.norm(_n,axis=1)+1e-12)
 _c=tri.mean(1); _ci=np.clip(np.round((_c[:,0]-RX0)/gs).astype(int),0,rnx-1); _cj=np.clip(np.round((_c[:,2]-RZ0)/gs).astype(int),0,rnz-1)
@@ -146,13 +144,29 @@ for c in j['checkins']:
     if c['id']=='cauthang': c['desc']='Bậc thang lớn sáu nhịp nối đường Lê Đại Hành trên cao xuống sân trước chợ, bên cây bách tán cao và toà nhà trắng đầu cong có sân thượng.'
 for nm,sv in j['stalls'].items():
     if inzone(sv['x'],sv['z']): print('quầy trong vùng:',nm,sv,hat(sv['x'],sv['z']))
-    if CB.ZONE.contains(_Pt(sv['x'],sv['z'])):
-        y=hat(sv['x'],sv['z']); print('quầy khu Hòa Bình:',nm,sv['y'],'->',y)
-        if y is not None: sv['y']=round(y,2)
-for c in j['checkins']:
-    if CB.ZONE.contains(_Pt(c['x'],c['z'])):
-        y=hat(c['x'],c['z']); print('check-in khu Hòa Bình',c['id'],c['y'],'->',y)
-        if y is not None: c['y']=round(y,2)
+# các vật đặt sẵn trong thế giới (gian, quầy, ki-ốt, điểm check-in, cổng...) và tuyến xe: nâng hạ theo mặt đất mới
+def hat0(x,z):
+    fi=(x-gx0)/gs; fj=(z-gz0)/gs; i=int(np.floor(fi)); jj=int(np.floor(fj)); a=fi-i; b=fj-jj
+    q=[h0[jj,i],h0[jj,i+1],h0[jj+1,i],h0[jj+1,i+1]]
+    if min(q)<-32000: return None
+    return ((q[0]*(1-a)+q[1]*a)*(1-b)+(q[2]*(1-a)+q[3]*a)*b)/100.0
+nbump=[0]
+def bump(o,ki='y'):
+    if not isinstance(o,dict) or ki not in o or 'x' not in o: return
+    if not (gx0+1<o['x']<gx0+(gnx-2)*gs and gz0+1<o['z']<gz0+(gnz-2)*gs) or inzone(o['x'],o['z']): return
+    a=hat0(o['x'],o['z']); b=hat(o['x'],o['z'])
+    if a is None or b is None or abs(b-a)<=0.01: return
+    o[ki]=round(o[ki]+(b-a),2); nbump[0]+=1
+for key in ('booths','kiosks','checkins','audience'):
+    for o in j.get(key,[]): bump(o)
+for o in j['stalls'].values(): bump(o)
+for key in ('stage','gate','man','balloon','portal','spawn','explore'): bump(j.get(key))
+for r in j['routes']:
+    for p in r['pts']:
+        if inzone(p[0],p[1]): continue
+        a=hat0(p[0],p[1]); b=hat(p[0],p[1])
+        if a is not None and b is not None and abs(b-a)>0.01: p[2]=round(p[2]+(b-a),2); nbump[0]+=1
+print('vật và điểm tuyến xe nâng hạ theo mặt đất mới:',nbump[0])
 # ---- bản đồ nhỏ (1 px = 1 m) ----
 b=base64.b64decode(j['map'].split(',')[1]); mm=np.asarray(Image.open(io.BytesIO(b)).convert('RGB')).copy()
 BL=np.array([120,112,104]); AS=np.array([120,122,128]); GR=np.array([126,168,98])
@@ -167,14 +181,11 @@ for pz in range(mm.shape[0]):
         elif k[gj,gi]==1: mm[pz,px]=GR
         else:
             v=int(round(186+2.13*hv/100.0)); mm[pz,px]=(v,v-6,v-16)
-# khu Hòa Bình: mặt đất ngoài viền lề là đường nhựa trên bản đồ nhỏ
-SR=shapely.from_wkt(open('/home/claude/work/build/curbs.wkt').read()); Pl=R(tri[tl==1093]); zx0,zz0,zx1,zz1=CB.ZONE.bounds
-for pz in range(int((zz0-gz0)/(2*gs)),int((zz1-gz0)/(2*gs))+1):
-    for px in range(int((zx0-gx0)/(2*gs)),int((zx1-gx0)/(2*gs))+1):
-        gi=px*2; gj=pz*2
-        if not (i0<=gi<=i1 and j0<=gj<=j1) or h[gj,gi]<=-32000 or k[gj,gi]==1 or not np.isnan(Pl[gj-j0,gi-i0]): continue
-        q=_Pt(gx0+gi*gs,gz0+gj*gs)
-        if CB.ZONE.contains(q) and not SR.contains(q): mm[pz,px]=AS
+# mặt đất đã hoá nhựa (giữa đường và nhà) là màu đường trên bản đồ nhỏ; trừ viền lề, sân lát giữ lại, cỏ, nước
+_A=np.load('curb_asph.npy')[:mm.shape[0],:mm.shape[1]]; _KF=np.load('curb_keepflat.npy'); _kf=tmask(_KF) if len(_KF) else np.zeros(Hk.shape,bool)
+_sl=(slice(0,2*mm.shape[0],2),slice(0,2*mm.shape[1],2))
+_m=_A&(h[_sl]>-32000)&(k[_sl]!=1)&(k[_sl]!=2)&(k[_sl]!=3)&np.isnan(Hw)[_sl]&~_kf[_sl]
+mm[_m]=AS
 # sân nhựa trước cầu: màu đường trên bản đồ nhỏ
 im=Image.fromarray(mm); dr=ImageDraw.Draw(im)
 for poly in PL['asphalt']: dr.polygon([((x-gx0)/(2*gs),(z-gz0)/(2*gs)) for x,z in poly],fill=tuple(int(v) for v in AS))
@@ -205,7 +216,7 @@ while dq:
         c,d=a+da,b_+db
         if 0<=c<gnz and 0<=d<gnx and ok[c,d] and not reach[c,d] and abs(int(h[c,d])-hc)<=52: reach[c,d]=True; dq.append((c,d))
 def rc(x,z): return bool(reach[int(round((z-gz0)/gs)),int(round((x-gx0)/gs))])
-pts={'trước nhà xám':PZ.GW(6,-3.2),'trước ki-ốt':PZ.KW(0,-3.6),'bãi xe':(-27.0,-80.0),'ngã ba':(-33.5,-108.5),'đầu cầu':BR.BW(-2.5,0),'dốc lên cầu':BR.BW(0.5,0),'gầm cầu s=24':BR.BW(24,0),'đường dưới cầu':BR.BW(52.4,2),'sân chợ dưới thang':BR.FW(9,6),'đỉnh thang':l2w(0.5,0),'giữa thang':l2w(16,2),'chân thang':l2w(UF+1,0),'sân chân thang':(2,32),'sân thượng':l2w(5,-18),'sân trên':(-47,10),'cỏ nam thang':(-30,42),'trước cửa hàng':l2w(UF+1.5,10),'trước toà trắng':l2w(32,-18),'bùng binh tây':(18,12),'bùng binh':(31.5,25),'bồn liễu':(-44.5,61),'vỉa hè LĐH':(-41,33)}
+pts={'điểm xuất phát':(j['spawn']['x'],j['spawn']['z']),'cổng chợ đêm':(j['gate']['x'],j['gate']['z']),'trước nhà xám':PZ.GW(6,-3.2),'trước ki-ốt':PZ.KW(0,-3.6),'bãi xe':(-27.0,-80.0),'ngã ba':(-33.5,-108.5),'đầu cầu':BR.BW(-2.5,0),'dốc lên cầu':BR.BW(0.5,0),'gầm cầu s=24':BR.BW(24,0),'đường dưới cầu':BR.BW(52.4,2),'sân chợ dưới thang':BR.FW(9,6),'đỉnh thang':l2w(0.5,0),'giữa thang':l2w(16,2),'chân thang':l2w(UF+1,0),'sân chân thang':(2,32),'sân thượng':l2w(5,-18),'sân trên':(-47,10),'cỏ nam thang':(-30,42),'trước cửa hàng':l2w(UF+1.5,10),'trước toà trắng':l2w(32,-18),'bùng binh tây':(18,12),'bùng binh':(31.5,25),'bồn liễu':(-44.5,61),'vỉa hè LĐH':(-41,33)}
 for nm,(x,z) in pts.items(): print(' tới được %-16s'%nm, rc(float(x),float(z)), 'h=%.2f'%(h[int(round((float(z)-gz0)/gs)),int(round((float(x)-gx0)/gs))]/100.0))
 for c in j['checkins']: print(' check-in',c['id'],rc(c['x'],c['z']))
 for nm,sv in j['stalls'].items(): print(' quầy',nm,rc(sv['x'],sv['z']+2.9))

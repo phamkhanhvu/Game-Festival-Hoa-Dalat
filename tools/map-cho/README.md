@@ -15,7 +15,7 @@ Thứ tự chạy (cần `numpy`, `scipy`, `pillow`; đường dẫn làm việc
 
 `plaza.py` dựng khu đầu cầu phía Khu Hòa Bình theo 7 ảnh góc nhìn quanh số 31 Khu Hòa Bình: nhà xám cũ ba tầng có hàng quán dưới mái hiên, ki-ốt bên phải lối lên cầu, đảo cây bách có hàng rào cắt tỉa, cột đèn, cột điện, sân nhựa trước cầu, băng lam và tường tấm bê tông của khối rạp Hòa Bình. Atlas mở rộng thành 2048×2048 (8×8 ô), các ô mới nằm ở cột 4 đến 7.
 
-`curbs.py` làm lại lề đường khu Hòa Bình (cần `shapely`): bỏ các dải lề chạy theo đường và đảo lát giữa đường, đổi mặt đất trong vùng sang màu nhựa, rồi viền một dải lề hẹp (0,6 m) ôm chân từng công trình. Nền và hiên riêng của công trình (sân trước rạp, hành lang dưới mái hiên) giữ nguyên. Vùng áp dụng là đa giác `ZONE` trong tệp.
+`curbs.py` làm lại lề đường toàn bản đồ (cần `shapely`): bỏ các dải lề chạy theo đường và đảo lát giữa đường, đổi mặt đất nằm giữa đường và nhà sang màu nhựa (cách đường tối đa 14 m, cách nhà tối đa 16 m), rồi viền một dải lề hẹp 0,6 m ôm chân từng công trình. Sân lát rộng, nền và hiên riêng của công trình giữ nguyên; khu cầu thang chợ (`design.ZONE_E`) không đụng tới. Tệp này cũng gỡ dãy bạt xanh dương quanh khối rạp Hòa Bình.
 
 Lưới `h` chỉ có một tầng (mặt đất, kể cả đường dưới gầm cầu). Lối đi nằm phía trên mặt đất được ghi riêng trong `world_cho.js`:
 
