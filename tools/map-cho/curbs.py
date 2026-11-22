@@ -49,7 +49,7 @@ def analyse(P,I,tl,C,UV,extra=()):
     sw=np.zeros(len(I),bool); keep=[]
     for l in np.unique(tl[cand]):
         m=cand&(tl==l)
-        if _thick(tri[m])<THICK: sw|=m&~inprot                                 # dải lề chạy theo đường, đảo lát: bỏ
+        if _thick(tri[m])<THICK: sw|=m                                         # dải lề chạy theo đường, đảo lát: bỏ (kể cả trong khu cầu thang chợ: phần lát ở đó là mảng dựng riêng, không nằm trong lưới gốc)
         else: keep+= [Polygon(t[:,[0,2]]) for t in tri[m]]                     # sân lát rộng: giữ
     keep=unary_union([p for p in keep if p.area>1e-3]) if keep else Polygon()
     # bạt xanh dương quanh khối rạp Hòa Bình
