@@ -44,6 +44,7 @@ for l,d in info.items():
     if any(segdist((d['ctr'][0],d['ctr'][2]),a_,b_)<1.6 for a_,b_ in FRONTS.values()): dele.add(l)
 dele|=set([1176,1201,1025])          # cây cũ trong bồn liễu, biển của ki-ốt đã xoá
 dele|=set([1345,1344,1379,1483,1596,1662,1564,1575,1580,1591,1386,1393,1402,1413,1597,1496,1577,1578,1673,1696,1794])   # khu cầu đi bộ vào chợ
+dele|=set([1999,2228,2003,2004])      # cổng chợ đêm màu đỏ (hai trụ và biển): bỏ theo yêu cầu
 dele|=set([1357,1404,1356,1403])      # hai nhà phố ở góc Nguyễn Chí Thanh, thay bằng nhà xám ba tầng (plaza.py)
 keep_force=set([1371,1177,1687,1428,1452])
 dele-=keep_force

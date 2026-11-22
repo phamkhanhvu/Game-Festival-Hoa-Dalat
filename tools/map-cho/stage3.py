@@ -63,6 +63,8 @@ for x,z in ((-49.0,4.5),(-48.0,11.5),(-46.2,18.5)): blk|=disc(x,z,0.4)
 for x,z in ((-51.5,8.0),(-44.0,22.5)): blk|=disc(x,z,0.35)
 sx,sz=l2w(0.6,5.6); blk|=disc(float(sx),float(sz),0.3)
 blk|=(np.abs(Xg-TW[0])<=2.9)&(np.abs(Zg-TW[1])<=2.9)
+# cổng chợ đêm đã bỏ: mở lại hai ô chân trụ
+gate_un=disc(43.15,64.4,1.0)|disc(60.85,59.65,1.0); valid|=gate_un
 # ---- cầu đi bộ vào chợ: mặt cầu là tầng trên (WORLD.decks), lưới h chỉ giữ mặt đất bên dưới ----
 Sg,Tg=BR.w2b(Xg,Zg); Qf,Pf=BR.w2f(Xg,Zg); dky=BR.deck_y(Sg); WB_=BR.HW+BR.PT
 front=Pf>0.4
@@ -85,7 +87,7 @@ valid&=~blk
 valid&=~np.isnan(hn)
 # chỉ ghi các ô thuộc vùng chỉnh hoặc nằm dưới mảng/vật mới
 wb=pmask(WILLOW_BED)
-chg=zone|wb|blk|tree_del|~np.isnan(Hw)|swm
+chg=zone|wb|blk|tree_del|~np.isnan(Hw)|swm|gate_un
 newh=np.where(valid,np.round(hn*100),-32768)
 hsub=h[j0:j1+1,i0:i1+1]; before=hsub.copy()
 hsub[chg]=newh[chg].astype(np.int16)
