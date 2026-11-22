@@ -96,6 +96,23 @@ _r=PZ.build(walk,solid,deco,gfnB,_tp); print('khu đầu cầu Khu Hòa Bình:',
 from shapely.geometry import Polygon as _Poly
 _nb=[_Poly([tuple(PZ.GW(u,v)) for u,v in ((0,0),(PZ.GLEN,0),(PZ.GLEN,PZ.GDEP),(0,PZ.GDEP))]),_Poly([tuple(PZ.KW(u,v)) for u,v in ((-PZ.KL/2,-PZ.KD/2),(PZ.KL/2,-PZ.KD/2),(PZ.KL/2,PZ.KD/2),(-PZ.KL/2,PZ.KD/2))])]
 _nt,_nc=CB.build(walk,solid,_an,_nb); print('viền lề quanh công trình:',_nt,'tam giác mặt lát +',_nc,'tam giác bó vỉa')
+# ---- rạp Hòa Bình: tháp và khối mặt tiền liền một khối (theo ảnh) ----
+# Tháp (826) và tường mặt tiền (644) sơn cùng màu bê tông xám; đắp thêm mái và hai tường hồi nối mặt tiền với thân rạp,
+# để tháp mọc lên từ chính khối nhà chứ không đứng rời trước một tấm biển.
+from mb import lin as _lin
+_GR=_lin('#b7bbbd')
+for _l,_c in ((826,_GR),(644,_GR),(828,_lin('#dfe1e2')),(835,_lin('#dfe1e2'))): C[np.unique(I[tl==_l])]=_c
+_u=np.array([24.6,5.2]); _u/=np.linalg.norm(_u); _v=np.array([_u[1],-_u[0]])            # u dọc mặt tiền (tây sang đông), v vào trong (về thân rạp)
+_w=P[np.unique(I[tl==644])][:,[0,2]]; _t=P[np.unique(I[tl==826])][:,[0,2]]
+_uw=float((_w@_u).min()); _ue=float((_t@_u).max()); _vf=float((_w@_v).min()); _vt=float((_t@_v).min()); _ytop=float(P[np.unique(I[tl==644])][:,1].max()); _y0=19.8
+_vh=float(np.array([-85.0,-53.0])@_v)-0.35                                              # tường nam thân rạp (đã có tường tấm che)
+def _q(uu,vv,y): p=_u*uu+_v*vv; return (float(p[0]),float(y),float(p[1]))
+_n0=solid.ntri
+solid.quad([_q(_uw,_vf,_ytop),_q(_ue,_vt,_ytop),_q(_ue,_vh,_ytop),_q(_uw,_vh,_ytop)],PLAIN,_lin('#9fa3a5'),np.array([0,1.0,0]))
+solid.quad([_q(_uw,_vh,_y0),_q(_uw,_vf,_y0),_q(_uw,_vf,_ytop),_q(_uw,_vh,_ytop)],PLAIN,_GR,np.array([-_u[0],0,-_u[1]]))       # hồi tây
+solid.quad([_q(_ue,_vt,_y0),_q(_ue,_vh,_y0),_q(_ue,_vh,_ytop),_q(_ue,_vt,_ytop)],PLAIN,_GR,np.array([_u[0],0,_u[1]]))         # hồi đông (sau tháp)
+solid.quad([_q(_uw,_vf,_ytop),_q(_ue,_vf,_ytop),_q(_ue,_vf,_ytop+0.28),_q(_uw,_vf,_ytop+0.28)],PLAIN,_lin('#c9cccd'),np.array([-_v[0],0,-_v[1]]))   # gờ mái mặt tiền
+print('rạp Hòa Bình: khối mặt tiền liền tháp',solid.ntri-_n0,'tam giác; u',round(_uw,1),round(_ue,1),'v',round(_vf,1),round(_vt,1),round(_vh,1),'y',_y0,_ytop)
 # toà nhà lớn phía nam (khách sạn trắng trong ảnh): sơn lại màu trắng
 v1371=np.unique(I[tl==1371]); c=C[v1371]; wallv=(c.max(1)>0.3)&(np.abs(c[:,0]-c[:,1])<0.12)
 C[v1371[wallv]]=lin('#f3f1eb')
