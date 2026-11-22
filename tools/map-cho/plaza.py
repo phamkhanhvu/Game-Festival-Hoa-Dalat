@@ -55,7 +55,7 @@ def build(walk,solid,deco,gfn,terr):
     NU=np.array([GU[0],0,GU[1]]); NV=np.array([GV[0],0,GV[1]])
     rects=[]; discs=[]
     # ================= sân nhựa trước cầu =================
-    n=drape(walk,terr,FS,0.10,PLAIN,ASPH)+drape(walk,terr,FN,0.10,PLAIN,ASPH)
+    n=0          # sân nhựa trước cầu: nay do curbs.py đổi màu cả mặt đất trong vùng, không cần mảng phủ riêng
     # ================= nhà xám ba tầng =================
     gy=float(gfn(*GW(GLEN/2,-1.0))); yb=gy-2.6
     y1=gy+3.3; y2=gy+3.52; y3=gy+4.1; y4=gy+7.6; y5=gy+11.1; y6=gy+11.45; y7=gy+11.95
@@ -157,5 +157,5 @@ def build(walk,solid,deco,gfn,terr):
         wall(solid,a,b,ya-0.14,ya,PLAIN,lin('#b9ad92'))
     solid.quad([(ne[0],yt-0.25,ne[1]),(nw[0],yt-0.25,nw[1]),(sw[0],yt-0.25,sw[1]),(se[0],yt-0.25,se[1])],PLAIN,lin('#8f8a7e'),UP)
     for (a,b) in ((ne,se),(nw,ne),(sw,nw),(se,sw)): wall(solid,a,b,yt-0.25,yt,PLAIN,lin('#b9ad92'))
-    json.dump(dict(rects=rects,discs=[[round(float(v),2) for v in d_] for d_ in discs],asphalt=[FS,FN]),open('/home/claude/work/build/plaza.json','w'))
+    json.dump(dict(rects=rects,discs=[[round(float(v),2) for v in d_] for d_ in discs],asphalt=[]),open('/home/claude/work/build/plaza.json','w'))
     return dict(walk_tris=n)

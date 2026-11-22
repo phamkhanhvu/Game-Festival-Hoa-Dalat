@@ -25,6 +25,15 @@ gset=set([98,1452])|set(l for l,d in info.items() if d['ground'])
 is_g=np.isin(tl,list(gset))
 Hk=R(tri[inreg&is_g]); Hw=R(Pw)
 hn=np.fmax(Hk,Hw)
+# ---- lề khu Hòa Bình đã gỡ: ô dưới lề cũ lấy cao độ mặt còn lại (địa hình, đường, vạch, sân) ----
+import curbs as CB, shapely
+from shapely.geometry import Point as _Pt
+CD=np.load('curb_del.npy'); swm=tmask(CD) if len(CD) else np.zeros(Hk.shape,bool)
+Ht=R(tri[inreg&(tl==98)]); _n=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]); _flat=np.abs(_n[:,1])>0.9*(np.linalg.norm(_n,axis=1)+1e-12)
+_c=tri.mean(1); _ci=np.clip(np.round((_c[:,0]-RX0)/gs).astype(int),0,rnx-1); _cj=np.clip(np.round((_c[:,2]-RZ0)/gs).astype(int),0,rnz-1)
+_near=(_c[:,1]-np.nan_to_num(Ht[_cj,_ci],nan=-1e9))<0.7
+Hflat=R(tri[inreg&_flat&_near&(tl!=98)])
+hn=np.where(swm,np.fmax(hn,Hflat),hn)
 zone=pmask(ZONE_E); zdel=pmask(ZONE_DEL)
 hold=h[j0:j1+1,i0:i1+1].astype(float); oldvalid=hold>-32000
 # mặt đi lại định sẵn: bậc thang (dốc trơn), sân thượng khối cao
@@ -78,7 +87,7 @@ valid&=~blk
 valid&=~np.isnan(hn)
 # chỉ ghi các ô thuộc vùng chỉnh hoặc nằm dưới mảng/vật mới
 wb=pmask(WILLOW_BED)
-chg=zone|wb|blk|tree_del|~np.isnan(Hw)
+chg=zone|wb|blk|tree_del|~np.isnan(Hw)|swm
 newh=np.where(valid,np.round(hn*100),-32768)
 hsub=h[j0:j1+1,i0:i1+1]; before=hsub.copy()
 hsub[chg]=newh[chg].astype(np.int16)
@@ -137,6 +146,13 @@ for c in j['checkins']:
     if c['id']=='cauthang': c['desc']='Bậc thang lớn sáu nhịp nối đường Lê Đại Hành trên cao xuống sân trước chợ, bên cây bách tán cao và toà nhà trắng đầu cong có sân thượng.'
 for nm,sv in j['stalls'].items():
     if inzone(sv['x'],sv['z']): print('quầy trong vùng:',nm,sv,hat(sv['x'],sv['z']))
+    if CB.ZONE.contains(_Pt(sv['x'],sv['z'])):
+        y=hat(sv['x'],sv['z']); print('quầy khu Hòa Bình:',nm,sv['y'],'->',y)
+        if y is not None: sv['y']=round(y,2)
+for c in j['checkins']:
+    if CB.ZONE.contains(_Pt(c['x'],c['z'])):
+        y=hat(c['x'],c['z']); print('check-in khu Hòa Bình',c['id'],c['y'],'->',y)
+        if y is not None: c['y']=round(y,2)
 # ---- bản đồ nhỏ (1 px = 1 m) ----
 b=base64.b64decode(j['map'].split(',')[1]); mm=np.asarray(Image.open(io.BytesIO(b)).convert('RGB')).copy()
 BL=np.array([120,112,104]); AS=np.array([120,122,128]); GR=np.array([126,168,98])
@@ -151,6 +167,14 @@ for pz in range(mm.shape[0]):
         elif k[gj,gi]==1: mm[pz,px]=GR
         else:
             v=int(round(186+2.13*hv/100.0)); mm[pz,px]=(v,v-6,v-16)
+# khu Hòa Bình: mặt đất ngoài viền lề là đường nhựa trên bản đồ nhỏ
+SR=shapely.from_wkt(open('/home/claude/work/build/curbs.wkt').read()); Pl=R(tri[tl==1093]); zx0,zz0,zx1,zz1=CB.ZONE.bounds
+for pz in range(int((zz0-gz0)/(2*gs)),int((zz1-gz0)/(2*gs))+1):
+    for px in range(int((zx0-gx0)/(2*gs)),int((zx1-gx0)/(2*gs))+1):
+        gi=px*2; gj=pz*2
+        if not (i0<=gi<=i1 and j0<=gj<=j1) or h[gj,gi]<=-32000 or k[gj,gi]==1 or not np.isnan(Pl[gj-j0,gi-i0]): continue
+        q=_Pt(gx0+gi*gs,gz0+gj*gs)
+        if CB.ZONE.contains(q) and not SR.contains(q): mm[pz,px]=AS
 # sân nhựa trước cầu: màu đường trên bản đồ nhỏ
 im=Image.fromarray(mm); dr=ImageDraw.Draw(im)
 for poly in PL['asphalt']: dr.polygon([((x-gx0)/(2*gs),(z-gz0)/(2*gs)) for x,z in poly],fill=tuple(int(v) for v in AS))
