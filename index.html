@@ -410,7 +410,7 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '1ae080b9'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'a4619f42'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
@@ -2235,7 +2235,7 @@ const curSong = () => SONGS[songIdx], nextSong = () => SONGS[SQ.length ? SQ[0] :
 /* ----- danh sách bài hát và yêu cầu bài (có phí): xếp hàng hát kế tiếp bằng xu, hát ngay bằng kim cương ----- */
 const SONG_FEE = 2000, SONG_NOW_GEMS = 10, SONG_QUEUE_MAX = 3;
 function songsRender(){
-  if (!STAGE) return '<p>Sân khấu Music Festival ở Quảng trường Lâm Viên. Hãy qua đó để nghe nhạc và yêu cầu bài hát.</p>';
+  if (!STAGE) return '<p>Hãy tới sân khấu Music Festival để nghe nhạc và yêu cầu bài hát.</p>';
   let h = `<p>Sân khấu <b>${STAGE_NAME}</b> · ${STAGE_HOST}. Yêu cầu bài: <b>${fmt(SONG_FEE)} xu</b> để ban nhạc hát kế tiếp (xếp hàng tối đa ${SONG_QUEUE_MAX} bài), hoặc <b>${SONG_NOW_GEMS} kim cương</b> để hát ngay.</p>`;
   SONGS.forEach((sg, i) => {
     const cur = i === songIdx, q = SQ.indexOf(i), okC = S.coins >= SONG_FEE, okG = S.gems >= SONG_NOW_GEMS;
@@ -3587,7 +3587,7 @@ function renderModal(){
   } else if (modalType === 'hunt'){
     h += CUR_EVENT ? row('Gian hàng thương hiệu · ' + CUR_EVENT.name, `12 gian ở trung tâm sân dưới: 2 gian Kim Cương cạnh sân khấu (cấp 20), 4 gian Vàng (cấp 15), 2 gian Bạc (cấp 12) và 4 gian nhà tài trợ. ${myBooth() ? 'Gian của bạn: <b>' + escH(myBooth().name) + '</b>.' : 'Bạn chưa có gian.'}`, '') : row('Gian hàng thương hiệu', 'Chỉ dựng khi có sự kiện. ' + (nextEvent() ? 'Sự kiện tới: <b>' + nextEvent().e.name + '</b> từ ' + nextEvent().date.toLocaleDateString('vi-VN') + '.' : ''), '');
     h += row('Đố Vui Đà Lạt · ' + dvRank(dvKnown()), `5 thẻ nhỏ được giấu quanh quảng trường, nhặt xong sẽ có thẻ mới ở chỗ khác. Đã biết ${dvKnown()}/${DV_N} câu.<span class="pbar"><i style="width:${dvKnown() / DV_N * 100}%"></i></span>`, '');
-    h += row(STAGE_NAME + ' · ' + STAGE_HOST, `Sân khấu chính giữa sân dưới, trước cầu thang lớn. Đang diễn: ${curSong().title}. Đã cổ vũ ${S.stats.cheers || 0} tiết mục.`, '');
+    h += row(STAGE_NAME + ' · ' + STAGE_HOST, `${MAP === 'cho' ? 'Sân khấu trên quảng trường trước Rạp Hòa Bình (Khu Hòa Bình).' : 'Sân khấu chính giữa sân dưới, trước cầu thang lớn.'} Đang diễn: ${curSong().title}. Đã cổ vũ ${S.stats.cheers || 0} tiết mục.`, '');
     h += '<p>Đi khắp quảng trường để nhặt vật phẩm phát sáng. Chúng hiện thành chấm màu trên bản đồ nhỏ, vòng trắng chỉ vật phẩm gần nhất của nhiệm vụ đang theo. Hoa, quả thông, atiso và hộp quà sẽ mọc lại sau một lúc.</p>';
     HUNTS.forEach(q => {
       const pr = huntP(q), done = pr >= q.goal, got = S.hunts[q.id];
