@@ -410,7 +410,7 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '49a842ac'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '264b837f'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
@@ -1212,7 +1212,9 @@ WORLD.lamps.forEach(t => PROPS.push({ x:t.x, z:t.z, r:0.3 }));
 PROPS.push({ x:WORLD.balloon.x, z:WORLD.balloon.z, r:0.7 }, { x:WORLD.man.x, z:WORLD.man.z, r:0.5 });
 if (festOn()){ WORLD.pots.forEach(t => PROPS.push({ x:t.x, z:t.z, r:0.6 })); [-2.6, 2.6].forEach(dx => PROPS.push({ x:WORLD.gate.x + dx, z:WORLD.gate.z, r:0.3 })); }
 const RECTP = [];                      /* vật cản hình chữ nhật: sân khấu chính, gian trưng bày */
-if (WORLD.stage){ const t = WORLD.stage; RECTP.push({ x0:t.x - t.w / 2, x1:t.x + t.w / 2, z0:t.z - t.d / 2, z1:t.z + t.d / 2 }, { x0:t.x - t.w / 2 - 1.5, x1:t.x + t.w / 2 + 1.5, z0:t.z + t.d / 2 - 1.1, z1:t.z + t.d / 2 - 0.1 }); }
+if (WORLD.stage){ const t = WORLD.stage, c = Math.cos(t.rot || 0), sn = Math.sin(t.rot || 0), N = 6, sw = (t.w + 3) / N;
+  for (let k = 0; k < N; k++){ const lx = -(t.w + 3) / 2 + (k + 0.5) * sw, inner = Math.abs(lx) < t.w / 2, z0 = inner ? -t.d / 2 : t.d / 2 - 1.1, z1 = inner ? t.d / 2 : t.d / 2 - 0.1, lz = (z0 + z1) / 2, hx = sw / 2 + 0.25, hz = (z1 - z0) / 2 + Math.abs(sn) * sw / 2;
+    const cx = t.x + lx * c + lz * sn, cz = t.z - lx * sn + lz * c; RECTP.push({ x0:cx - hx, x1:cx + hx, z0:cz - hz, z1:cz + hz }); } }
 /* gian thương hiệu chỉ dựng khi có sự kiện; gian hàng trước lối vào quay cửa về phía bắc (về sân khấu) */
 if (CUR_EVENT) (WORLD.booths || []).forEach(b => { const n = b.face ? b.face < 0 : b.z > -45; RECTP.push({ x0:b.x - 2.7, x1:b.x + 2.7, z0:n ? b.z - 1.3 : b.z - 1.8, z1:n ? b.z + 1.8 : b.z + 1.3 }); });
 function propHit(x, z, pad){ for (let i = 0; i < RECTP.length; i++){ const r = RECTP[i]; if (x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad) return true; }
@@ -2229,6 +2231,9 @@ function boothIncome(dt){
 /* ----- sân khấu chính ----- */
 const STAGE = WORLD.stage || null;
 const STAGE_NAME = 'Music Festival', STAGE_HOST = 'Sense Acoustic Cafe';
+/* sân khấu có thể xoay (WORLD.stage.rot, radian quanh trục đứng) cho song song với mép sân; stW: toạ độ sân khấu -> bản đồ, stL: ngược lại */
+const ST_ROT = STAGE ? (STAGE.rot || 0) : 0, ST_C = Math.cos(ST_ROT), ST_S = Math.sin(ST_ROT);
+const stW = (lx, lz) => ({ x:STAGE.x + lx * ST_C + lz * ST_S, z:STAGE.z - lx * ST_S + lz * ST_C }), stL = (x, z) => { const dx = x - STAGE.x, dz = z - STAGE.z; return { x:dx * ST_C - dz * ST_S, z:dx * ST_S + dz * ST_C }; };
 /* tiết mục = bài hát đang phát; mỗi lượt phát một bài được cổ vũ một lần */
 const showSlot = () => songPlays;
 const curSong = () => SONGS[songIdx], nextSong = () => SONGS[SQ.length ? SQ[0] : (songIdx + 1) % SONGS.length];
@@ -2334,14 +2339,14 @@ if (STAGE){
     for (let i = 0; i < PN; i++){ pp[i * 3] = (fr() - 0.5) * (W2 + 7); pp[i * 3 + 1] = 0.3 + fr() * 8.5; pp[i * 3 + 2] = FZ - 2 + fr() * 9; tc.set(FCOL[fc()]); pcl[i * 3] = tc.r; pcl[i * 3 + 1] = tc.g; pcl[i * 3 + 2] = tc.b; }
     const pgm = new THREE.BufferGeometry(); pgm.setAttribute('position', new THREE.BufferAttribute(pp, 3)); pgm.setAttribute('color', new THREE.BufferAttribute(pcl, 3));
     const pts = new THREE.Points(pgm, new THREE.PointsMaterial({ size:0.17, vertexColors:true, transparent:true, opacity:0.95, depthWrite:false })); pts.frustumCulled = false; g.add(pts); stageFx.petals = { pos:pp, attr:pgm.attributes.position, n:PN, w:W2 + 7 }; }
-  g.position.set(STAGE.x, STAGE.y, STAGE.z); scene.add(g); stageFx.group = g;
+  g.position.set(STAGE.x, STAGE.y, STAGE.z); g.rotation.y = ST_ROT; scene.add(g); stageFx.group = g;
   /* bốn nghệ sĩ: ca sĩ, guitar, đàn phím, trống */
   [[0, 1.6, '#e2453b'], [-3.4, 1.2, '#2f6fc0'], [3.6, 0.5, '#d9a322'], [0, -2.1, '#7a55c0']].forEach(([x, z, shirt], i) => {
-    const m = personMesh({ shirt, pants:'#2b2f3a', hair:pick(HAIRS) }); m.position.set(STAGE.x + x, STAGE.y + 1.06, STAGE.z + z); scene.add(m); stageFx.performers.push({ mesh:m, x:STAGE.x + x, z:STAGE.z + z, i });
+    const w = stW(x * W2 / 14, z * D2 / 8), m = personMesh({ shirt, pants:'#2b2f3a', hair:pick(HAIRS) }); m.position.set(w.x, STAGE.y + 1.06, w.z); scene.add(m); stageFx.performers.push({ mesh:m, x:w.x, z:w.z, i });
   });
   drawStageScreen();
   /* khán giả đứng xem trước sân khấu */
-  (WORLD.audience || []).forEach(a => { const p = makePerson('audience'); placePerson(p, a); p.ang = Math.PI + rand(-0.25, 0.25); p.sp = 0; people.push(p); });
+  (WORLD.audience || []).forEach(a => { const p = makePerson('audience'); placePerson(p, a); p.ang = Math.PI + ST_ROT + rand(-0.25, 0.25); p.sp = 0; people.push(p); });
 }
 /* đổi nghệ sĩ sang mô hình nhân vật thật khi đã tải xong */
 function upgradeStage(){ stageFx.performers.forEach(pf => { const m = crowdMesh(); if (!m) return; m.position.copy(pf.mesh.position); scene.remove(pf.mesh); pf.mesh = m; scene.add(m); }); }
@@ -2357,7 +2362,7 @@ function updateExpo(dt){
   boothIncome(dt);
   if (!STAGE){ if (bgmVol !== 0) setBgmVol(0); return; }   /* map không có sân khấu: không phát nhạc */
   const ds = Math.hypot(P.x - STAGE.x, P.z - STAGE.z);
-  nearStage = Math.abs(P.x - STAGE.x) < STAGE.w / 2 + 5 && P.z > STAGE.z + STAGE.d / 2 - 0.5 && P.z < STAGE.z + STAGE.d / 2 + 11 && Math.abs(P.h - STAGE.y) < 1.5;
+  const lp = stL(P.x, P.z); nearStage = Math.abs(lp.x) < STAGE.w / 2 + 5 && lp.z > STAGE.d / 2 - 0.5 && lp.z < STAGE.d / 2 + 13 && Math.abs(P.h - STAGE.y) < 1.5;
   /* nhạc phát ra từ sân khấu: càng xa càng nhỏ, quá 150 đơn vị thì không còn nghe thấy */
   setBgmVol(0.9 * Math.pow(clamp(1 - ds / 150, 0, 1), 1.6));
   if (ds > 140) return;
@@ -2369,10 +2374,10 @@ function updateExpo(dt){
   if (stageFx.foot) stageFx.foot.forEach((m, i) => m.color.setHSL((T * 0.25 + i / 14) % 1, 1, 0.6));
   if (stageFx.petals && ds < 70){ const pe = stageFx.petals, a = pe.pos, d2 = Math.min(dt, 0.1); for (let i = 0; i < pe.n; i++){ a[i * 3 + 1] -= d2 * (0.55 + (i % 5) * 0.13); a[i * 3] += Math.sin(T * 1.3 + i) * d2 * 0.45; if (a[i * 3 + 1] < 0.15) a[i * 3 + 1] = 8.6; } pe.attr.needsUpdate = true; }
   stageFx.performers.forEach(pf => {
-    const m = pf.mesh, u = m.userData; m.position.y = STAGE.y + 1.06 + Math.abs(Math.sin(T * 4 + pf.i)) * 0.05; m.rotation.y = Math.sin(T * 0.8 + pf.i * 2) * 0.35;
+    const m = pf.mesh, u = m.userData; m.position.y = STAGE.y + 1.06 + Math.abs(Math.sin(T * 4 + pf.i)) * 0.05; m.rotation.y = ST_ROT + Math.sin(T * 0.8 + pf.i * 2) * 0.35;
     if (u.armL && u.armR){ u.armL.rotation.x = -0.9 + Math.sin(T * 6 + pf.i) * 0.35; u.armR.rotation.x = -0.6 + Math.cos(T * 6 + pf.i) * 0.35; }
   });
-  stageFx.noteT -= dt; if (stageFx.noteT <= 0 && ds < 45){ stageFx.noteT = rand(1.2, 2.6); floatText(STAGE.x + rand(-5, 5), STAGE.y + 3.2, STAGE.z + 2, pick(['♪', '♫', '♪ ♫']), pick(['#ffe08a', '#ffb3d1', '#b9e3ff'])); }
+  stageFx.noteT -= dt; if (stageFx.noteT <= 0 && ds < 45){ stageFx.noteT = rand(1.2, 2.6); const nw = stW(rand(-5, 5) * STAGE.w / 14, STAGE.d / 4); floatText(nw.x, STAGE.y + 3.2, nw.z, pick(['♪', '♫', '♪ ♫']), pick(['#ffe08a', '#ffb3d1', '#b9e3ff'])); }
 }
 /* ===== Chơi cùng nhau: người chơi đã đăng nhập thấy nhau trên quảng trường (Firebase Realtime Database, nhánh presence/{uid}) =====
    Mỗi máy ghi vị trí của mình khoảng 4 lần mỗi giây khi đang di chuyển, nhịp 20 giây khi đứng yên; rời trang hay mất mạng thì máy chủ tự xoá */
@@ -2973,7 +2978,7 @@ function danceStart(){
   let c = Math.floor(danceBeat() / DN_BEATS) + 1; if ((c * DN_BEATS - danceBeat()) * d.spb < 1.6) c++;
   Object.assign(d, { on:true, c0:c, round:-1, score:0, combo:0, maxCombo:0, len:3, streak:0, seq:[], idx:0, hit:false, cnt:{ PERFECT:0, GREAT:0, COOL:0, BAD:0, MISS:0 }, done:false, move:null, moveT:0, spin:0, song:curSong().title,
     back:{ x:P.x, z:P.z, h:P.h, ang:P.ang, yaw, pitch, camDist } });
-  P.x = STAGE.x - 1.9; P.z = STAGE.z + 2.7; P.h = STAGE.y + 1.06; P.j = 0; P.vy = 0; P.goto = null; P.ang = 0; yaw = 0; pitch = 0.3; camDist = innerHeight > innerWidth ? 14 : 10;
+  const dp = stW(-1.9 * STAGE.w / 14, Math.min(2.7, STAGE.d / 2 - 0.7)); P.x = dp.x; P.z = dp.z; P.h = STAGE.y + 1.06; P.j = 0; P.vy = 0; P.goto = null; P.ang = ST_ROT; yaw = ST_ROT; pitch = 0.3; camDist = innerHeight > innerWidth ? 14 : 10;
   if (typeof runOn !== 'undefined' && runOn){ runOn = false; setRunBtn(); }
   const el = document.createElement('div'); el.id = 'dn';
   el.innerHTML = `<div class="dntop"><div><b id="dnScore">0</b><small id="dnInfo"></small></div><button class="dnx" data-dn="quit" aria-label="Thoát nhảy">×</button></div>
