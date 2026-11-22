@@ -9,3 +9,5 @@ Game 3D chạy trên trình duyệt: kinh doanh quầy hàng trên Quảng trư�
 
 ## Bản đồ Chợ Đà Lạt
 Mạng đường và đường bao nhà khu Chợ Đà Lạt – Khu Hòa Bình lấy từ OpenStreetMap (© OpenStreetMap contributors, giấy phép ODbL). Cao độ, mặt đứng nhà và các dãy nhà phố lấp thêm là dựng ước lượng.
+
+Khu cầu thang chợ (bậc thang sáu nhịp, cây bách tán, toà nhà trắng đầu cong có sân thượng, cửa hàng đặc sản, hàng liễu, dãy khách sạn và tháp viễn thông phía trên) dựng chi tiết theo ảnh thực tế do chủ dự án cung cấp. Công cụ dựng nằm ở `tools/map-cho/`.
