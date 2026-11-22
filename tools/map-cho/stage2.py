@@ -102,6 +102,9 @@ _nt,_nc=CB.build(walk,solid,_an,_nb); print('viền lề quanh công trình:',_n
 from mb import lin as _lin
 _GR=_lin('#b7bbbd')
 for _l,_c in ((826,_GR),(644,_GR),(828,_lin('#dfe1e2')),(835,_lin('#dfe1e2'))): C[np.unique(I[tl==_l])]=_c
+# mái thân rạp: tôn sẫm; mặt trên mái hiên hai bên: bê tông xám (ảnh từ trên cao)
+C[np.unique(I[tl==674])]=_lin('#4f4a44')
+_k=np.where(tl==612)[0]; _tt=P[I[_k]]; _fl=(np.abs(_tt[:,:,1]-19.8).max(1)<0.12); C[np.unique(I[_k[_fl]])]=_lin('#aaa79f')
 _u=np.array([24.6,5.2]); _u/=np.linalg.norm(_u); _v=np.array([_u[1],-_u[0]])            # u dọc mặt tiền (tây sang đông), v vào trong (về thân rạp)
 _w=P[np.unique(I[tl==644])][:,[0,2]]; _t=P[np.unique(I[tl==826])][:,[0,2]]
 _uw=float((_w@_u).min()); _ue=float((_t@_u).max()); _vf=float((_w@_v).min()); _vt=float((_t@_v).min()); _ytop=float(P[np.unique(I[tl==644])][:,1].max()); _y0=19.8

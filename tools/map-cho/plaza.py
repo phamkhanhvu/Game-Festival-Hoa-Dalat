@@ -18,6 +18,7 @@ def KW(u,v): return KC+KU*u+KV*v
 IBX0,IBX1,IBZ0,IBZ1=-37.4,-32.0,-86.4,-80.6; IBH=0.3
 TREES=[(-35.7,-84.6,9.5,1.3),(-34.2,-85.0,11.0,1.45),(-33.0,-84.1,10.0,1.35),(-34.9,-82.7,11.6,1.5),(-33.4,-82.3,8.6,1.2)]   # (x, z, cao, bán kính)
 GLAMPS=[(-38.0,-87.1),(-31.3,-80.0)]; UPOLE=(-34.9,-88.3)
+ROW=[(-35.3-0.18*k*4.2,-76.5+4.2*k) for k in range(6)]          # sáu cây, cách nhau 4,2 m, chạy về phía nam
 # ---- sân nhựa trước cầu ----
 FS=[(-29.8,-104.1),(-18.9,-96.9),(-24.6,-90.4),(-32.4,-88.4),(-36.1,-88.3)]
 FN=[(-28.2,-104.7),(-16.2,-96.5),(-13.0,-99.4),(-19.6,-110.6)]
@@ -131,6 +132,9 @@ def build(walk,solid,deco,gfn,terr):
     solid.obox((IBX0+0.55,cz+0.45),EX,EZ,0.42,hz-0.6,iy-0.05,iy+0.85,HG,NOISE,top=True)     # hàng rào mép tây
     rects.append(dict(c=[cx,cz],u=[1.0,0.0],hu=hx+0.2,hv=hz+0.2))
     for (x,z,h,r) in TREES: cypress(deco,x,z,iy,h,r)
+    # hàng bách dọc mép bãi xe phía đông đường (theo ảnh từ trên cao)
+    for k,(x,z) in enumerate(ROW):
+        gy_=float(gfn(x,z)); cypress(deco,x,z,gy_,7.5+1.2*((k*7)%3),1.05+0.1*(k%2)); discs.append((x,z,0.6))
     for (x,z) in GLAMPS:
         green_lamp(deco,x,z,float(gfn(x,z))+0.05); discs.append((x,z,0.3))
     # cột điện bê tông giữa ki-ốt và đảo cây, hai tay đèn
@@ -155,7 +159,7 @@ def build(walk,solid,deco,gfn,terr):
         L=float(np.linalg.norm(b-a))
         wall(solid,a,b,ya,ybm,STRIPE,BE,bays=max(1,int(round(L/3.2)))); wall(solid,a,b,ybm,yt,PANEL,WHITE,bays=max(1,int(round(L/5.0))))
         wall(solid,a,b,ya-0.14,ya,PLAIN,lin('#b9ad92'))
-    solid.quad([(ne[0],yt-0.25,ne[1]),(nw[0],yt-0.25,nw[1]),(sw[0],yt-0.25,sw[1]),(se[0],yt-0.25,se[1])],PLAIN,lin('#8f8a7e'),UP)
+    # không đậy nắp phẳng: nhìn từ trên thấy mái tôn hai dốc màu sẫm nằm trong lòng tường chắn (như ảnh chụp từ trên cao)
     for (a,b) in ((ne,se),(nw,ne),(sw,nw),(se,sw)): wall(solid,a,b,yt-0.25,yt,PLAIN,lin('#b9ad92'))
     json.dump(dict(rects=rects,discs=[[round(float(v),2) for v in d_] for d_ in discs],asphalt=[]),open('/home/claude/work/build/plaza.json','w'))
     return dict(walk_tris=n)
