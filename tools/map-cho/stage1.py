@@ -43,11 +43,11 @@ for l,d in info.items():
     if l==TERR or d['ground'] or l in dele or d['n']>12: continue
     if any(segdist((d['ctr'][0],d['ctr'][2]),a_,b_)<1.6 for a_,b_ in FRONTS.values()): dele.add(l)
 dele|=set([1176,1201,1025])          # cây cũ trong bồn liễu, biển của ki-ốt đã xoá
+dele|=set([1345,1344,1379,1483,1596,1662,1564,1575,1580,1591,1386,1393,1402,1413,1597,1496,1577,1578,1673,1696,1794])   # khu cầu đi bộ vào chợ
 keep_force=set([1371,1177,1687,1428,1452])
 dele-=keep_force
-print('xoá',len(dele),'thành phần;',sum(info[l]['n'] for l in dele),'tam giác')
-for l in sorted(dele,key=lambda l:-info[l]['n'])[:60]:
-    d=info[l]; print('  ',l,d['n'],'ctr(%.1f,%.1f)'%(d['ctr'][0],d['ctr'][2]),'rel[%.1f,%.1f]'%(d['relmin'],d['relmax']))
+print('xoá',len(dele),'thành phần;',int(np.isin(tl,list(dele)).sum()),'tam giác')
+
 # lớp mặt đất nằm trong vùng: giữ lại và dời theo địa hình
 glayers=[l for l,d in info.items() if d['ground'] and l not in dele]
 gl_in=[]
@@ -72,6 +72,10 @@ ASPH=(1452,1456)
 is_gl=np.isin(tl,gl_in+[1452]); is_asph=np.isin(tl,ASPH)
 drop_tri=cin&is_gl&((~is_asph&(platemask[cj,ci]|t_band|t_bld))|(is_asph&(t_band|t_bld)))
 drop_tri|=cin&(tl==961)&platemask[cj,ci]      # đoạn lối lát cũ nối lên đỉnh thang
+import bridge as BR
+_q,_p=BR.w2f(tri[:,:,0],tri[:,:,2])
+back=(tl==1551)&(np.abs(_p)<0.35).all(1)&(tri[:,:,1].min(1)>=8.7)&(tri[:,:,1].max(1)<=17.4)&(_q.min(1)>BR.QW-0.3)&(_q.max(1)<BR.QE+0.3)
+print('bỏ tường sau chợ cũ (tầng 1, 2, tường mái):',int(back.sum()),'tam giác'); drop_tri|=back
 print('bỏ tam giác lớp mặt đất cũ:',drop_tri.sum())
 keepmask=np.zeros((NZ,NX),bool)
 for l in gl_in:

@@ -69,6 +69,18 @@ deco.prism((sx,sz),0.05,0.05,sy,sy+2.3,4,lin('#4a4f55'),cap=False)
 wall(deco,lw(0.75,6.3),lw(0.75,4.9),sy+1.5,sy+2.4,BILL,lin('#2a5fa8'))
 hotels(solid,gfn); print('dãy khách sạn:',solid.ntri-n0); n0=solid.ntri
 TW=(-83.0,42.0); tower(deco,TW[0],TW[1],float(gfn(*TW))); print('cây, chậu, đèn, tháp:',deco.ntri)
+# ---- cầu đi bộ vào tầng trên chợ, cầu thang lên sân thượng ----
+import bridge as BR, json
+from rast import raster as _raster
+sys.path.insert(0,'/home/claude/work')
+_T=P[I[tl==98]]; _s=(_T[:,:,0].max(1)>-45)&(_T[:,:,0].min(1)<75)&(_T[:,:,2].max(1)>-112)&(_T[:,:,2].min(1)<-3)
+_G=_raster(_T[_s],-42.0,-110.0,0.5,231,213)
+def gfnB(x,z):
+    fx=min(max((float(x)+42.0)/0.5,0),229.0); fz=min(max((float(z)+110.0)/0.5,0),211.0); i=int(fx); j=int(fz); a=fx-i; b=fz-j
+    return (_G[j,i]*(1-a)+_G[j,i+1]*a)*(1-b)+(_G[j+1,i]*(1-a)+_G[j+1,i+1]*a)*b
+n0=solid.ntri; n1=deco.ntri
+decks=BR.build(solid,deco,gfnB,walk); n_br=solid.ntri; BR.low_buildings(solid,gfnB)
+json.dump(dict(decks=decks,path=BR.deck_path(gfnB),props=[[round(x,2),round(z,2),round(0.6*sc,2),round(y,2)] for (x,z,y,sc) in BR.pots()],tri=[n0,n_br]),open('decks.json','w')); print('cầu đi bộ, cửa chợ, cầu thang, sân thượng:',solid.ntri-n0,'+',deco.ntri-n1,'tam giác;',len(decks),'mảng đi được tầng trên')
 # toà nhà lớn phía nam (khách sạn trắng trong ảnh): sơn lại màu trắng
 v1371=np.unique(I[tl==1371]); c=C[v1371]; wallv=(c.max(1)>0.3)&(np.abs(c[:,0]-c[:,1])<0.12)
 C[v1371[wallv]]=lin('#f3f1eb')

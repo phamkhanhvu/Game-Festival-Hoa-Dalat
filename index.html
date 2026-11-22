@@ -410,7 +410,7 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'c7a2f31e'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'd41b7e52'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
@@ -464,6 +464,29 @@ function topAt(x, z){
   const i = Math.round((x - GR.x0) / GR.cs), j = Math.round((z - GR.z0) / GR.cs);
   if (i < 0 || j < 0 || i >= GR.nx || j >= GR.nz) return 0.8;
   const t = GR.top[j * GR.nx + i]; return t === -32768 ? 0.8 : t * 0.01;
+}
+/* ===== Tầng đi bộ phía trên mặt đất (cầu đi bộ, cầu thang, sân thượng) =====
+   Lưới h chỉ có một tầng. Lối đi nằm phía trên được mô tả bằng các mảng lồi phẳng trong WORLD.decks:
+   { p:[[x,z],…], a, b, c } với cao độ y = a + b·x + c·z. Người chơi đứng trên mặt nào gần cao độ đang đứng nhất. */
+const DECKS = (WORLD.decks || []).map(d => {
+  const n = d.p.length, e = []; let ar = 0, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+  for (let i = 0; i < n; i++){ const a = d.p[i], b = d.p[(i + 1) % n]; ar += a[0] * b[1] - b[0] * a[1]; x0 = Math.min(x0, a[0]); x1 = Math.max(x1, a[0]); z0 = Math.min(z0, a[1]); z1 = Math.max(z1, a[1]); }
+  const sg = ar >= 0 ? 1 : -1;
+  for (let i = 0; i < n; i++){ const a = d.p[i], b = d.p[(i + 1) % n], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ex = -(b[1] - a[1]) / l * sg, ez = (b[0] - a[0]) / l * sg; e.push(ex, ez, -(ex * a[0] + ez * a[1])); }
+  return { e, a:d.a, b:d.b, c:d.c, s:d.s, x0:x0 - 0.1, x1:x1 + 0.1, z0:z0 - 0.1, z1:z1 + 0.1 };
+});
+const DPATH = WORLD.deckPath || [], DPROPS = WORLD.deckProps || [];   /* DPROPS: vật cản trên tầng trên [x, z, bán kính, cao độ] */
+/* cao độ mảng tầng trên tại (x,z), lấy mảng gần cao độ ref nhất (deckK = số thứ tự mảng đó); NaN nếu ở đó không có mảng nào */
+let deckK = -1;
+function deckAt(x, z, ref){
+  let best = NaN, bd = 1e9; deckK = -1;
+  for (let k = 0; k < DECKS.length; k++){
+    const d = DECKS[k]; if (x < d.x0 || x > d.x1 || z < d.z0 || z > d.z1) continue;
+    const e = d.e; let inside = true; for (let i = 0; i < e.length; i += 3) if (e[i] * x + e[i + 1] * z + e[i + 2] < -0.06){ inside = false; break; }
+    if (!inside) continue;
+    const y = d.a + d.b * x + d.c * z, dd = Math.abs(y - ref); if (dd < bd){ bd = dd; best = y; deckK = k; }
+  }
+  return best;
 }
 function fatal(msg){ $('loading').hidden = true; const el = $('rotate'); el.hidden = false; el.innerHTML = '<p>' + msg + '</p>'; }
 if (!window.THREE){ fatal('Không tải được thư viện 3D. Hãy kiểm tra mạng rồi mở lại trang.'); return; }
@@ -538,10 +561,13 @@ function load(){
 const LOCAL_HAD_SAVE = (() => { try { return !!localStorage.getItem(SAVE_KEY); } catch(e){ return false; } })();
 let S = load();
 /* vị trí lưu theo từng map */
-{ const pp = (S.pos && S.pos[MAP]) || (MAP === 'lv' ? S.player : null); S.player = pp && hAt(pp.x, pp.z) > -50 ? { x:pp.x, z:pp.z } : { x:SPAWN.x, z:SPAWN.z }; }
+{ const pp = (S.pos && S.pos[MAP]) || (MAP === 'lv' ? S.player : null), du = pp && typeof pp.u === 'number' ? deckAt(pp.x, pp.z, pp.u) : NaN;
+  S.player = pp && du === du && Math.abs(du - pp.u) < 0.6 ? { x:pp.x, z:pp.z, u:du } : pp && hAt(pp.x, pp.z) > -50 ? { x:pp.x, z:pp.z } : { x:SPAWN.x, z:SPAWN.z }; }
 S.cartPush = false;
 if (byId.xeday && S.cart && typeof S.cart.x === 'number' && hAt(S.cart.x, S.cart.z) > -50){ const d = byId.xeday; d.x = S.cart.x; d.z = S.cart.z; d.y = Math.max(0, hAt(d.x, d.z)); }
 const P = { x:S.player.x, z:S.player.z, y:0, h:Math.max(0, hAt(S.player.x, S.player.z)), j:0, vy:0, ang:Math.PI, walk:0, moving:false, sta:100, goto:null, stuck:0 };
+/* tầng đang đứng: up = đang ở tầng trên, gy = cao độ mặt đang đứng, (sx,sz) = chỗ đứng sau bước đi gần nhất (để nhận ra khi bị dời chỗ) */
+P.up = typeof S.player.u === 'number'; P.gy = P.up ? S.player.u : groundAt(P.x, P.z); P.sx = P.x; P.sz = P.z; if (P.up) P.h = P.gy;
 /* ===== Lưu theo tài khoản Claude (người chơi đăng nhập claude.ai) ===== */
 const CLOUD = { ref:null, lastKey:'', pushing:false, dirty:false, adopting:false, status:'Đang kết nối tài khoản…' };
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
@@ -734,7 +760,7 @@ function cloudPush(){
 }
 function save(){
   if (CLOUD.adopting) return;
-  try { S.savedAt = now(); S.player = (typeof DANCE !== 'undefined' && DANCE.on && DANCE.back) ? { x:DANCE.back.x, z:DANCE.back.z } : { x:P.x, z:P.z }; S.pos = S.pos || {}; S.pos[MAP] = S.player; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
+  try { S.savedAt = now(); S.player = (typeof DANCE !== 'undefined' && DANCE.on && DANCE.back) ? { x:DANCE.back.x, z:DANCE.back.z } : P.up && P.gy === P.gy ? { x:P.x, z:P.z, u:Math.round(P.gy * 100) / 100 } : { x:P.x, z:P.z }; S.pos = S.pos || {}; S.pos[MAP] = S.player; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
   cloudPush(); boardPush();
 }
 try { const hot = window.claude && window.claude.hot; if (hot && hot.snapshot) hot.snapshot(() => { S.player = { x:P.x, z:P.z }; return { S }; }); } catch(e){}
@@ -2432,7 +2458,8 @@ function onlineSend(force){
   if (!ON.me || ON.hidden) return;
   const t = now(), o = OUTFITS.find(x => x.id === S.outfit) || OUTFITS[0];
   const d = { n:String(S.name || 'Chủ Quầy').slice(0, 16), x:Math.round(P.x * 100) / 100, z:Math.round(P.z * 100) / 100, a:Math.round(P.ang * 100) / 100, m:P.moving ? 1 : 0, o:o.id === 'blue' ? '' : o.color, lv:S.level, mp:MAP };
-  const L = ON.last, changed = !L || L.n !== d.n || L.o !== d.o || L.m !== d.m || L.lv !== d.lv || L.mp !== d.mp || Math.hypot(L.x - d.x, L.z - d.z) > 0.04 || Math.abs(L.a - d.a) > 0.06;
+  if (P.up && P.gy === P.gy) d.u = Math.round(P.gy * 10) / 10;   /* đang ở tầng trên (cầu đi bộ, sân thượng): gửi kèm cao độ */
+  const L = ON.last, changed = !L || L.u !== d.u || L.n !== d.n || L.o !== d.o || L.m !== d.m || L.lv !== d.lv || L.mp !== d.mp || Math.hypot(L.x - d.x, L.z - d.z) > 0.04 || Math.abs(L.a - d.a) > 0.06;
   if (!force && (t - ON.sentAt < ON_SEND_MS || (!changed && t - ON.sentAt < ON_BEAT_MS))) return;
   ON.sentAt = t; ON.last = d;
   ON.me.set(Object.assign({ t:firebase.database.ServerValue.TIMESTAMP }, d)).catch(e => { console.warn('online ghi', e && e.code); });
@@ -2455,11 +2482,11 @@ function onlineTint(r){ const u = r.mesh.userData, c = r.d.o || ''; if (r.col ==
 function onlineUpsert(snap){
   const id = snap.key, d = snap.val(); if (!d || id === ON.uid || typeof d.x !== 'number' || typeof d.z !== 'number') return;
   if ((d.mp || 'lv') !== MAP){ onlineDrop(id); return; }   /* người chơi ở map khác */
-  if (hAt(d.x, d.z) < -50) return;
+  if (hAt(d.x, d.z) < -50 && typeof d.u !== 'number') return;
   let r = ON.others.get(id);
   if (!r){
     if (ON.others.size >= ON_MAX) return;
-    r = { id, d, x:d.x, z:d.z, y:Math.max(0, hAt(d.x, d.z)), ang:d.a || 0, walk:Math.random() * 6, moving:false, col:null, seen:now() };
+    r = { id, d, x:d.x, z:d.z, y:typeof d.u === 'number' ? d.u : Math.max(0, hAt(d.x, d.z)), ang:d.a || 0, walk:Math.random() * 6, moving:false, col:null, seen:now() };
     r.mesh = onlineMesh(r); r.mesh.scale.setScalar(1.06); scene.add(r.mesh);
     r.lbl = mkLabel('name other'); ON.others.set(id, r);
     if (ON.uid && now() - ON.startAt > 4000 && !(typeof d.t === 'number' && now() + ON.off - d.t > ON_STALE_MS)) toast((String(d.n || 'Một người chơi').slice(0, 16)) + ' vừa vào quảng trường');
@@ -2492,7 +2519,7 @@ function updateOnline(dt){
     r.moving = dist > 0.06 || (d.m && dist > 0.01);
     if (r.moving) r.walk += dt * 9;
     r.ang = lerpAng(r.ang, dist > 0.15 ? Math.atan2(dx, dz) : (d.a || 0), Math.min(1, dt * 10));
-    const gy = hAt(r.x, r.z); if (gy > -50) r.y += (Math.max(0, gy) - r.y) * Math.min(1, dt * 12);
+    const gy = typeof d.u === 'number' ? deckAt(r.x, r.z, d.u) : hAt(r.x, r.z); if (gy > -50) r.y += (Math.max(0, gy) - r.y) * Math.min(1, dt * 12);
     r.mesh.position.set(r.x, r.y, r.z); r.mesh.rotation.y = r.ang;
     animPerson(r.mesh, r.walk, r.moving);
   });
@@ -2904,14 +2931,23 @@ function resize(){
 const camPos = new THREE.Vector3(), camTgt = new THREE.Vector3();
 function desiredCam(out){
   /* lùi camera theo góc nhìn; nếu có vật cao chắn giữa camera và nhân vật thì nâng góc nhìn rồi kéo gần lại */
-  const ty = P.y + 1.55; let d = camDist, pt = pitch;
+  const ty = P.y + 1.55; let d = camDist, pt = pitch, hit = 0;
+  const place = () => out.set(P.x + Math.sin(yaw) * Math.cos(pt) * d, ty + Math.sin(pt) * d, P.z + Math.cos(yaw) * Math.cos(pt) * d);
+  /* tầng trên (mặt cầu, sàn thang): sàn ở dưới chân thì coi như mặt đất; sàn ở trên đầu thì tia nhìn không được xuyên qua bản sàn,
+     khi đó hạ góc nhìn rồi kéo gần lại để camera chui dưới gầm */
+  const dk0 = DECKS.length ? deckAt(P.x, P.z, ty) : NaN, under = dk0 === dk0 && dk0 > ty + 0.3;
   for (let i = 0; i < 9; i++){
-    out.set(P.x + Math.sin(yaw) * Math.cos(pt) * d, ty + Math.sin(pt) * d, P.z + Math.cos(yaw) * Math.cos(pt) * d);
-    let hit = false;
-    for (let f = 0.25; f <= 1.001; f += 0.25){ if (topAt(P.x + (out.x - P.x) * f, P.z + (out.z - P.z) * f) + 0.45 > ty + (out.y - ty) * f){ hit = true; break; } }
+    place(); hit = 0;
+    for (let f = 0.25; f <= 1.001; f += 0.25){
+      const x = P.x + (out.x - P.x) * f, z = P.z + (out.z - P.z) * f, y = ty + (out.y - ty) * f;
+      if (topAt(x, z) + 0.45 > y){ hit = 1; break; }
+      if (DECKS.length){ const dk = deckAt(x, z, y); if (dk === dk){ if (dk > ty){ if (y > dk - 0.9 && (under || y < dk + 1.5)){ hit = 2; break; } } else if (dk + 0.45 > y){ hit = 1; break; } } }
+    }
     if (!hit) break;
-    if (i % 2 === 0) pt = Math.min(1.3, pt + 0.13); else d *= 0.8;
+    if (hit === 2){ if (i % 2 === 0) pt = Math.max(0.06, pt - 0.13); else d *= 0.8; }
+    else if (i % 2 === 0) pt = Math.min(1.3, pt + 0.13); else d *= 0.8;
   }
+  if (hit){ if (hit === 1) pt = 1.3; place(); }   /* vẫn vướng (đứng sát tường cao): nhìn gần như thẳng từ trên xuống */
   return out;
 }
 function updateCamera(dt, snap){
@@ -2935,7 +2971,9 @@ function ptrEnd(e){
     const hit = STALLS.find(d => ray.ray.distanceToPoint(hitPt.set(d.x, d.y + 1.6, d.z)) < 2);
     if (hit) setGoto(hit.x, hit.z + 2.9);
     else { const o = ray.ray.origin, dr = ray.ray.direction; /* dò tia chạm xuống lưới mặt đất */
-      for (let t = 1; t < 170; t += 0.25){ const x = o.x + dr.x * t, y = o.y + dr.y * t, z = o.z + dr.z * t, gh = hAt(x, z); if (gh > -50 && y <= gh + 0.05){ if (y > gh - 1.0) setGoto(x, z); break; } if (y < 0) break; }
+      for (let t = 1; t < 170; t += 0.25){ const x = o.x + dr.x * t, y = o.y + dr.y * t, z = o.z + dr.z * t, gh = hAt(x, z);
+        if (DECKS.length){ const dk = deckAt(x, z, y); if (dk === dk && y <= dk + 0.05 && y > dk - 0.6){ setGoto(x, z, dk); break; } }   /* chạm trúng mặt cầu, bậc thang hay sân thượng */
+        if (gh > -50 && y <= gh + 0.05){ if (y > gh - 1.0) setGoto(x, z); break; } if (y < 0) break; }
     }
   }
   ptr = null; dragging = false;
@@ -2946,8 +2984,40 @@ cv.addEventListener('wheel', e => { camDist = clamp(camDist + Math.sign(e.deltaY
 /* ================= Cập nhật ================= */
 function questTarget(){ if (MAP !== 'lv') return null; const q = QUESTS[S.quest]; if (!q || !q.tgt || q.p() >= q.goal) return null; return q.tgt(); }
 /* đi bộ: chia nhỏ quãng đường, trượt dọc vật cản thay vì đứng khựng */
+/* đi hai tầng: bước tới (nx,nz) hợp lệ thì trả về cao độ mặt sẽ đứng (pUpN = mặt đó thuộc tầng trên), không thì NaN.
+   Chỗ có mảng tầng trên vừa tầm bước thì đi trên mảng (mặt cầu che mặt đất); đang đẩy xe thì không lên tầng trên. */
+let pUpN = false;
+function pStep(nx, nz){
+  const cur = P.gy, lim = MAX_SLOPE * Math.hypot(nx - P.x, nz - P.z) + 0.02;
+  const d = S.cartPush ? NaN : deckAt(nx, nz, cur === cur ? cur : P.h);
+  if (d === d && !(Math.abs(d - cur) > lim)){
+    for (let i = 0; i < DPROPS.length; i++){ const c = DPROPS[i], r = c[2] + PR; if (Math.abs(c[3] - d) < 1.5 && (nx - c[0]) * (nx - c[0]) + (nz - c[1]) * (nz - c[1]) < r * r) return NaN; }
+    pUpN = true; return d;
+  }
+  const g = groundAt(nx, nz);
+  if (g === g && !(Math.abs(g - cur) > lim) && !propHit(nx, nz, PR)){ pUpN = false; return g; }
+  return NaN;
+}
+/* bị dời chỗ từ bên ngoài (dịch chuyển, chơi lại): đứng xuống mặt đất; chỗ không có mặt đất thì lấy mảng tầng trên gần nhất */
+function pSync(){
+  if (P.x === P.sx && P.z === P.sz) return;
+  const g = groundAt(P.x, P.z); P.sx = P.x; P.sz = P.z;
+  if (g === g){ P.gy = g; P.up = false; } else { const d = deckAt(P.x, P.z, P.h); P.gy = d; P.up = d === d; }
+}
 function movePlayer(dx, dz){
   const dist = Math.hypot(dx, dz), n = Math.max(1, Math.ceil(dist / 0.2)), sx = dx / n, sz = dz / n;
+  if (DECKS.length){
+    pSync();
+    for (let i = 0; i < n; i++){
+      let y = pStep(P.x + sx, P.z + sz);
+      if (y === y){ P.x += sx; P.z += sz; }
+      else if (Math.abs(sx) > 1e-5 && (y = pStep(P.x + sx, P.z)) === y) P.x += sx;
+      else if (Math.abs(sz) > 1e-5 && (y = pStep(P.x, P.z + sz)) === y) P.z += sz;
+      else break;
+      P.gy = y; P.up = pUpN;
+    }
+    P.sx = P.x; P.sz = P.z; return;
+  }
   for (let i = 0; i < n; i++){
     if (stepOk(P.x, P.z, P.x + sx, P.z + sz)){ P.x += sx; P.z += sz; }
     else if (Math.abs(sx) > 1e-5 && stepOk(P.x, P.z, P.x + sx, P.z)) P.x += sx;
@@ -2956,9 +3026,29 @@ function movePlayer(dx, dz){
   }
 }
 /* chạm để tự đi: tìm đường vòng qua vật cản */
-function setGoto(x, z){
-  const path = NAV.path(P.x, P.z, x, z);
-  if (path && path.length){ const n = path.shift(); P.goto = { x:n.x, z:n.z, path, fx:x, fz:z }; } else P.goto = { x, z, path:[], fx:x, fz:z };
+/* điểm (x,y,z) ở tầng trên thuộc đoạn nào của chuỗi mốc (đoạn i nằm giữa mốc i và i+1): chỉ xét các đoạn đi qua mảng đang đứng */
+function dpNear(x, z, y){
+  const dk = deckAt(x, z, y), sr = dk === dk && DECKS[deckK].s ? DECKS[deckK].s : [0, DPATH.length - 2];
+  let bi = sr[0], bd = 1e9;
+  for (let i = sr[0]; i <= sr[1] && i < DPATH.length - 1; i++){
+    const a = DPATH[i], b = DPATH[i + 1], vx = b[0] - a[0], vz = b[1] - a[1], t = clamp(((x - a[0]) * vx + (z - a[1]) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+    const ex = x - a[0] - vx * t, ez = z - a[1] - vz * t, ey = (y - (a[2] + (b[2] - a[2]) * t)) * 2, d = ex * ex + ez * ez + ey * ey; if (d < bd){ bd = d; bi = i; }
+  }
+  return bi;
+}
+/* đường đi khi điểm đầu hoặc điểm đích ở tầng trên: bám chuỗi mốc WORLD.deckPath (mốc 0 nằm dưới đất ở đầu cầu), phần dưới đất dùng lưới tìm đường */
+function deckRoute(x, z, ty){
+  if (DPATH.length < 2) return null;
+  const tUp = ty !== undefined, pi = P.up ? dpNear(P.x, P.z, P.gy) : -1, ti = tUp ? dpNear(x, z, ty) : -1, wp = i => ({ x:DPATH[i][0], z:DPATH[i][1] });
+  let out = [];
+  if (P.up && tUp){ if (ti > pi) for (let i = pi + 1; i <= ti; i++) out.push(wp(i)); else for (let i = pi; i > ti; i--) out.push(wp(i)); out.push({ x, z }); }
+  else if (tUp){ const a = NAV.path(P.x, P.z, DPATH[0][0], DPATH[0][1]); if (!a) return null; out = a; for (let i = 1; i <= ti; i++) out.push(wp(i)); out.push({ x, z }); }
+  else { for (let i = pi; i >= 0; i--) out.push(wp(i)); const b = NAV.path(DPATH[0][0], DPATH[0][1], x, z); if (!b) return null; out = out.concat(b); }
+  return out;
+}
+function setGoto(x, z, ty){
+  const path = DECKS.length && (P.up || ty !== undefined) ? deckRoute(x, z, ty) : NAV.path(P.x, P.z, x, z);
+  if (path && path.length){ const n = path.shift(); P.goto = { x:n.x, z:n.z, path, fx:x, fz:z, fy:ty }; } else P.goto = { x, z, path:[], fx:x, fz:z, fy:ty };
   P.stuck = 0;
 }
 /* ================= Nhảy trên sân khấu (kiểu Audition) =================
@@ -3113,7 +3203,8 @@ function update(dt){
   if (running) P.sta = Math.max(0, P.sta - 22 * dt); else P.sta = Math.min(100, P.sta + (P.moving ? 10 : 18) * dt);
   if (runOn && P.sta <= 1){ runOn = false; setRunBtn(); toast('Hết thể lực, nghỉ một chút rồi chạy tiếp.'); }
   if (P.goto){ const moved = Math.hypot(P.x - px, P.z - pz); if (moved < sp * dt * 0.25){ P.stuck += dt; if (P.stuck > 0.5){ P.goto = null; P.stuck = 0; } } else P.stuck = 0; }
-  const gh = hAt(P.x, P.z); if (gh > -50) P.h += (gh - P.h) * Math.min(1, dt * 16);
+  let gh; if (DECKS.length){ pSync(); gh = P.gy === P.gy ? P.gy : -99; } else gh = hAt(P.x, P.z);
+  if (gh > -50) P.h += (gh - P.h) * Math.min(1, dt * 16);
   if (P.j > 0 || P.vy !== 0){ P.vy -= 16 * dt; P.j += P.vy * dt; if (P.j <= 0){ P.j = 0; P.vy = 0; } }
   if (DANCE.on) P.h = STAGE.y + 1.06;
   P.y = P.h + P.j;
@@ -3168,7 +3259,7 @@ function update(dt){
     if (head && head.state === 'queue' && s.stock > 0){ r.prog += dt / serveTime(d) * (near ? 1.6 : (s.staff ? 1.5 : 1)); if (r.prog >= 1) sell(d, false); } else r.prog = 0;
   }
   questRing.visible = !!(qt && !qt.stall); if (questRing.visible){ questRing.position.set(qt.x, hAt(qt.x, qt.z) + 0.08, qt.z); questRing.material.opacity = 0.6 + Math.sin(T * 5) * 0.3; questRing.scale.setScalar(1 + Math.sin(T * 3) * 0.08); }
-  gotoRing.visible = !!P.goto; if (P.goto) gotoRing.position.set(P.goto.fx, Math.max(0, hAt(P.goto.fx, P.goto.fz)) + 0.1, P.goto.fz);
+  gotoRing.visible = !!P.goto; if (P.goto) gotoRing.position.set(P.goto.fx, (P.goto.fy !== undefined ? P.goto.fy : Math.max(0, hAt(P.goto.fx, P.goto.fz))) + 0.1, P.goto.fz);
   playerRing.visible = false; playerRing.position.set(P.x, P.h + 0.1, P.z);
   playerMesh.position.set(P.x, P.y, P.z); playerMesh.rotation.y = P.ang; animPerson(playerMesh, P.walk, P.moving); danceUpdate(dt);
 
@@ -3787,7 +3878,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, myOwned, myKiosk, DANCE, danceStart, danceKey, danceHit, danceEnd, danceBeat, danceUpdate, skyToggle, dayK, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { deckAt, DECKS, DPATH, cam:() => [camera.position.x, camera.position.y, camera.position.z], desiredCam, place:(x, z, u) => { P.x = x; P.z = z; P.goto = null; if (u !== undefined){ P.up = true; P.gy = u; P.h = u; P.sx = x; P.sz = z; } }, items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, myOwned, myKiosk, DANCE, danceStart, danceKey, danceHit, danceEnd, danceBeat, danceUpdate, skyToggle, dayK, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
