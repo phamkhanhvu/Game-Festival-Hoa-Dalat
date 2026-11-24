@@ -4,6 +4,7 @@
 # phía dưới thêm băng xanh dương trên dãy cửa hàng tầng trệt và đường chỉ vàng trên mảng tường trắng.
 # Mặt bằng khối thấp là khung chữ nhật bo tròn hai góc phía bùng binh (không phải đầu bán nguyệt): tệp này dựng lại cả khối thấp theo mặt bằng đó
 # và chặn thêm phần hai góc mới trong lưới đi lại của world_cho.js.
+# Tầng trệt mặt nhìn ra bùng binh là nhà thuốc: thêm hai ô vân vào atlas (biển NHÀ THUỐC chữ thập xanh, mặt tiền quầy thuốc).
 # Không dựng logo hay chữ thương hiệu thật. Chạy: python3 galaxy.py <market.glb vào> <market.glb ra> [<world_cho.js vào> <world_cho.js ra>]
 import sys, os, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,28 @@ cen = P[I].mean(1); cu, cv = w2l(cen[:, 0], cen[:, 2])
 inb = (cu > 12.8) & (cv < v1 + 0.15) & contains_xy(FOOT.buffer(1.0), cu, cv)
 old = inb & (cen[:, 1] > Q + 0.6) & (cen[:, 1] < yB + 6); I = I[~old]; print('bỏ', int(old.sum()), 'tam giác của khối thấp cũ')
 B = mb.MB(); UPV = np.array([0, 1.0, 0])
+# ----- hai ô vân mới cho nhà thuốc: (5,2) nửa trên là biển hiệu; (6,2) là mặt tiền quầy thuốc -----
+import io
+from PIL import Image, ImageDraw, ImageFont
+PHSIGN, PHSHOP = (5, 2), (6, 2)
+def patch_atlas(jpeg):
+    A = Image.open(io.BytesIO(jpeg)).convert('RGB'); F = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+    t = Image.new('RGB', (256, 256), (31, 95, 174)); d = ImageDraw.Draw(t)
+    d.rectangle([0, 0, 255, 127], fill=(31, 95, 174)); d.rectangle([0, 118, 255, 127], fill=(58, 166, 85))
+    d.ellipse([10, 34, 62, 86], fill=(255, 255, 255)); d.rectangle([30, 42, 42, 78], fill=(40, 160, 80)); d.rectangle([18, 54, 54, 66], fill=(40, 160, 80))
+    f = ImageFont.truetype(F, 26); d.text((72, 44), 'NHÀ THUỐC', font=f, fill=(255, 255, 255))
+    d.rectangle([0, 128, 255, 255], fill=(240, 244, 246)); f2 = ImageFont.truetype(F, 20); d.text((14, 150), 'THUỐC TỐT · GIÁ TỐT', font=f2, fill=(31, 95, 174)); d.text((14, 190), 'MỞ CỬA MỖI NGÀY', font=f2, fill=(40, 140, 80))
+    A.paste(t, (PHSIGN[0] * 256, PHSIGN[1] * 256))
+    t = Image.new('RGB', (256, 256), (236, 240, 242)); d = ImageDraw.Draw(t)
+    d.rectangle([6, 10, 249, 255], fill=(206, 226, 236)); d.rectangle([6, 10, 249, 16], fill=(120, 130, 138))
+    for cx in (6, 126, 244): d.rectangle([cx, 10, cx + 5, 255], fill=(120, 130, 138))
+    cols = [(255, 255, 255), (60, 140, 200), (240, 200, 70), (70, 170, 110), (230, 100, 90), (250, 250, 250)]
+    for half, x0 in enumerate((16, 136)):
+        for r in range(4):
+            y = 40 + r * 52; d.rectangle([x0, y + 34, x0 + 102, y + 38], fill=(250, 250, 250))
+            for c in range(6): d.rectangle([x0 + 2 + c * 17, y + 6 + (c * 7 + r * 3) % 9, x0 + 15 + c * 17, y + 33], fill=cols[(c + r + half) % 6])
+    d.ellipse([196, 20, 236, 60], fill=(255, 255, 255)); d.rectangle([211, 26, 221, 54], fill=(40, 160, 80)); d.rectangle([202, 35, 230, 45], fill=(40, 160, 80))
+    A.paste(t, (PHSHOP[0] * 256, PHSHOP[1] * 256)); out = io.BytesIO(); A.save(out, 'JPEG', quality=90, optimize=True); return out.getvalue()
 W = np.array([l2w(u, v) for u, v in pts], float); n = len(W)
 seg = np.linalg.norm(np.diff(W, axis=0), axis=1); S = np.concatenate([[0], np.cumsum(seg)]); TOT = S[-1]
 def outn(k):
@@ -54,9 +77,12 @@ for k in range(n - 1):
     B.tri([p3(ctr, CEIL), p3(E0[k + 1], CEIL), p3(E0[k], CEIL)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#efe9dc'), -UPV)
     B.tri([p3(ctr, LOW - 0.25), p3(E1[k], LOW - 0.25), p3(E1[k + 1], LOW - 0.25)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#b9bdb8'), UPV)
 for a, b in ((E0[-1], E0[0]),): B.tri([p3(ctr, CEIL), p3(a, CEIL), p3(b, CEIL)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#efe9dc'), -UPV); B.tri([p3(ctr, LOW - 0.25), p3(a, LOW - 0.25), p3(b, LOW - 0.25)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#b9bdb8'), UPV)
+EAST = [k for k in range(n - 1) if pts[k][0] > UE - 0.01 and pts[k + 1][0] > UE - 0.01]          # các nhịp của mặt phẳng phía bùng binh
 # thân khối thấp: kính cửa hàng tầng trệt, tường trắng phía trên, sàn mái lát gạch
 for k in range(n - 1):
-    strip(W[k], W[k + 1], Q - 0.5, yg, Q - 0.5, yg, GLASS, lin('#ffffff', 0.96), k); strip(W[k], W[k + 1], yg, FLOOR, yg, FLOOR, PLAIN, WH, k)
+    if k in EAST[:10]: e = EAST.index(k); strip(W[k], W[k + 1], Q - 0.5, yg - 1.3, Q - 0.5, yg - 1.3, PHSHOP, lin('#ffffff'), k, (0.5 * (e % 2), 0, 0.5 * (e % 2) + 0.5, 1)); strip(W[k], W[k + 1], yg - 1.3, yg, yg - 1.3, yg, PLAIN, WH, k)      # nhà thuốc ở mặt nhìn ra bùng binh
+    else: strip(W[k], W[k + 1], Q - 0.5, yg, Q - 0.5, yg, GLASS, lin('#ffffff', 0.96), k)
+    strip(W[k], W[k + 1], yg, FLOOR, yg, FLOOR, PLAIN, WH, k)
     B.tri([p3(ctr, FLOOR), p3(W[k], FLOOR), p3(W[k + 1], FLOOR)], [tile_uv(PAVE, .5, .5), tile_uv(PAVE, .1, .1), tile_uv(PAVE, .9, .1)], lin('#d9d6ce'), UPV)
 B.tri([p3(ctr, FLOOR), p3(W[-1], FLOOR), p3(W[0], FLOOR)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#d9d6ce'), UPV)
 # lan can nan gỗ, bồn cây rủ, cột cam mảnh
@@ -78,6 +104,8 @@ for k in range(4, n - 4, 5):
     q = W[k] - ON[k] * 1.7; B.prism((q[0], q[1]), 0.45, 0.45, FLOOR + 0.70, FLOOR + 0.76, 6, lin('#c9a273')); B.prism((q[0], q[1]), 0.05, 0.05, FLOOR, FLOOR + 0.7, 4, lin('#5a5148'), cap=False)
 # tầng dưới: băng xanh dương trên dãy cửa hàng, chỉ vàng trên mảng tường trắng
 F0, F1 = off(0.95), off(0.04)
+SG = EAST[len(EAST) // 2 - 3:len(EAST) // 2 + 3]
+for e, k in enumerate(SG): strip(F0[k] + ON[k] * 0.03, F0[k + 1] + ON[k + 1] * 0.03, yg - 1.12, yg - 0.06, yg - 1.12, yg - 0.06, PHSIGN, lin('#ffffff'), k, (e / len(SG), 0, (e + 1) / len(SG), 0.5))     # biển NHÀ THUỐC trên băng xanh
 for k in range(1, n - 2):
     B.quad([p3(W[k], yg + 0.16), p3(F0[k], yg + 0.16), p3(F0[k + 1], yg + 0.16), p3(W[k + 1], yg + 0.16)], PLAIN, WH, UPV); strip(F0[k], F0[k + 1], yg - 0.03, yg + 0.16, yg - 0.03, yg + 0.16, PLAIN, WH2, k)
     strip(F0[k], F0[k + 1], yg - 1.15, yg - 0.03, yg - 1.15, yg - 0.03, PLAIN, BLUE, k); strip(F0[k], F0[k + 1], yg - 1.3, yg - 1.15, yg - 1.3, yg - 1.15, PLAIN, lin('#3aa655'), k)
@@ -86,7 +114,7 @@ for k in range(n - 1):
     yl = yg + (FLOOR - 0.5 - yg) * (0.45 + 0.2 * np.sin(S[k] / TOT * np.pi * 3)); yr = yg + (FLOOR - 0.5 - yg) * (0.45 + 0.2 * np.sin(S[k + 1] / TOT * np.pi * 3))
     strip(F1[k], F1[k + 1], yl, yl + 0.16, yr, yr + 0.16, PLAIN, lin('#e3c24a'), k)
 Pn, Nn, UVn, Cn = B.arrays(); In = np.arange(len(Pn)).reshape(-1, 3) + len(P)
-nv, nt, size = mb.write_glb(dst, np.concatenate([P, Pn]), np.concatenate([N, Nn]), np.concatenate([UV, UVn]), np.concatenate([C, Cn]), np.concatenate([I, In]), m['img'])
+nv, nt, size = mb.write_glb(dst, np.concatenate([P, Pn]), np.concatenate([N, Nn]), np.concatenate([UV, UVn]), np.concatenate([C, Cn]), np.concatenate([I, In]), patch_atlas(m['img']))
 print('thêm', len(In), 'tam giác; tệp mới', nt, 'tam giác', size, 'byte')
 if len(sys.argv) > 4:                                                    # chặn phần mặt bằng mới trong lưới đi lại, bỏ đèn và chậu rơi vào trong nhà
     import worldio
