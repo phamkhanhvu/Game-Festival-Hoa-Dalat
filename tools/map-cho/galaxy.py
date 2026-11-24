@@ -2,7 +2,9 @@
 # sân quán mở trên mái khối thấp, cột mảnh màu cam, lan can nan gỗ, bồn cây rủ viền mép sân, vách kính lùi vào trong,
 # băng lam trang trí xám xanh nẹp vàng chạy quanh: cao ở hai bên, hạ thấp bằng đường cong chữ S khi ôm mũi cong;
 # phía dưới thêm băng xanh dương trên dãy cửa hàng tầng trệt và đường chỉ vàng trên mảng tường trắng.
-# Không dựng logo hay chữ thương hiệu thật. Chạy: python3 galaxy.py <market.glb vào> <market.glb ra>
+# Mặt bằng khối thấp là khung chữ nhật bo tròn hai góc phía bùng binh (không phải đầu bán nguyệt): tệp này dựng lại cả khối thấp theo mặt bằng đó
+# và chặn thêm phần hai góc mới trong lưới đi lại của world_cho.js.
+# Không dựng logo hay chữ thương hiệu thật. Chạy: python3 galaxy.py <market.glb vào> <market.glb ra> [<world_cho.js vào> <world_cho.js ra>]
 import sys, os, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import glbio, mb
@@ -12,13 +14,17 @@ FINS, WILL, GLASS, PLAIN, PAVE = (7, 0), (1, 7), (2, 4), (3, 0), (0, 2)
 src, dst = sys.argv[1], sys.argv[2]
 m = glbio.load(src); P, N, UV, C, I = m['P'], m['N'], m['UV'], m['C'][:, :3], m['I']
 yB = WB['roof']; yg = Q + 4.2; v0 = WB['v0']; v1 = WB['v1'] - 0.03; vc = (WB['v0'] + WB['v1']) / 2; R = WB['R']; uc = WB['uc']
-# bỏ lan can kính, bể nước và chậu cây cũ trên mái khối thấp (giữ sàn mái và vách kính của khối cao ở u = 12.5)
+UE = uc + R; RC = 4.5                                                     # mép đông khối thấp và bán kính bo góc
+arc = lambda cu_, cv_, a0, a1: [(cu_ + RC * np.cos(a), cv_ + RC * np.sin(a)) for a in np.linspace(a0, a1, 8)]
+pts = [(u, v1) for u in np.linspace(WB['u0'], UE - RC, 12)[:-1]] + arc(UE - RC, v1 - RC, np.pi / 2, 0) + [(UE, v) for v in np.linspace(v1 - RC, v0 + RC, 12)[1:-1]] + arc(UE - RC, v0 + RC, 0, -np.pi / 2) + [(u, v0) for u in np.linspace(UE - RC, WB['u0'], 12)[1:]]
+from shapely.geometry import Polygon
+from shapely import contains_xy
+FOOT = Polygon(pts + [(WB['u0'], v0)])
+# bỏ toàn bộ khối thấp cũ (tường, mái đón, sàn mái, lan can, bể nước, chậu cây) và các vật nằm trong hai góc mới; giữ vách kính khối cao ở u = 12.5 và lan can cầu thang
 cen = P[I].mean(1); cu, cv = w2l(cen[:, 0], cen[:, 2])
-inb = (cu > 12.8) & (((cu <= uc) & (cv > v0 - 0.15) & (cv < v1 + 0.15)) | ((cu > uc) & ((cu - uc) ** 2 + (cv - vc) ** 2 < (R + 0.15) ** 2)))
-old = inb & (cen[:, 1] > yB + 0.02) & (cen[:, 1] < yB + 6); I = I[~old]; print('bỏ', int(old.sum()), 'tam giác cũ trên mái khối thấp')
+inb = (cu > 12.8) & (cv < v1 + 0.15) & contains_xy(FOOT.buffer(1.0), cu, cv)
+old = inb & (cen[:, 1] > Q + 0.6) & (cen[:, 1] < yB + 6); I = I[~old]; print('bỏ', int(old.sum()), 'tam giác của khối thấp cũ')
 B = mb.MB(); UPV = np.array([0, 1.0, 0])
-# đường bao mép sân, chia mịn: từ góc tây nam (sát cầu thang), qua mũi cong, tới góc tây bắc
-pts = [(u, v1) for u in np.linspace(WB['u0'], uc, 7)] + [(uc + R * np.cos(a), vc + (R - 0.03) * np.sin(a)) for a in np.linspace(np.pi / 2, -np.pi / 2, 37)[1:-1]] + [(u, v0) for u in np.linspace(uc, WB['u0'], 7)]
 W = np.array([l2w(u, v) for u, v in pts], float); n = len(W)
 seg = np.linalg.norm(np.diff(W, axis=0), axis=1); S = np.concatenate([[0], np.cumsum(seg)]); TOT = S[-1]
 def outn(k):
@@ -48,6 +54,11 @@ for k in range(n - 1):
     B.tri([p3(ctr, CEIL), p3(E0[k + 1], CEIL), p3(E0[k], CEIL)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#efe9dc'), -UPV)
     B.tri([p3(ctr, LOW - 0.25), p3(E1[k], LOW - 0.25), p3(E1[k + 1], LOW - 0.25)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#b9bdb8'), UPV)
 for a, b in ((E0[-1], E0[0]),): B.tri([p3(ctr, CEIL), p3(a, CEIL), p3(b, CEIL)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#efe9dc'), -UPV); B.tri([p3(ctr, LOW - 0.25), p3(a, LOW - 0.25), p3(b, LOW - 0.25)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#b9bdb8'), UPV)
+# thân khối thấp: kính cửa hàng tầng trệt, tường trắng phía trên, sàn mái lát gạch
+for k in range(n - 1):
+    strip(W[k], W[k + 1], Q - 0.5, yg, Q - 0.5, yg, GLASS, lin('#ffffff', 0.96), k); strip(W[k], W[k + 1], yg, FLOOR, yg, FLOOR, PLAIN, WH, k)
+    B.tri([p3(ctr, FLOOR), p3(W[k], FLOOR), p3(W[k + 1], FLOOR)], [tile_uv(PAVE, .5, .5), tile_uv(PAVE, .1, .1), tile_uv(PAVE, .9, .1)], lin('#d9d6ce'), UPV)
+B.tri([p3(ctr, FLOOR), p3(W[-1], FLOOR), p3(W[0], FLOOR)], [tile_uv(PLAIN, .5, .5)] * 3, lin('#d9d6ce'), UPV)
 # lan can nan gỗ, bồn cây rủ, cột cam mảnh
 PL0, PL1 = off(0.05), off(0.85)
 for k in range(n - 1):
@@ -61,13 +72,14 @@ for k in range(1, n - 1, 3):
 # vách kính của quán lùi vào trong, trụ trắng lớn hai bên
 IN = off(-3.4)
 for k in range(n - 1): strip(IN[k], IN[k + 1], FLOOR, CEIL, FLOOR, CEIL, GLASS, lin('#8fa3a8'), k)
-for k in (8, n - 9): q = W[k] - ON[k] * 0.7; t = np.array([-ON[k][1], ON[k][0]]); B.obox(q, t, ON[k], 0.55, 0.55, FLOOR, CEIL, WH, top=False)
+for k in (9, n - 10): q = W[k] - ON[k] * 0.7; t = np.array([-ON[k][1], ON[k][0]]); B.obox(q, t, ON[k], 0.55, 0.55, FLOOR, CEIL, WH, top=False)
 # bàn ghế trên sân quán
 for k in range(4, n - 4, 5):
     q = W[k] - ON[k] * 1.7; B.prism((q[0], q[1]), 0.45, 0.45, FLOOR + 0.70, FLOOR + 0.76, 6, lin('#c9a273')); B.prism((q[0], q[1]), 0.05, 0.05, FLOOR, FLOOR + 0.7, 4, lin('#5a5148'), cap=False)
 # tầng dưới: băng xanh dương trên dãy cửa hàng, chỉ vàng trên mảng tường trắng
 F0, F1 = off(0.95), off(0.04)
-for k in range(5, n - 6):
+for k in range(1, n - 2):
+    B.quad([p3(W[k], yg + 0.16), p3(F0[k], yg + 0.16), p3(F0[k + 1], yg + 0.16), p3(W[k + 1], yg + 0.16)], PLAIN, WH, UPV); strip(F0[k], F0[k + 1], yg - 0.03, yg + 0.16, yg - 0.03, yg + 0.16, PLAIN, WH2, k)
     strip(F0[k], F0[k + 1], yg - 1.15, yg - 0.03, yg - 1.15, yg - 0.03, PLAIN, BLUE, k); strip(F0[k], F0[k + 1], yg - 1.3, yg - 1.15, yg - 1.3, yg - 1.15, PLAIN, lin('#3aa655'), k)
     B.quad([p3(W[k], yg - 1.3), p3(W[k + 1], yg - 1.3), p3(F0[k + 1], yg - 1.3), p3(F0[k], yg - 1.3)], PLAIN, WH2, -UPV)
 for k in range(n - 1):
@@ -76,3 +88,15 @@ for k in range(n - 1):
 Pn, Nn, UVn, Cn = B.arrays(); In = np.arange(len(Pn)).reshape(-1, 3) + len(P)
 nv, nt, size = mb.write_glb(dst, np.concatenate([P, Pn]), np.concatenate([N, Nn]), np.concatenate([UV, UVn]), np.concatenate([C, Cn]), np.concatenate([I, In]), m['img'])
 print('thêm', len(In), 'tam giác; tệp mới', nt, 'tam giác', size, 'byte')
+if len(sys.argv) > 4:                                                    # chặn phần mặt bằng mới trong lưới đi lại, bỏ đèn và chậu rơi vào trong nhà
+    import worldio
+    j, h, tp, kk, pre, post = worldio.load(sys.argv[3]); nx, nz, x0, z0, st = j['nx'], j['nz'], j['x0'], j['z0'], j['step']
+    X, Z = np.meshgrid(x0 + np.arange(nx) * st, z0 + np.arange(nz) * st); gu, gv = w2l(X, Z); ins = contains_xy(FOOT.buffer(0.35), gu.ravel(), gv.ravel()).reshape(nz, nx) & (gu > WB['u0'])
+    new = ins & (h > -30000); h[ins] = -32768; tp[ins] = int(round(yB * 100)); print('chặn thêm', int(new.sum()), 'ô lưới')
+    for key in ('lamps', 'pots', 'trees', 'utrees', 'flowers', 'flags'):
+        if isinstance(j.get(key), list) and j[key]:
+            def inside(o):
+                x, z = (o['x'], o['z']) if isinstance(o, dict) else (o[0], o[1]); u_, v_ = w2l(x, z); return bool(u_ > WB['u0']) and bool(contains_xy(FOOT.buffer(0.8), float(u_), float(v_)))
+            keep = [o for o in j[key] if not inside(o)]
+            if len(keep) != len(j[key]): print(key, 'bỏ', len(j[key]) - len(keep)); j[key] = keep
+    worldio.save(sys.argv[4], j, h, tp, kk, pre, post)
