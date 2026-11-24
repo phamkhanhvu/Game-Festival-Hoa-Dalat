@@ -1122,6 +1122,15 @@ function buildSkinned(sc, img){
     if (!o.isSkinnedMesh) return;
     o.frustumCulled = false; o.castShadow = true;
     o.geometry.computeVertexNormals();                      /* pháp tuyến mượt trước khi tách đỉnh theo từng tam giác */
+    /* Mô hình dựng từ tranh nên bề mặt lồi lõm li ti: nếu chiếu sáng theo pháp tuyến thật, mặt và áo bị loang lổ, tối hơn tranh gốc.
+       Làm mượt pháp tuyến qua các đỉnh kề (4 lượt) rồi ngả về hướng thẳng đứng, để ánh sáng trên nhân vật đều và trong như tranh, vẫn sáng tối theo ngày đêm. */
+    { const ge0 = o.geometry, ix0 = ge0.index, na = ge0.attributes.normal;
+      if (ix0 && na){ const nvt = na.count, cur = new Float32Array(nvt * 3), acc = new Float32Array(nvt * 3), ia = ix0.array;
+        for (let v = 0; v < nvt; v++){ cur[v * 3] = na.getX(v); cur[v * 3 + 1] = na.getY(v); cur[v * 3 + 2] = na.getZ(v); }
+        for (let it = 0; it < 4; it++){ acc.set(cur);
+          for (let t = 0; t < ia.length; t += 3) for (let e = 0; e < 3; e++){ const a = ia[t + e], b = ia[t + (e + 1) % 3]; for (let c = 0; c < 3; c++){ acc[a * 3 + c] += cur[b * 3 + c]; acc[b * 3 + c] += cur[a * 3 + c]; } }
+          for (let v = 0; v < nvt; v++){ const x = acc[v * 3], y = acc[v * 3 + 1], z = acc[v * 3 + 2], l = Math.hypot(x, y, z) || 1; cur[v * 3] = x / l; cur[v * 3 + 1] = y / l; cur[v * 3 + 2] = z / l; } }
+        for (let v = 0; v < nvt; v++){ const x = cur[v * 3] * 0.42, y = cur[v * 3 + 1] * 0.42 + 0.8, z = cur[v * 3 + 2] * 0.42, l = Math.hypot(x, y, z) || 1; na.setXYZ(v, x / l, y / l, z / l); } } }
     /* tách đỉnh theo từng tam giác (tự làm, giữ nguyên kiểu dữ liệu và cờ normalized của trọng số xương) */
     const src = o.geometry, ix = src.index, N = ix ? ix.count : src.attributes.position.count, ge = new THREE.BufferGeometry(), GET = ['getX', 'getY', 'getZ', 'getW'];
     for (const k in src.attributes){
