@@ -415,7 +415,7 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'a8d61f04'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '56f931b3'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
@@ -1111,7 +1111,7 @@ function buildFlags(){
 /* nhân vật chính: mô hình có khung xương thật. Màu lấy từ ảnh mẫu của nhân vật (character.jpg): nửa trái ảnh chiếu lên mặt trước,
    nửa phải (tóc, lưng áo, ba lô) chiếu lên mặt sau; chân tay cử động theo xương */
 const JACKET_BASE = '#86362a';
-const loadImg = url => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('không tải được ' + url)); im.src = url; });
+const loadImg = url => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('không tải được ' + url)); im.src = url + '?v=' + (window.BUILD_V || ''); });
 function buildSkinned(sc, img){
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body); body.add(sc);
   const pc = document.createElement('canvas'); pc.width = img.naturalWidth; pc.height = img.naturalHeight; const px2 = pc.getContext('2d'); px2.drawImage(img, 0, 0);
@@ -1209,7 +1209,7 @@ function loadModel(){
     });
     scene.add(model); buildFlags(); el.hidden = true; document.body.dataset.ready = '1';
     const bad = [];
-    Promise.all([loadBin('character.glb').then(b => { CHAR_BUF = b; return parseGlb(b); }), loadImg('character.jpg')]).then(([c, img]) => { CHAR_IMG = img; upgradePlayerSkinned(c.scene, img); }).catch(e => { console.warn('nv chính', e); bad.push('nhân vật chính'); })
+    Promise.all([loadBin('character.glb').then(b => { CHAR_BUF = b; return parseGlb(b); }), loadImg('character4.jpg')]).then(([c, img]) => { CHAR_IMG = img; upgradePlayerSkinned(c.scene, img); }).catch(e => { console.warn('nv chính', e); bad.push('nhân vật chính'); })
       .then(() => Promise.all(CROWD.map(k => tplChar(k).catch(e => { console.warn('nv', k, e); bad.push(k); }))))
       .then(() => { upgradeCrowd(); upgradeStage(); if (bad.length) toast('Không tải được nhân vật ' + bad.join(' · ').slice(0, 160)); })
       .then(() => loadDecor()).catch(e => { console.warn('decor', e); toast('Không tải được cây cối, xe cộ: ' + (e && e.message || e)); })
