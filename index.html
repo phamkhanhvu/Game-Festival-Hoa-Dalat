@@ -1127,10 +1127,12 @@ function buildSkinned(sc, img){
     { const ge0 = o.geometry, ix0 = ge0.index, na = ge0.attributes.normal;
       if (ix0 && na){ const nvt = na.count, cur = new Float32Array(nvt * 3), acc = new Float32Array(nvt * 3), ia = ix0.array;
         for (let v = 0; v < nvt; v++){ cur[v * 3] = na.getX(v); cur[v * 3 + 1] = na.getY(v); cur[v * 3 + 2] = na.getZ(v); }
-        for (let it = 0; it < 4; it++){ acc.set(cur);
+        const lit = new Float32Array(nvt * 3);
+        for (let it = 0; it < 22; it++){ if (it === 4) lit.set(cur); acc.set(cur);
           for (let t = 0; t < ia.length; t += 3) for (let e = 0; e < 3; e++){ const a = ia[t + e], b = ia[t + (e + 1) % 3]; for (let c = 0; c < 3; c++){ acc[a * 3 + c] += cur[b * 3 + c]; acc[b * 3 + c] += cur[a * 3 + c]; } }
           for (let v = 0; v < nvt; v++){ const x = acc[v * 3], y = acc[v * 3 + 1], z = acc[v * 3 + 2], l = Math.hypot(x, y, z) || 1; cur[v * 3] = x / l; cur[v * 3 + 1] = y / l; cur[v * 3 + 2] = z / l; } }
-        for (let v = 0; v < nvt; v++){ const x = cur[v * 3] * 0.42, y = cur[v * 3 + 1] * 0.42 + 0.8, z = cur[v * 3 + 2] * 0.42, l = Math.hypot(x, y, z) || 1; na.setXYZ(v, x / l, y / l, z / l); } } }
+        for (let v = 0; v < nvt; v++){ const x = lit[v * 3] * 0.42, y = lit[v * 3 + 1] * 0.42 + 0.8, z = lit[v * 3 + 2] * 0.42, l = Math.hypot(x, y, z) || 1; na.setXYZ(v, x / l, y / l, z / l); }
+        ge0.setAttribute('vdir', new THREE.BufferAttribute(cur, 3)); } }      /* hướng bề mặt đã làm mượt rất mạnh (22 lượt): dùng để chọn ô ảnh, không bị nếp áo làm nhiễu */
     /* tách đỉnh theo từng tam giác (tự làm, giữ nguyên kiểu dữ liệu và cờ normalized của trọng số xương) */
     const src = o.geometry, ix = src.index, N = ix ? ix.count : src.attributes.position.count, ge = new THREE.BufferGeometry(), GET = ['getX', 'getY', 'getZ', 'getW'];
     for (const k in src.attributes){
@@ -1142,21 +1144,24 @@ function buildSkinned(sc, img){
     const pos = ge.attributes.position, n = pos.count;
     let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9;
     for (let v = 0; v < n; v++){ const y = pos.getY(v), x = pos.getX(v); if (y < y0) y0 = y; if (y > y1) y1 = y; if (x < x0) x0 = x; if (x > x1) x1 = x; }
-    /* mặt phẳng lưng: giữa bề dày của chân (thân người) và điểm lùi sau nhất (ba lô) */
-    let zb = 1e9, zl0 = 1e9, zl1 = -1e9;
-    for (let v = 0; v < n; v++){ const z = pos.getZ(v); if (z < zb) zb = z; if ((pos.getY(v) - y0) / (y1 - y0) < 0.4){ if (z < zl0) zl0 = z; if (z > zl1) zl1 = z; } }
-    const zPack = zl0 + (zb - zl0) * 0.35, clampN = (v, a, b) => v < a ? a : v > b ? b : v;
+    /* Ảnh phủ gồm bốn ô ngang: trước, sau, phải, trái (tools/nhan-vat/tex4.py). Mỗi tam giác lấy ô của hướng mà nó quay mặt về:
+       nhân vật nhìn về +z, bên trái của nhân vật là +x. Trong ô, toạ độ ngang là vị trí trong khung bao của mô hình nhìn từ hướng đó. */
+    let z0 = 1e9, z1 = -1e9, hz0 = 1e9, hz1 = -1e9, hx0 = 1e9, hx1 = -1e9; for (let v = 0; v < n; v++){ const z = pos.getZ(v); if (z < z0) z0 = z; if (z > z1) z1 = z; if ((pos.getY(v) - y0) / (y1 - y0) > 0.875){ if (z < hz0) hz0 = z; if (z > hz1) hz1 = z; const x = pos.getX(v); if (x < hx0) hx0 = x; if (x > hx1) hx1 = x; } }
     const uv = new Float32Array(n * 2), ca = new Float32Array(n * 3).fill(1), jk = [];
     for (let t = 0; t < n; t += 3){
-      /* tam giác quay mặt về phía trước (+z) dùng nửa ảnh mặt trước, còn lại dùng nửa ảnh mặt sau */
-      const ax = pos.getX(t + 1) - pos.getX(t), ay = pos.getY(t + 1) - pos.getY(t), bx = pos.getX(t + 2) - pos.getX(t), by = pos.getY(t + 2) - pos.getY(t);
-      const front = ax * by - ay * bx > 0;
-      /* khối ba lô nhô ra sau lưng: cả mặt bên cũng lấy màu ba lô thay vì màu áo */
-      const cz = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3, cty = ((pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3 - y0) / (y1 - y0), pack = cz < zPack && cty > 0.5 && cty < 0.82;
+      const ax = pos.getX(t + 1) - pos.getX(t), ay = pos.getY(t + 1) - pos.getY(t), az = pos.getZ(t + 1) - pos.getZ(t), bx = pos.getX(t + 2) - pos.getX(t), by = pos.getY(t + 2) - pos.getY(t), bz = pos.getZ(t + 2) - pos.getZ(t);
+      let nx = ay * bz - az * by, nz = ax * by - ay * bx; const rawAng = Math.atan2(Math.abs(nx), nz) * 57.3; const vd = ge.attributes.vdir; if (vd){ nx = vd.getX(t) + vd.getX(t + 1) + vd.getX(t + 2); nz = vd.getZ(t) + vd.getZ(t + 1) + vd.getZ(t + 2); }
+      /* góc lệch so với hướng nhìn thẳng: mặt (đầu) chuyển sang tranh nhìn ngang sớm hơn (48 độ) để tai và tóc mai lấy trọn từ tranh nhìn ngang; hai cánh tay chỉ dùng tranh trước và sau,
+         vì sọc kem trên tay áo ở các tranh không cùng độ cao; phần còn lại chuyển sang tranh nhìn ngang từ 56 độ */
+      const ang = Math.atan2(Math.abs(nx), nz) * 57.3, cy = ((pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3 - y0) / (y1 - y0), cx = ((pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3 - x0) / (x1 - x0);
+      const arm = cy > 0.38 && cy < 0.83 && (cx < 0.24 || cx > 0.76), lim = cy > 0.865 ? 48 : 56;
+      /* đầu gần giống khối cầu: chọn tranh theo góc của vị trí quanh trục đầu (không theo hướng bề mặt, vốn bị tóc và tai làm nhiễu):
+         dưới 52 độ là mặt trước (trừ các mặt dựng đứng quay ngang như vành tai, lấy tranh nhìn ngang), trên 128 độ là mặt sau, giữa là tranh nhìn ngang */
+      const head = cy > 0.875, mxh = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3 - (hx0 + hx1) / 2, mzh = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3 - (hz0 + hz1) / 2, hang = Math.atan2(Math.abs(mxh), mzh) * 57.3;
+      const view = head ? (hang < 52 && rawAng < 68 ? 0 : hang > 128 ? 1 : (mxh > 0 ? 3 : 2)) : arm ? (nz > 0 ? 0 : 1) : ang < lim ? 0 : ang > 180 - 52 ? 1 : (nx > 0 ? 3 : 2);
       for (let v = t; v < t + 3; v++){
-        let fu = (pos.getX(v) - x0) / (x1 - x0), w = 0.003 + 0.994 * (pos.getY(v) - y0) / (y1 - y0);
-        if (pack){ fu = clampN(fu, 0.35, 0.73); w = clampN(w, 0.555, 0.765); }
-        const u = 0.006 + 0.488 * fu + (front && !pack ? 0 : 0.5);
+        const fx = (pos.getX(v) - x0) / (x1 - x0), fz = (pos.getZ(v) - z0) / (z1 - z0), w = 0.003 + 0.994 * (pos.getY(v) - y0) / (y1 - y0);
+        const f = view === 0 ? fx : view === 1 ? 1 - fx : view === 2 ? fz : 1 - fz, u = view * 0.25 + (6 + 500 * f) / 2048;
         uv[v * 2] = u; uv[v * 2 + 1] = w;
         const pi = (Math.min(pc.height - 1, Math.floor((1 - w) * pc.height)) * pc.width + Math.min(pc.width - 1, Math.floor(u * pc.width))) * 4;
         if (pix[pi] > 85 && pix[pi + 1] < 95 && pix[pi] > pix[pi + 1] * 1.6) jk.push(v);   /* điểm ảnh màu đỏ gạch = áo khoác */
