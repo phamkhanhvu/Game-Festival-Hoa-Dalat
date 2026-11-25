@@ -26,3 +26,21 @@ Lưới `h` chỉ có một tầng (mặt đất, kể cả đường dưới g�
 Trong `index.html`, người chơi đứng trên mặt gần cao độ đang đứng nhất (`deckAt`, `pStep`), camera chui dưới gầm khi người chơi ở dưới bản sàn (`desiredCam`). Map không có `decks` thì chạy như cũ.
 
 Hình dáng khu này dựng theo hai ảnh thực tế do chủ dự án cung cấp; biển hiệu trong game là chữ chung (KHÁCH SẠN, NGÂN HÀNG, ĐẶC SẢN ĐÀ LẠT), không dùng tên hay logo thương hiệu thật.
+
+## Khu sau lưng chợ (thư mục `rear/`)
+
+`rear/rear.py` dựng lại khu sau lưng Chợ Đà Lạt theo bốn ảnh chụp từ trên cao (11.2026). Chạy trên `market.glb` và `world_cho.js` hiện có, không cần các bước ở trên:
+
+    python3 rear/rear.py <market.glb vào> <world_cho.js vào> <market.glb ra> <world_cho.js ra>
+
+Cần `numpy`, `scipy`, `pillow`, `shapely`. Các tệp:
+
+- `fr.py`: hệ trục riêng của chợ (s dọc tường sau về đông bắc, t vuông góc về phía Khu Hòa Bình).
+- `plan.py`: mặt bằng các khối mới theo (s, t).
+- `tiles.py`: 8 ô vân mới ở hàng 6 và 7 của atlas (tôn sóng, băng cửa kính, lam đứng, taluy, tôn cũ, mặt ki-ốt, bạt sọc, cửa cuốn).
+- `common.py`: mặt đất thấp nhất theo lưới 0,5 m, hàm dựng tường chia đoạn theo ô vân.
+- `rear.py` (phần 1 đến 3), `rearB.py` (phần 4 đến 7), `rear2.py` (ghi tệp, lưới đi lại, bản đồ nhỏ); `loop.npy` là tuyến xe vòng quanh chợ.
+
+Những gì được dựng: cánh đông bắc của chợ cũ (hai băng cửa kính, mái đón, sạp có bạt, dải mái tôn xanh, tháp thang lam đứng, dãy nhà phụ thấp), khối B mái đỏ, mặt sau và sân thượng khối trước (bỏ nhà cửa vòm, thêm hai mái tôn xanh và bảng hiệu), sân trên có dãy ki-ốt và mái taluy bê tông ô vuông phía tây cầu, vườn cây và dãy nhà phố phía đông cầu, bồn nước trên nhà góc bùng binh.
+
+Đoạn tường sau nằm giữa cửa cầu và thang lên mái (s từ -1,2 đến 17,2) giữ nguyên kiểu cũ vì dính với cầu thang và lối đi trên mái. Mái taluy bị chặn trong lưới đi lại; sân trên, nền lát quanh chợ và vườn cây đi lại được.
