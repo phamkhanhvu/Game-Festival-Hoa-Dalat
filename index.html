@@ -2067,10 +2067,10 @@ const BD_BONUS_MAX = 6, BD_IDS = BD_ITEMS.map(x => x.id);
 function bdS(){ if (!S.bdc || typeof S.bdc !== 'object') S.bdc = { own:{}, on:{} }; if (!S.bdc.own) S.bdc.own = {}; if (!S.bdc.on) S.bdc.on = {}; return S.bdc; }
 const bdMine = () => BD_IDS.filter(k => bdS().on[k]);
 /* đồ đang bày ở một gian: gian của mình lấy theo máy mình, gian người khác lấy theo máy chủ */
-function boothDc(b){ const o = BOWN[b.id]; if (!o || b.kiosk) return []; const u = myUid(); if (u && o.uid === u) return bdMine(); return String(o.dc || '').split(',').filter(k => BD_IDS.includes(k)); }
+function boothDc(b){ const o = BOWN[b.id]; if (!o) return []; const u = myUid(); if (u && o.uid === u) return bdMine(); return String(o.dc || '').split(',').filter(k => BD_IDS.includes(k)); }
 const boothBonus = b => Math.min(BD_BONUS_MAX, boothDc(b).length) * 0.05;
 const boothIncomeOf = b => Math.round(b.T.income * (1 + boothBonus(b)));
-function bdBuild(b, g, put, cm){
+function bdBuild(b, g, put, cm, kiosk){
   const dc = boothDc(b); if (!dc.length) return; const has = k => dc.includes(k), glow = c => new THREE.MeshBasicMaterial({ color:c, toneMapped:false }), flat = o => { o.castShadow = false; return o; };
   if (has('tham')){ flat(put(new THREE.BoxGeometry(2.0, 0.03, 2.3), lamb('#b3261e'), 0, 0.02, 2.4)); [-1, 1].forEach(a => flat(put(new THREE.BoxGeometry(0.1, 0.034, 2.3), lamb('#f0b429'), a * 0.95, 0.022, 2.4))); }
   if (has('hoa')) [-1.55, 1.55].forEach((x, i) => {
@@ -2086,7 +2086,7 @@ function bdBuild(b, g, put, cm){
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 2.0), new THREE.MeshBasicMaterial({ map:t })); m.position.set(-2.2, 1.12, 1.82); m.rotation.y = 0.25; g.add(m);
     const bk = put(new THREE.BoxGeometry(0.84, 2.04, 0.03), lamb('#2b2f3a'), -2.2, 1.12, 1.8); bk.rotation.y = 0.25; put(new THREE.BoxGeometry(0.9, 0.08, 0.3), lamb('#2b2f3a'), -2.2, 0.06, 1.8).rotation.y = 0.25;
   }
-  if (has('den')) for (let k = 0; k < 15; k++){ const u = k / 14, x = -2.5 + u * 5.0; flat(put(new THREE.SphereGeometry(0.075, 7, 6), glow(k % 2 ? 0xffd36a : 0xfff2c0), x, 3.06 - Math.sin(u * Math.PI * 3) ** 2 * 0.14, 1.3)); }
+  if (has('den') && !kiosk) for (let k = 0; k < 15; k++){ const u = k / 14, x = -2.5 + u * 5.0; flat(put(new THREE.SphereGeometry(0.075, 7, 6), glow(k % 2 ? 0xffd36a : 0xfff2c0), x, 3.06 - Math.sin(u * Math.PI * 3) ** 2 * 0.14, 1.3)); }
   if (has('bong')) [-2.6, 2.6].forEach((x, i) => { const cols = [b.color, '#ffffff', '#ffd23f', b.color, '#ff8fb8'];
     for (let k = 0; k < 5; k++){ const a = k * 1.26 + i; const s = put(new THREE.SphereGeometry(0.24, 10, 8), lamb(cols[k]), x + Math.cos(a) * 0.26, 3.95 + (k % 3) * 0.3, 1.2 + Math.sin(a) * 0.26); s.scale.y = 1.2; } });
   if (has('led')){
@@ -2104,25 +2104,27 @@ function bdBuild(b, g, put, cm){
 }
 /* ghi danh sách đồ đang bày lên máy chủ để người chơi khác thấy; máy chủ từ chối thì vẫn hiện trên máy mình */
 function bdSync(){
-  const b = myBooth(); if (!b) return; const dc = bdMine().join(',');
-  if (BO.local){ const r = S.bown[CUR_EVENT.key] && S.bown[CUR_EVENT.key][b.id]; if (r) r.dc = dc; if (BOWN[b.id]) BOWN[b.id].dc = dc; }
-  else if (BO.ref && BO.dcOk !== false && BOWN[b.id] && BOWN[b.id].dc !== dc){ BOWN[b.id].dc = dc; BO.ref.child(b.id).update({ dc }).then(() => { BO.dcOk = true; }).catch(e => { BO.dcOk = false; console.warn('trang trí gian: máy chủ chưa nhận', e && e.code); }); }
-  buildBooth(b); ctxKey = '';
+  const own = myOwned(); if (!own.length) return; const dc = bdMine().join(',');
+  own.forEach(b => {
+    if (BO.local){ const r = S.bown[CUR_EVENT.key] && S.bown[CUR_EVENT.key][b.id]; if (r) r.dc = dc; if (BOWN[b.id]) BOWN[b.id].dc = dc; }
+    else if (BO.ref && BO.dcOk !== false && BOWN[b.id] && BOWN[b.id].dc !== dc){ BOWN[b.id].dc = dc; BO.ref.child(b.id).update({ dc }).then(() => { BO.dcOk = true; }).catch(e => { BO.dcOk = false; console.warn('trang trí gian: máy chủ chưa nhận', e && e.code); }); }
+    buildBooth(b);
+  }); ctxKey = '';
 }
 function bdRender(){
-  const b = myBooth(); if (!b) return '<p>Bạn chưa có gian thương hiệu. Hãy mua một gian ở khu trung tâm trong mùa sự kiện, rồi quay lại trang trí.</p>';
+  const b = (nearBooth && myOwned().includes(nearBooth)) ? nearBooth : (myBooth() || myKiosk()); if (!b) return '<p>Bạn chưa có gian thương hiệu hay ki-ốt. Hãy mua một gian ở khu trung tâm hoặc một ki-ốt trong mùa sự kiện, rồi quay lại trang trí.</p>';
   const c = bdS(), n = bdMine().length;
-  let h = `<p><b>${escH(b.name)}</b> · Gian ${b.T.name} ${b.k}. Đang bày <b>${n} món</b>: thu nhập gian <b>+${Math.round(boothBonus(b) * 100)}%</b> = <b>${fmt(boothIncomeOf(b))} xu/phút</b> (mỗi món +5%, tối đa +${BD_BONUS_MAX * 5}%).</p>`;
+  let h = `<p><b>${escH(b.name)}</b> · ${b.kiosk ? 'Ki-ốt' : 'Gian ' + b.T.name} ${b.k}. Đang bày <b>${n} món</b>: thu nhập <b>+${Math.round(boothBonus(b) * 100)}%</b> = <b>${fmt(boothIncomeOf(b))} xu/phút</b> (mỗi món +5%, tối đa +${BD_BONUS_MAX * 5}%).</p>`;
   BD_ITEMS.forEach(a => { const own = !!c.own[a.id], on = !!c.on[a.id], ok = a.gems ? S.gems >= a.gems : S.coins >= a.cost;
     h += row(a.name, a.sub, own ? `<button class="gbtn${on ? '' : ' green'}" data-act="bdtog:${a.id}">${on ? 'Cất đi' : 'Bày ra'}<small>${on ? 'Đang bày ✓' : 'Đã mua'}</small></button>` : `<button class="gbtn ${ok ? 'green' : 'poor'}" data-act="bdbuy:${a.id}">Mua<small>${a.gems ? a.gems + ' kim cương' : fmt(a.cost) + ' xu'}</small></button>`); });
-  return h + '<button class="gbtn" data-act="bdname">Đổi tên và màu thương hiệu</button><p style="opacity:.75">Đồ trang trí là của bạn: nếu gian bị giành, bạn vẫn giữ đồ và bày lại ở gian mới.</p>';
+  return h + '<button class="gbtn" data-act="bdname">Đổi tên và màu thương hiệu</button><p style="opacity:.75">Đồ trang trí là của bạn, bày ở mọi gian và ki-ốt bạn đang giữ: nếu bị giành, bạn vẫn giữ đồ và bày lại ở chỗ mới.</p>';
 }
 function bdAct(a, id){
-  const it = BD_ITEMS.find(x => x.id === id), c = bdS(); if (!it || !myBooth()) return;
+  const it = BD_ITEMS.find(x => x.id === id), c = bdS(); if (!it || !myOwned().length) return;
   if (a === 'bdbuy'){ if (c.own[id]) return;
     if (it.gems ? S.gems < it.gems : S.coins < it.cost){ toast(it.gems ? `Cần ${it.gems} kim cương.` : `Cần ${fmt(it.cost)} xu.`, 'bad'); sfx('bad'); return; }
     if (it.gems) S.gems -= it.gems; else S.coins -= it.cost; c.own[id] = 1; c.on[id] = 1; S.stats.bdeco = (S.stats.bdeco || 0) + 1; sfx('buy');
-    toast(`Đã bày ${it.name} ở gian của bạn` + (bdMine().length <= BD_BONUS_MAX ? ': thu nhập +5%.' : '.'), 'gold');
+    toast(`Đã bày ${it.name}` + (bdMine().length <= BD_BONUS_MAX ? ': thu nhập +5%.' : '.'), 'gold');
   } else if (a === 'bdtog'){ if (!c.own[id]) return; if (c.on[id]) delete c.on[id]; else c.on[id] = 1; sfx('buy'); }
   bdSync();
 }
@@ -2154,12 +2156,15 @@ function buildKiosk(b){
   const t = canvasTex(512, 96, (c, w, h) => { c.fillStyle = o ? b.color : '#6f7682'; c.fillRect(0, 0, w, h); c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(0, h - 8, w, 8);
     c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; const tx = o ? b.name : 'KI-ỐT ' + b.k + ' · CHO THUÊ'; let fs = 58; do { c.font = `800 ${fs}px "Baloo 2", "Trebuchet MS", sans-serif`; fs -= 3; } while (c.measureText(tx).width > w - 30 && fs > 18); c.fillText(tx, w / 2, h / 2 - 3); });
   const sg = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.64), new THREE.MeshBasicMaterial({ map:t, toneMapped:false })); sg.position.set(0, 3.2, 0.1); g.add(sg);
-  const sg2 = new THREE.Mesh(sg.geometry, new THREE.MeshBasicMaterial({ map:t, toneMapped:false, side:THREE.DoubleSide })); sg2.position.set(0, 2.86, 3.14); g.add(sg2);      /* biển treo dưới mép mái đón, nhìn thấy từ ngoài đường */
   if (o){ const cm = lamb(b.color);
     put(new THREE.PlaneGeometry(3.0, 2.5), new THREE.MeshBasicMaterial({ color:0x1b1e25 }), 0, 1.5, 0.07);
     for (let r = 0; r < 2; r++){ put(new THREE.BoxGeometry(2.7, 0.07, 0.3), BM.trim, 0, 1.25 + r * 0.8, 0.2); for (let k = 0; k < 5; k++) put(new THREE.BoxGeometry(0.36, 0.34, 0.24), (k + r + b.k) % 3 ? cm : BM.wall, -1.05 + k * 0.52, 1.47 + r * 0.8, 0.2); }
     put(new THREE.BoxGeometry(2.7, 0.85, 0.7), BM.wall, 0, 0.43, 0.8); put(new THREE.BoxGeometry(2.8, 0.07, 0.8), cm, 0, 0.89, 0.8);
     for (let k = 0; k < 4; k++) put(new THREE.BoxGeometry(0.34, 0.24, 0.34), k % 2 ? BM.trim : cm, -0.95 + k * 0.63, 1.04, 0.8);
+    /* đồ trang trí: dùng chung bộ đồ của gian thương hiệu, thu nhỏ 0,7 lần cho vừa ô ki-ốt và bày trước quầy; dây đèn treo dưới mép mái đón */
+    const gg = new THREE.Group(); gg.scale.setScalar(0.7); gg.position.z = 1.0; g.add(gg);
+    bdBuild(b, gg, (geo, m, x, y, z) => { const q = new THREE.Mesh(geo, m); q.position.set(x, y, z); gg.add(q); return q; }, cm, true);
+    if (boothDc(b).includes('den')) for (let k = 0; k < 13; k++){ const u = k / 12; put(new THREE.SphereGeometry(0.06, 7, 6), new THREE.MeshBasicMaterial({ color:k % 2 ? 0xffd36a : 0xfff2c0, toneMapped:false }), -1.6 + u * 3.2, 2.72 - Math.sin(u * Math.PI * 3) ** 2 * 0.1, 3.05); }
   }
   g.position.set(b.x, b.y, b.z); g.rotation.y = Math.atan2(b.nx, b.nz); scene.add(g); b.group = g;
 }
@@ -2284,7 +2289,7 @@ function brandRender(){
   h += `<div class="field"><label for="optBrand"><b>Tên thương hiệu</b></label><input id="optBrand" maxlength="24" value="${escH(BO.draft != null ? BO.draft : (S.brand || ('Thương hiệu ' + S.name)))}"></div>`;
   h += `<div class="field"><b>Màu thương hiệu</b><div class="swatches">${cols}</div></div>`;
   h += '<button class="gbtn green" data-act="brandsave">Lưu tên thương hiệu</button>';
-  if (b) h += '<button class="gbtn" data-act="bdopen">Trang trí gian hàng</button>';
+  if (b || myKiosk()) h += '<button class="gbtn" data-act="bdopen">Trang trí gian hàng, ki-ốt</button>';
   if (b) h += `<p style="opacity:.75">Thu nhập gian: +${fmt(boothIncomeOf(b))} xu mỗi phút khi bạn đang chơi trong sự kiện. Người khác có thể giành gian với giá ${fmt(boothPrice(b))} xu; khi đó bạn được hoàn ${fmt(Math.round(BOWN[b.id].price * BOOTH_REFUND))} xu.</p>`;
   return h;
 }
@@ -3613,11 +3618,11 @@ function updateCtx(){
         else {
           const T = b.T, price = boothPrice(b);
           $('cLv').textContent = (b.kiosk ? 'Quầy cố định' : 'Gian ' + T.name) + ' · ' + CUR_EVENT.name;
-          $('cStats').innerHTML = mine ? `${b.kiosk ? 'Ki-ốt' : 'Gian'} của bạn · thu nhập <b>+${fmt(boothIncomeOf(b))} xu/phút</b> ${b.kiosk ? '' : ` · trang trí ${boothDc(b).length}/${BD_ITEMS.length} món (+${Math.round(boothBonus(b) * 100)}%)`}<br>Người khác giành được với giá ${fmt(price)} xu (bạn được hoàn ${fmt(Math.round(o.price * BOOTH_REFUND))} xu)`
+          $('cStats').innerHTML = mine ? `${b.kiosk ? 'Ki-ốt' : 'Gian'} của bạn · thu nhập <b>+${fmt(boothIncomeOf(b))} xu/phút</b> · trang trí ${boothDc(b).length}/${BD_ITEMS.length} món (+${Math.round(boothBonus(b) * 100)}%)<br>Người khác giành được với giá ${fmt(price)} xu (bạn được hoàn ${fmt(Math.round(o.price * BOOTH_REFUND))} xu)`
             : o ? `Chủ gian: <b>${escH(o.owner || 'Người chơi')}</b> · đã trả ${fmt(o.price)} xu<br>Giành lại gian: <b>${fmt(price)} xu</b> · cần cấp ${T.lv}`
             : `Còn trống · cần <b>cấp ${T.lv}</b><br>Giá: <b>${fmt(price)} xu</b> · thu nhập +${fmt(T.income)} xu/phút trong sự kiện`;
           const ok = S.level >= T.lv && S.coins >= price;
-          const buy = (mine && b.kiosk) ? '<button class="gbtn green" data-act="boothname">Đổi tên thương hiệu<small>Tên và màu trên biển ki-ốt</small></button>' : mine ? '<button class="gbtn green" data-act="boothdeco">Trang trí gian<small>Mua đồ bày cho đẹp · +5% mỗi món</small></button><button class="gbtn blue" data-act="boothname">Đổi tên thương hiệu<small>Tên và màu trên biển gian</small></button>'
+          const buy = (mine && b.kiosk) ? '<button class="gbtn green" data-act="boothdeco">Trang trí ki-ốt<small>Mua đồ bày cho đẹp · +5% mỗi món</small></button><button class="gbtn blue" data-act="boothname">Đổi tên thương hiệu<small>Tên và màu trên biển ki-ốt</small></button>' : mine ? '<button class="gbtn green" data-act="boothdeco">Trang trí gian<small>Mua đồ bày cho đẹp · +5% mỗi món</small></button><button class="gbtn blue" data-act="boothname">Đổi tên thương hiệu<small>Tên và màu trên biển gian</small></button>'
             : `<button class="gbtn ${ok ? 'green' : 'poor'}" data-act="boothbuy">${b.kiosk ? (o ? 'Mua lại ki-ốt' : 'Đăng ký mua ki-ốt') : (o ? 'Giành gian' : 'Mua gian')}<small>${S.level < T.lv ? 'Cần cấp ' + T.lv : fmt(price) + ' xu'}</small></button>`;
           $('cBtns').innerHTML = buy + visit;
         }
