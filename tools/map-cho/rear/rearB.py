@@ -59,7 +59,7 @@ CREST = [(-25.0, -30), (-24.0, -41), (-20.5, -52), (-16.0, -61), (-15.5, -70), (
 TOE = [(-13.0, -30), (-11.5, -40), (-8.5, -47.5), (-3.5, -54), (-1.5, -61.5), (-3.0, -66.0), (-8.9, -73.4), (-15.2, -81.2), (-19.6, -86.0)]
 BRIDGE = LineString([(-19, -91), (17.5, -45.5)]).buffer(3.3, cap_style=2)
 PLAT = Polygon(WEDGE + CREST[::-1]); FACE = Polygon(CREST + TOE[::-1])
-Z5 = Polygon(WEDGE + [(-20.5, -88.0), (-12.5, -80.5), (-6.0, -72.0), (1.5, -62.0)] + [(x + 6.0, z) for x, z in TOE[:5]][::-1]).buffer(0)
+Z5 = Polygon(WEDGE + [(-20.5, -88.0), (-12.5, -80.5), (-6.0, -72.0), (1.5, -62.0)] + [(x + 10.0, z) for x, z in TOE[:5]][::-1]).buffer(0)
 assert Z5.is_valid and PLAT.is_valid and FACE.is_valid
 FOOT = Z5.union(Polygon([(-20.5, -88.0), (-12.5, -80.5), (1.5, -62.0), (9.5, -57.0), (4.0, -66.0), (-6.0, -78.5), (-15.0, -88.5)])).difference(ROAD.buffer(4.3)).difference(PLAT).difference(FACE).buffer(-0.05)
 Z5 = Z5.buffer(0.8).difference(BRIDGE).difference(ROAD.buffer(4.4))
@@ -82,7 +82,7 @@ def drape(poly, tile, col, lift, st=2.0, per=4.0, skirt=True):
         e = poly.exterior
         for k in range(int(e.length / 1.5) + 1):
             a = e.interpolate(k * 1.5); b = e.interpolate(min((k + 1) * 1.5, e.length))
-            if a.distance(b) > 1e-6: B.quad([(a.x, g(a.x, a.y) - 0.15, a.y), (b.x, g(b.x, b.y) - 0.15, b.y), (b.x, gh(b.x, b.y) + lift, b.y), (a.x, gh(a.x, a.y) + lift, a.y)], PLAIN, col * 0.85)
+            if a.distance(b) > 1e-6: B.quad([(a.x, g(a.x, a.y) - 0.7, a.y), (b.x, g(b.x, b.y) - 0.7, b.y), (b.x, gh(b.x, b.y) + lift, b.y), (a.x, gh(a.x, a.y) + lift, a.y)], PLAIN, col * 0.85)
 def curtain(a, b, ya, yb, col, nh=None, step=1.5):
     """tường chắn từ mép trên (ya ở a, yb ở b) xuống tới mặt đất"""
     a = np.array(a, float); b = np.array(b, float); n = max(1, int(np.hypot(*(b - a)) / step))
@@ -190,3 +190,63 @@ _near = np.array([ROAD.distance(Point(x, z)) < 2.0 for x, z in cen[:, [0, 2]][::
 _rd = contains_xy(ROAD.buffer(2.0).intersection(RG.buffer(30)), cen[:, 0], cen[:, 2]) & (np.abs(cen[:, 1] - cg) < 0.05) & (_c.max(1) < 0.25); ASPHC = np.median(_c[_rd], axis=0) if _rd.sum() > 20 else lin('#55575c')
 C = C.copy(); q8 = contains_xy(unary_union([RG, OLDAWN.buffer(1.5), OLDROW.buffer(1.5)]), cen[:, 0], cen[:, 2]) & (np.abs(cen[:, 1] - cg) <= 0.12) & (_green | _light) & ~dead & ~contains_xy(park, cen[:, 0], cen[:, 2])
 C[I[q8].ravel()] = ASPHC; UV = UV.copy(); UV[I[q8].ravel()] = tile_uv(PLAIN, .5, .5); print('mặt nền đổi màu nhựa:', int(q8.sum()), 'tam giác, màu', np.round(ASPHC, 3))
+
+# ================= 8. cắt bỏ mặt nền cũ bên dưới các tấm phủ mới =================
+# nền cũ có nhiều lớp chồng nhau (lề, mảng lát, nền nhà cũ) cao thấp lệch tới 0,45 m nên đâm xuyên qua cỏ và nền lát mới.
+# Mọi tam giác nền nằm trong vùng phủ bị cắt đúng theo mép vùng; phần nằm ngoài vùng giữ lại, nội suy cao độ, vân và màu.
+import shapely
+# nền lát quanh vườn cây và dãy nhà phố: dưới dãy nhà cũ đã bỏ, lưới nền gốc bị thủng nhiều chỗ
+FILL = unary_union([OLDROW, OLDAWN]).buffer(3.5).difference(park).difference(ROAD.buffer(4.3)).difference(FOOT).difference(PLAT).difference(FACE).buffer(-0.01)
+FILLS = [q_ for q_ in ([FILL] if FILL.geom_type == 'Polygon' else list(FILL.geoms)) if q_.area > 1]
+for gp in FILLS: drape(gp, PLAIN, PAVE, 0.06)
+CUT = unary_union([APR, park, FOOT, PLAT, FACE] + FILLS).buffer(0)
+tri3 = P[I]; ymax = tri3[:, :, 1].max(1); glo = np.minimum(cg, GR.at(tri3[:, :, 0], tri3[:, :, 2], smooth=False).min(1))
+gsv = GR.at(tri3[:, :, 0], tri3[:, :, 2]); nearg = (tri3[:, :, 1] <= np.maximum(gsv, GR.at(tri3[:, :, 0], tri3[:, :, 2], smooth=False)) + 0.6).all(1)      # mọi đỉnh nằm sát mặt nền (kể cả tam giác nền dốc)
+_f3 = np.cross(tri3[:, 1] - tri3[:, 0], tri3[:, 2] - tri3[:, 0]); flat3 = np.abs(_f3[:, 1]) > 0.5 * np.maximum(np.linalg.norm(_f3, axis=1), 1e-9); gsc = GR.at(cen[:, 0], cen[:, 2])
+nearg |= flat3 & (cen[:, 1] > gsc - 1.5) & (cen[:, 1] < gsc + 0.6)                      # mặt nền ở chỗ giật cấp (dưới gầm cầu): so với mặt tấm phủ
+bx0, bz0, bx1, bz1 = CUT.bounds; cand = np.where(~dead & ((ymax <= np.maximum(cg, glo) + 0.5) | nearg) & (tri3[:, :, 0].max(1) > bx0) & (tri3[:, :, 0].min(1) < bx1) & (tri3[:, :, 2].max(1) > bz0) & (tri3[:, :, 2].min(1) < bz1))[0]
+# lưới nền gốc tô màu theo đỉnh (cỏ, lề sáng, nhựa tối). Sát mép các vùng phủ còn sót những tam giác nửa sáng nửa tối, trông như mảnh vỡ:
+# trong dải 5 m quanh vùng phủ, đỉnh sáng hoặc xanh của các tam giác chuyển màu được đổi theo màu các đỉnh tối cùng tam giác. Vạch sơn đường (mảnh nhỏ) không đụng tới.
+def offc(cc): return (cc.min(-1) > 0.27) | ((cc[..., 1] > cc[..., 0] * 1.15) & (cc[..., 1] > cc[..., 2] * 1.15))
+area3 = np.linalg.norm(np.cross(tri3[:, 1] - tri3[:, 0], tri3[:, 2] - tri3[:, 0]), axis=1) / 2; BAND = CUT.buffer(5.0); terr = ~dead & nearg & (area3 > 2.5) & contains_xy(BAND, cen[:, 0], cen[:, 2]); n9 = 0
+for _it in range(3):
+    oc = offc(C[I]); mix = np.where(terr & oc.any(1) & ~oc.all(1))[0]
+    if not len(mix): break
+    acc = np.zeros((len(C), 3)); cnt = np.zeros(len(C))
+    for i_ in mix:
+        v = I[i_]; dk = C[v][~oc[i_]].mean(0); vo = v[oc[i_]]; acc[vo] += dk; cnt[vo] += 1
+    vv = np.where(cnt > 0)[0]; C[vv] = acc[vv] / cnt[vv][:, None]; n9 += len(vv)
+# đỉnh còn màu cỏ của sườn dốc cũ trong dải này: lấy màu trung bình các đỉnh nền không xanh, không sáng trong bán kính 5 m
+from scipy.spatial import cKDTree
+tv = np.unique(I[terr].ravel()); cv = C[tv]; isg = (cv[:, 1] > cv[:, 0] * 1.15) & (cv[:, 1] > cv[:, 2] * 1.15); okv = ~offc(cv)
+if isg.any() and okv.any():
+    kd = cKDTree(P[tv][okv][:, [0, 2]]); dd, ix = kd.query(P[tv][isg][:, [0, 2]], k=6, distance_upper_bound=5.0); src = cv[okv]
+    for a_, (d_, i_) in zip(tv[isg], zip(dd, ix)):
+        m_ = np.isfinite(d_)
+        if m_.any(): C[a_] = src[i_[m_]].mean(0); n9 += 1
+print('mép vùng phủ: đổi màu', n9, 'đỉnh lưới nền')
+shapely.prepare(CUT); XP, XN, XUV, XC, XSRC = [], [], [], [], []; ncut = nrem = 0
+for i_ in cand:
+    v = I[i_]; a2 = P[v][:, [0, 2]]; ar2 = 0.5 * ((a2[1, 0] - a2[0, 0]) * (a2[2, 1] - a2[0, 1]) - (a2[2, 0] - a2[0, 0]) * (a2[1, 1] - a2[0, 1]))
+    if abs(ar2) < 1e-5:
+        if CUT.contains(Point(*a2.mean(0))): dead[i_] = True; ncut += 1
+        continue
+    T_ = Polygon(a2)
+    if not CUT.intersects(T_): continue
+    if CUT.contains(T_): dead[i_] = True; ncut += 1; continue
+    if T_.intersection(CUT).area < 1e-4: continue
+    dead[i_] = True; ncut += 1; rem = T_.difference(CUT)
+    if rem.is_empty or rem.area < 1e-4: continue
+    M = np.array([[a2[1, 0] - a2[0, 0], a2[2, 0] - a2[0, 0]], [a2[1, 1] - a2[0, 1], a2[2, 1] - a2[0, 1]]]); Mi = np.linalg.inv(M)
+    # lưới nền gốc tô màu theo đỉnh (cỏ, lề, nhựa): mảnh còn lại nằm ngoài vùng phủ nên chỉ lấy màu các đỉnh nằm ngoài vùng, không thì loang màu cỏ, màu lề ra mặt đường
+    outv = ~contains_xy(CUT, a2[:, 0], a2[:, 1]); _ok = outv & ~offc(C[v]); ccol = C[v][_ok].mean(0) if _ok.any() else (C[v][outv].mean(0) if outv.any() else C[v][np.argmin(C[v].sum(1))])
+    for gp in ([rem] if rem.geom_type == 'Polygon' else [q_ for q_ in rem.geoms if q_.geom_type == 'Polygon']):
+        if gp.area < 1e-4: continue
+        for t_ in shapely.constrained_delaunay_triangles(gp).geoms:
+            co = np.array(t_.exterior.coords)[:3]; s2 = 0.5 * ((co[1, 0] - co[0, 0]) * (co[2, 1] - co[0, 1]) - (co[2, 0] - co[0, 0]) * (co[1, 1] - co[0, 1]))
+            if abs(s2) < 1e-6: continue
+            if (s2 > 0) != (ar2 > 0): co = co[::-1]
+            bc = (Mi @ (co - a2[0]).T).T; w = np.stack([1 - bc[:, 0] - bc[:, 1], bc[:, 0], bc[:, 1]], 1)
+            pp = w @ P[v]; pp[:, 0] = co[:, 0]; pp[:, 2] = co[:, 1]; XP.append(pp); XN.append(w @ N[v]); XUV.append(w @ UV[v]); XC.append(np.tile(ccol, (3, 1))); XSRC.append(i_); nrem += 1
+print('cắt nền cũ dưới tấm phủ: bỏ', ncut, 'tam giác, giữ lại', nrem, 'mảnh ngoài vùng')
+

@@ -45,7 +45,7 @@ for x0 in np.arange(BX0, BX1, st):
             for k in range(1, len(pts) - 1): B.tri([pts[0], pts[k], pts[k + 1]], [tile_uv(PLAIN, .5, .5)] * 3, PAVE, UP)
 edge = APR.exterior
 for k in range(int(edge.length / 1.5)):
-    a = edge.interpolate(k * 1.5); b = edge.interpolate(min((k + 1) * 1.5, edge.length)); B.quad([(a.x, g(a.x, a.y) - 0.15, a.y), (b.x, g(b.x, b.y) - 0.15, b.y), (b.x, gh(b.x, b.y) + 0.06, b.y), (a.x, gh(a.x, a.y) + 0.06, a.y)], PLAIN, PAVE * 0.8)
+    a = edge.interpolate(k * 1.5); b = edge.interpolate(min((k + 1) * 1.5, edge.length)); B.quad([(a.x, g(a.x, a.y) - 0.7, a.y), (b.x, g(b.x, b.y) - 0.7, b.y), (b.x, gh(b.x, b.y) + 0.06, b.y), (a.x, gh(a.x, a.y) + 0.06, a.y)], PLAIN, PAVE * 0.8)
 OPEN.append(APR)
 
 # ================= 2. cánh đông bắc chợ cũ =================

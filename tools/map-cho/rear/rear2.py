@@ -1,6 +1,8 @@
 # ================= ghi market.glb =================
 keep = ~dead; I2 = I[keep]
-Pn, Nn_, UVn, Cn = B.arrays(); In = np.arange(len(Pn)).reshape(-1, 3) + len(P)
+Pn, Nn_, UVn, Cn = B.arrays()
+if XP: Pn = np.concatenate([Pn, np.concatenate(XP)]); Nn_ = np.concatenate([Nn_, np.concatenate(XN)]); UVn = np.concatenate([UVn, np.concatenate(XUV)]); Cn = np.concatenate([Cn, np.concatenate(XC)])
+In = np.arange(len(Pn)).reshape(-1, 3) + len(P)
 nv, nt, size = mb.write_glb(dst, np.concatenate([P, Pn]), np.concatenate([N, Nn_]), np.concatenate([UV, UVn]), np.concatenate([C, Cn]), np.concatenate([I2, In]), tiles.patch_atlas(m['img']))
 print('bỏ', int(dead.sum()), 'thêm', len(In), 'tam giác; tệp mới', nt, 'tam giác', size, 'byte')
 # ================= lưới đi lại, lưới mái, loại nền, bản đồ nhỏ =================
@@ -21,6 +23,8 @@ def setflat(poly, yfn, kval=None):
     return mk
 mAPR = setflat(APR, lambda mk: GHI[mk] + 0.06); mPLAT = setflat(PLAT.buffer(0.3), lambda mk: np.full(int(mk.sum()), PY)); mPARK = setflat(park, lambda mk: GHI[mk] + 0.06, 1)
 for gp in ([FOOT] if FOOT.geom_type == 'Polygon' else list(FOOT.geoms)): setflat(gp, lambda mk: GHI[mk] + 0.06)
+for gp in FILLS:
+    mk = mask(gp) & inb; q = mk & (h == -32768) & ~mask(BRIDGE.buffer(1.0)); h[q] = np.round(GHI[q] * 100).astype(int); touched |= mk; setflat(gp, lambda mk: GHI[mk] + 0.06)
 mFACE = mask(FACE.buffer(0.25)) & ~mask(PLAT.buffer(-0.4)); h[mFACE] = -32768; top[mFACE] = np.round(np.maximum(GH[mFACE], 5) * 100).astype(int); touched |= mFACE
 mRAIL = mask(LineString(RAIL).buffer(0.35)); h[mRAIL] = -32768; top[mRAIL] = int(PY * 100 + 105); touched |= mRAIL
 n_blk = 0

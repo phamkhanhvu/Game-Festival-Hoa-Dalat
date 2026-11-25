@@ -44,3 +44,5 @@ Cần `numpy`, `scipy`, `pillow`, `shapely`. Các tệp:
 Những gì được dựng: cánh đông bắc của chợ cũ (hai băng cửa kính, mái đón, sạp có bạt, dải mái tôn xanh, tháp thang lam đứng, dãy nhà phụ thấp), khối B mái đỏ, mặt sau và sân thượng khối trước (bỏ nhà cửa vòm, thêm hai mái tôn xanh và bảng hiệu), sân trên có dãy ki-ốt và mái taluy bê tông ô vuông phía tây cầu, vườn cây và dãy nhà phố phía đông cầu, bồn nước trên nhà góc bùng binh.
 
 Đoạn tường sau nằm giữa cửa cầu và thang lên mái (s từ -1,2 đến 17,2) giữ nguyên kiểu cũ vì dính với cầu thang và lối đi trên mái. Mái taluy bị chặn trong lưới đi lại; sân trên, nền lát quanh chợ và vườn cây đi lại được.
+
+Các tấm phủ mới (cỏ vườn cây, nền lát quanh chợ, nền lát quanh dãy nhà phố, sân trên, mái taluy) thay hẳn mặt nền cũ bên dưới: mọi tam giác nền cũ trong vùng phủ bị cắt đúng theo mép vùng (phần 8 của `rearB.py`). Lý do: lưới nền gốc có nhiều lớp chồng nhau, lại thủng dưới các nhà cũ, nên nếu chỉ phủ lên trên thì nền cũ đâm xuyên qua cỏ và nền lát.

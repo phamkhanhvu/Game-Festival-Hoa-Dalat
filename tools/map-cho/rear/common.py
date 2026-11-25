@@ -19,7 +19,10 @@ def ground_raster(P, I):
     bad = np.isnan(G); ind = ndimage.distance_transform_edt(bad, return_distances=False, return_indices=True); G = G[tuple(ind)]
     return G
 class Ground:
-    def __init__(self, G): self.G = G; self.Gs = ndimage.uniform_filter(ndimage.median_filter(G, 5), 5); self.Gh = ndimage.uniform_filter(ndimage.maximum_filter(ndimage.median_filter(G, 3), 7), 5)
+    def __init__(self, G):
+        # G: mặt thấp nhất thô. Lưới nền gốc thủng dưới các nhà cũ nên G có những hố sâu giả (lấy theo mặt đường gần nhất hoặc mặt chìm dưới đất);
+        # lấp các hố nhỏ hơn cỡ 10 m trước khi làm mượt, để tấm phủ mới và lưới đi lại không bị lõm
+        self.G = G; Gf = np.maximum(G, ndimage.median_filter(G, 21) - 0.4); self.Gs = ndimage.uniform_filter(ndimage.median_filter(Gf, 5), 5); self.Gh = self.Gs
     def at(self, x, z, smooth=True, hi=False):
         G = self.Gh if hi else (self.Gs if smooth else self.G); fx = np.clip((np.asarray(x, float) - BX0) / GS - 0.5, 0, G.shape[1] - 1.001); fz = np.clip((np.asarray(z, float) - BZ0) / GS - 0.5, 0, G.shape[0] - 1.001)
         i = np.floor(fx).astype(int); j = np.floor(fz).astype(int); a = fx - i; b = fz - j
