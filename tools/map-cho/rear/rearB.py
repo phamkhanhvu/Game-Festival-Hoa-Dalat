@@ -193,6 +193,16 @@ import shapely
 # nền lát quanh vườn cây và dãy nhà phố: dưới dãy nhà cũ đã bỏ, lưới nền gốc bị thủng nhiều chỗ
 FILL = unary_union([OLDROW, OLDAWN]).buffer(3.5).difference(park).difference(ROAD.buffer(4.3)).difference(FOOT).difference(PLAT).difference(FACE).buffer(-0.01)
 FILLS = [q_ for q_ in ([FILL] if FILL.geom_type == 'Polygon' else list(FILL.geoms)) if q_.area > 1]
+# viền lát quanh sân trên (phía Khu Hòa Bình): che dải cỏ cũ còn sót sát mép sân, có gờ che chỗ lệch cao độ
+RIM = PLAT.buffer(2.0).difference(PLAT).difference(FACE.buffer(0.4)).difference(ROAD.buffer(4.3)).difference(park).difference(FOOT).intersection(Polygon([(-60, -95), (-22.5, -95), (-22.5, -27), (-60, -27)])).buffer(-0.01)
+nR = kill_whole(RIM, frac=0.5, reach=3.0) + kill(RIM)
+for gp in polys(RIM): FILLS.append(gp)
+for a_, b_ in zip(WEDGE[:-1], WEDGE[1:]):
+    a_ = np.array(a_, float); b_ = np.array(b_, float); n_ = max(1, int(np.hypot(*(b_ - a_)) / 1.5))
+    for i_ in range(n_):
+        p_ = a_ + (b_ - a_) * i_ / n_; q_ = a_ + (b_ - a_) * (i_ + 1) / n_; t0 = max(PY, gh(*p_) + 0.06) + 0.01; t1 = max(PY, gh(*q_) + 0.06) + 0.01; l0 = min(PY, g(*p_)) - 0.4; l1 = min(PY, g(*q_)) - 0.4
+        B.wall(p_, q_, l0, t0, PLAIN, PAVE * 0.85, None, None, None, l1, t1); B.wall(q_, p_, l1, t1, PLAIN, PAVE * 0.85, None, None, None, l0, t0)
+print('viền sân trên: bỏ', nR, 'tam giác vật cũ')
 for gp in FILLS: drape(gp, PLAIN, PAVE, 0.06)
 CUT = unary_union([APR, park, FOOT, PLAT, FACE] + FILLS).buffer(0)
 tri3 = P[I]; ymax = tri3[:, :, 1].max(1); glo = np.minimum(cg, GR.at(tri3[:, :, 0], tri3[:, :, 2], smooth=False).min(1))
@@ -203,7 +213,8 @@ bx0, bz0, bx1, bz1 = CUT.bounds; cand = np.where(~dead & ((ymax <= np.maximum(cg
 # lưới nền gốc tô màu theo đỉnh (cỏ, lề sáng, nhựa tối). Sát mép các vùng phủ còn sót những tam giác nửa sáng nửa tối, trông như mảnh vỡ:
 # trong dải 5 m quanh vùng phủ, đỉnh sáng hoặc xanh của các tam giác chuyển màu được đổi theo màu các đỉnh tối cùng tam giác. Vạch sơn đường (mảnh nhỏ) không đụng tới.
 def offc(cc): return (cc.min(-1) > 0.27) | ((cc[..., 1] > cc[..., 0] * 1.15) & (cc[..., 1] > cc[..., 2] * 1.15))
-area3 = np.linalg.norm(np.cross(tri3[:, 1] - tri3[:, 0], tri3[:, 2] - tri3[:, 0]), axis=1) / 2; BAND = CUT.buffer(5.0); terr = ~dead & nearg & (area3 > 2.5) & contains_xy(BAND, cen[:, 0], cen[:, 2]); n9 = 0
+area3 = np.linalg.norm(np.cross(tri3[:, 1] - tri3[:, 0], tri3[:, 2] - tri3[:, 0]), axis=1) / 2; BAND = unary_union([APR, BLOCKS[0][0], BLOCKS[0][1], FOOT, PLAT, FACE] + FILLS).buffer(5.0)      # chỉ khu sau chợ; các bãi cỏ khác có vỉa lát sáng màu sát đường, không được đổi màu
+BANDP = BAND; terr = ~dead & nearg & (area3 > 2.5) & contains_xy(BAND, cen[:, 0], cen[:, 2]); n9 = 0
 for _it in range(3):
     oc = offc(C[I]); mix = np.where(terr & oc.any(1) & ~oc.all(1))[0]
     if not len(mix): break
@@ -235,6 +246,8 @@ for i_ in cand:
     M = np.array([[a2[1, 0] - a2[0, 0], a2[2, 0] - a2[0, 0]], [a2[1, 1] - a2[0, 1], a2[2, 1] - a2[0, 1]]]); Mi = np.linalg.inv(M)
     # lưới nền gốc tô màu theo đỉnh (cỏ, lề, nhựa): mảnh còn lại nằm ngoài vùng phủ nên chỉ lấy màu các đỉnh nằm ngoài vùng, không thì loang màu cỏ, màu lề ra mặt đường
     outv = ~contains_xy(CUT, a2[:, 0], a2[:, 1]); _ok = outv & ~offc(C[v]); ccol = C[v][_ok].mean(0) if _ok.any() else (C[v][outv].mean(0) if outv.any() else C[v][np.argmin(C[v].sum(1))])
+    inband = BANDP.contains(Point(*a2.mean(0))); cvx = C[v].copy()
+    if outv.any(): cvx[~outv] = cvx[outv].mean(0)                     # đỉnh nằm dưới tấm phủ (màu cỏ): lấy màu các đỉnh ngoài vùng
     for gp in ([rem] if rem.geom_type == 'Polygon' else [q_ for q_ in rem.geoms if q_.geom_type == 'Polygon']):
         if gp.area < 1e-4: continue
         for t_ in shapely.constrained_delaunay_triangles(gp).geoms:
@@ -242,6 +255,20 @@ for i_ in cand:
             if abs(s2) < 1e-6: continue
             if (s2 > 0) != (ar2 > 0): co = co[::-1]
             bc = (Mi @ (co - a2[0]).T).T; w = np.stack([1 - bc[:, 0] - bc[:, 1], bc[:, 0], bc[:, 1]], 1)
-            pp = w @ P[v]; pp[:, 0] = co[:, 0]; pp[:, 2] = co[:, 1]; XP.append(pp); XN.append(w @ N[v]); XUV.append(w @ UV[v]); XC.append(np.tile(ccol, (3, 1))); XSRC.append(i_); nrem += 1
+            pp = w @ P[v]; pp[:, 0] = co[:, 0]; pp[:, 2] = co[:, 1]; XP.append(pp); XN.append(w @ N[v]); XUV.append(w @ UV[v]); XC.append(np.tile(ccol, (3, 1)) if inband else w @ cvx); XSRC.append(i_); nrem += 1
 print('cắt nền cũ dưới tấm phủ: bỏ', ncut, 'tam giác, giữ lại', nrem, 'mảnh ngoài vùng')
 
+
+# ================= 9. đường quanh các công viên lớn: mặt nhựa đều màu =================
+# Lưới nền gốc tô màu theo đỉnh trên ô 2 đến 3 m, nên vỉa sáng màu quanh công viên loang ra đường thành từng mảng răng cưa.
+# Trong dải 11 m quanh mỗi công viên lớn (trừ sát chân nhà 2,5 m), mặt nền đổi sang màu nhựa đều; vỉa lát mới sát công viên giữ nguyên.
+BIGZ = [z_ for z_ in ZONES if z_.area > 400]
+if BIGZ:
+    ZB = unary_union(BIGZ).buffer(11.0).difference(unary_union(BIGZ)); zx0, zz0, zx1, zz1 = ZB.bounds
+    hm = np.isin(blab, np.where(bsz >= 80)[0][1:] if bsz[0] >= 80 else np.where(bsz >= 80)[0]) & (blab > 0); jj_, ii_ = np.indices(blab.shape)
+    hm &= (ggx0 + ii_ * ggst > zx0 - 4) & (ggx0 + ii_ * ggst < zx1 + 4) & (ggz0 + jj_ * ggst > zz0 - 4) & (ggz0 + jj_ * ggst < zz1 + 4)
+    ZB = ZB.difference(cells_poly(hm, 0.05).buffer(2.5)).buffer(0)
+    q9 = ~dead & nearg & (area3 > 1.0) & contains_xy(ZB, cen[:, 0], cen[:, 2]); vv = np.unique(I[q9].ravel()); vv = vv[contains_xy(ZB, P[vv, 0], P[vv, 2])]; _dk = ~offc(C[vv]); ASPH2 = np.median(C[vv][_dk], axis=0) if _dk.sum() > 20 else ASPHC; C[vv] = ASPH2; n9b = 0      # màu nhựa lấy tại chỗ
+    for k_ in range(len(XP)):
+        if ZB.contains(Point(XP[k_][:, 0].mean(), XP[k_][:, 2].mean())): XC[k_] = np.tile(ASPH2, (3, 1)); n9b += 1
+    print('đường quanh công viên lớn: đổi màu nhựa', len(vv), 'đỉnh lưới nền,', n9b, 'mảnh cắt')
