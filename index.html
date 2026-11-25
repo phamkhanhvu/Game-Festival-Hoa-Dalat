@@ -2249,7 +2249,7 @@ async function buyBooth(){
   if (!u){ toast('Đăng nhập để mua gian thương hiệu: mỗi gian là duy nhất, mọi người chơi đều thấy tên thương hiệu của bạn.', 'bad'); openModal('settings'); return; }
   if (cur && cur.uid === u) return;
   if (S.level < T.lv){ toast(`Gian ${T.name} cần cấp ${T.lv}.`, 'bad'); sfx('bad'); return; }
-  const mine = b.kiosk ? myKiosk() : myBooth(); if (mine){ toast(b.kiosk ? 'Mỗi người chỉ giữ một ki-ốt.' : 'Mỗi người chỉ giữ một gian thương hiệu trong một sự kiện.', 'bad'); sfx('bad'); return; }
+  const mine = b.kiosk ? myKiosk() : myBooth(); if (mine){ toast(b.kiosk ? 'Mỗi người chỉ giữ một ki-ốt.' : 'Mỗi người chỉ giữ một gian thương hiệu trên mỗi bản đồ.', 'bad'); sfx('bad'); return; }
   const price = boothPrice(b); if (S.coins < price){ toast(`Cần ${fmt(price)} xu.`, 'bad'); sfx('bad'); return; }
   const brand = String(S.brand || ('Thương hiệu ' + S.name)).slice(0, 24), color = S.brandColor || BRAND_COLORS[b.no % BRAND_COLORS.length];
   const rec = { uid:u, owner:String(S.name).slice(0, 16), brand, color, price };
