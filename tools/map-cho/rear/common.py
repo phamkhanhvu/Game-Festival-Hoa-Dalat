@@ -7,7 +7,7 @@ from scipy import ndimage
 from shapely.geometry import Polygon, LineString, Point
 from shapely import contains_xy
 from fr import *
-BX0, BX1, BZ0, BZ1, GS = -75.0, 170.0, -160.0, 25.0, 0.5
+BX0, BX1, BZ0, BZ1, GS = -130.0, 200.0, -165.0, 265.0, 0.5            # khung làm việc: cả bản đồ
 def ground_raster(P, I):
     """mặt thấp nhất mỗi ô 0,5 m trong khung làm việc (mặt đất, kể cả dưới gầm cầu); ô không có mặt thì lấy ô gần nhất"""
     cen = P[I].mean(1); sel = (cen[:, 0] > BX0 - 10) & (cen[:, 0] < BX1 + 10) & (cen[:, 2] > BZ0 - 10) & (cen[:, 2] < BZ1 + 10); T = I[sel]

@@ -46,3 +46,14 @@ Những gì được dựng: cánh đông bắc của chợ cũ (hai băng cửa
 Đoạn tường sau nằm giữa cửa cầu và thang lên mái (s từ -1,2 đến 17,2) giữ nguyên kiểu cũ vì dính với cầu thang và lối đi trên mái. Mái taluy bị chặn trong lưới đi lại; sân trên, nền lát quanh chợ và vườn cây đi lại được.
 
 Các tấm phủ mới (cỏ vườn cây, nền lát quanh chợ, nền lát quanh dãy nhà phố, sân trên, mái taluy) thay hẳn mặt nền cũ bên dưới: mọi tam giác nền cũ trong vùng phủ bị cắt đúng theo mép vùng (phần 8 của `rearB.py`). Lý do: lưới nền gốc có nhiều lớp chồng nhau, lại thủng dưới các nhà cũ, nên nếu chỉ phủ lên trên thì nền cũ đâm xuyên qua cỏ và nền lát.
+
+### Đất dốc: bậc thang có kè (`rear/rearC.py`)
+
+Nguyên tắc của chủ dự án: không để đất dốc tràn ra đường hay ăn vào chân nhà; chênh cao giải quyết bằng bờ kè. `rearC.py` áp dụng cho sườn đồi phía đông cầu đi bộ và cho mọi bãi cỏ dốc khác của bản đồ (lấy từ lưới loại nền `k == 1`, từ 30 m2):
+
+- chia khối đất thành các bậc phẳng cách nhau 1,8 m theo mặt đất đã làm mượt; mỗi bậc có kè đá đứng bao quanh và gờ kè cao 28 cm;
+- sát đường và sát nhà là vỉa lát đi theo mặt đường (bãi nhỏ dưới 400 m2 thì không chừa vỉa);
+- cầu thang khoét vào bậc trên, đặt ở đoạn kè có mặt dưới phẳng và đi được; bậc không có chỗ đặt cầu thang thành bồn cây;
+- lưới đi lại: mặt bậc phẳng, cầu thang là dốc đều, kè cao hơn 0,52 m nên tự chặn.
+
+Khung làm việc của `common.py` nay là cả bản đồ.

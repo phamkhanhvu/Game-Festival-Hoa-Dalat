@@ -21,10 +21,17 @@ def setflat(poly, yfn, kval=None):
     mk = mask(poly) & inb & (h != -32768); h[mk] = np.round(yfn(mk) * 100).astype(int); touched[mk] = True
     if kval is not None: kk[mask(poly) & inb] = kval
     return mk
-mAPR = setflat(APR, lambda mk: GHI[mk] + 0.06); mPLAT = setflat(PLAT.buffer(0.3), lambda mk: np.full(int(mk.sum()), PY)); mPARK = setflat(park, lambda mk: GHI[mk] + 0.06, 1)
+mAPR = setflat(APR, lambda mk: GHI[mk] + 0.06); mPLAT = setflat(PLAT.buffer(0.3), lambda mk: np.full(int(mk.sum()), PY)); mPARK = setflat(PAVEH, lambda mk: GHI[mk] + 0.06, 0)
 for gp in ([FOOT] if FOOT.geom_type == 'Polygon' else list(FOOT.geoms)): setflat(gp, lambda mk: GHI[mk] + 0.06)
 for gp in FILLS:
     mk = mask(gp) & inb; q = mk & (h == -32768) & ~mask(BRIDGE.buffer(1.0)); h[q] = np.round(GHI[q] * 100).astype(int); touched |= mk; setflat(gp, lambda mk: GHI[mk] + 0.06)
+# khối đồi bậc thang: mặt bậc phẳng (cỏ), cầu thang là dốc đều; kè cao hơn 0,52 m nên lưới tự chặn, không cần chặn riêng
+nbr = ~mask(BRIDGE.buffer(0.3))
+for poly, lvl in TERR:
+    mk = mask(poly) & inb; q = mk & (h == -32768) & nbr; h[q] = int(round(lvl * 100)); touched |= mk; setflat(poly, lambda mk, lvl=lvl: np.full(int(mk.sum()), lvl), 1)
+for (p_, n_, t_, run_, hlo_, lvl_) in STAIRS:
+    rect = Polygon([tuple(p_ + t_ * 1.1 + n_ * 0.3), tuple(p_ - t_ * 1.1 + n_ * 0.3), tuple(p_ - t_ * 1.1 - n_ * run_), tuple(p_ + t_ * 1.1 - n_ * run_)]); mk = mask(rect) & inb & nbr
+    d_ = np.clip(-((X[mk] - p_[0]) * n_[0] + (Z[mk] - p_[1]) * n_[1]) / run_, 0, 1); h[mk] = np.round((hlo_ + (lvl_ - hlo_) * d_) * 100).astype(int); kk[mk] = 0; touched |= mk
 mFACE = mask(FACE.buffer(0.25)) & ~mask(PLAT.buffer(-0.4)); h[mFACE] = -32768; top[mFACE] = np.round(np.maximum(GH[mFACE], 5) * 100).astype(int); touched |= mFACE
 mRAIL = mask(LineString(RAIL).buffer(0.35)); h[mRAIL] = -32768; top[mRAIL] = int(PY * 100 + 105); touched |= mRAIL
 n_blk = 0
@@ -39,6 +46,7 @@ def fix(o):
         if 'x' in o and 'z' in o and 'y' in o:
             i = int(round((o['x'] - gx0) / gst)); j = int(round((o['z'] - gz0) / gst))
             if 0 <= i < nx and 0 <= j < nz and touched[j, i] and h[j, i] != -32768 and abs(h[j, i] / 100 - o['y']) > 0.02 and abs(h[j, i] / 100 - o['y']) < 1.0: print('  chỉnh cao độ', round(o['x'], 1), round(o['z'], 1), o['y'], '->', h[j, i] / 100); o['y'] = round(h[j, i] / 100, 2)
+            if 0 <= i < nx and 0 <= j < nz and touched[j, i] and h[j, i] != -32768 and abs(h[j, i] / 100 - o['y']) >= 1.0: print('  !!! vật lệch cao độ từ 1 m:', {a: b for a, b in o.items() if a in ('x', 'z', 'y', 'id')}, 'lưới', h[j, i] / 100)
             if 0 <= i < nx and 0 <= j < nz and touched[j, i] and h[j, i] == -32768: print('  !!! vật nằm trong ô bị chặn:', {a: b for a, b in o.items() if a in ('x', 'z', 'y', 'id')})
         for v in o.values(): fix(v)
     elif isinstance(o, list):

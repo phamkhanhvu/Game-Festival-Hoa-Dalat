@@ -61,7 +61,7 @@ BRIDGE = LineString([(-19, -91), (17.5, -45.5)]).buffer(3.3, cap_style=2)
 PLAT = Polygon(WEDGE + CREST[::-1]); FACE = Polygon(CREST + TOE[::-1])
 Z5 = Polygon(WEDGE + [(-20.5, -88.0), (-12.5, -80.5), (-6.0, -72.0), (1.5, -62.0)] + [(x + 10.0, z) for x, z in TOE[:5]][::-1]).buffer(0)
 assert Z5.is_valid and PLAT.is_valid and FACE.is_valid
-FOOT = Z5.union(Polygon([(-20.5, -88.0), (-12.5, -80.5), (1.5, -62.0), (9.5, -57.0), (4.0, -66.0), (-6.0, -78.5), (-15.0, -88.5)])).difference(ROAD.buffer(4.3)).difference(PLAT).difference(FACE).buffer(-0.05)
+FOOT = Z5.intersection(Polygon([(-60, -62.5), (40, -62.5), (40, -20), (-60, -20)])).difference(ROAD.buffer(4.3)).difference(PLAT).difference(FACE).buffer(-0.05)      # nền lát chân taluy, chỉ đoạn gần ngang mặt đường
 Z5 = Z5.buffer(0.8).difference(BRIDGE).difference(ROAD.buffer(4.4))
 n5 = kill_whole(Z5) + kill(Z5); OPEN.append(Z5); print('taluy: bỏ', n5)
 def sheet(poly, yfn, tile, col, st=2.0, per=4.0, lift=0.0):
@@ -154,13 +154,6 @@ for k, (cx, cz, ang, col) in enumerate(((-10.9, -33.5, 1.47, BLUE), (-9.6, -40.5
 # ================= 6. vườn cây bên phải cầu và dãy nhà phố =================
 OLDROW = Polygon(WL([(7.3, 13.2), (59, 16.3), (59, 43.5), (7.3, 43.5)])); OLDAWN = Polygon(WL([(9.0, 8.5), (60, 12.0), (60, 17.0), (9.0, 14.0)]))
 n6 = kill_whole(OLDROW.difference(BRIDGE.buffer(1.5)).difference(ROAD.buffer(4.4))) + kill(OLDROW) + kill(OLDAWN, extra=(cen[:, 1] > cg + 1.2) & (cen[:, 1] < cg + 6.0) & (np.ptp(P[I][:, :, 1], axis=1) < 1.6)); OPEN.append(OLDROW); print('dãy nhà cũ bên phải cầu: bỏ', n6)
-park = Polygon(WL(PARK)).union(Polygon([(8.0, -64.5), (14.0, -63.5), (6.1, -83.8), (12.0, -90.0), (4.0, -94.0), (-9.1, -83.5)])).buffer(0); drape(park, (1, 7), lin('#86b86a'), 0.06, per=4.0)
-rng = np.random.default_rng(11); TREES = []
-for s, t, kind in ((10.5, 19, 'round'), (16, 22, 'pine'), (22, 19.5, 'round'), (28.5, 21, 'round'), (33.5, 24, 'pine'), (12.5, 28, 'pine'), (19, 30, 'round'), (26, 29, 'pine'), (32, 33, 'round'), (15, 37, 'round'), (22.5, 38, 'pine'), (30, 40, 'round')):
-    c_ = L(s, t); tree(c_, 6.5 + rng.random() * 2.5, 2.0 + rng.random() * 0.8, kind); TREES.append(c_); BLOCK.append((Point(*c_).buffer(0.05), g(*c_) + 6))
-for s0, s1, t in ((11, 25, 24.5), (17, 34, 31.5), (13, 28, 35.2)):                                      # bậc kè bê tông cũ
-    c_ = L((s0 + s1) / 2, t); y0 = min(g(*L(s0, t - 0.5)), g(*L(s1, t - 0.5))) - 0.3; y1 = max(g(*L(s0, t + 0.5)), g(*L(s1, t + 0.5))) + 0.55
-    B.obox(c_, A, Nn, (s1 - s0) / 2, 0.3, y0, y1, lin('#a9a8a2'), tile=(6, 0)); BLOCK.append((Polygon(WL([(s0, t - 0.3), (s1, t - 0.3), (s1, t + 0.3), (s0, t + 0.3)])), y1))
 # dãy nhà phố bốn căn nhìn ra đường sau chợ
 SP = WL(SHOPS); HOUSES = [(39.5, 44.0, 4, lin('#f0e6cf'), (0, 0)), (44.0, 48.3, 3, lin('#dfe9ef'), (2, 1)), (48.3, 52.8, 4, lin('#f3ead8'), (1, 0)), (52.8, 57.0, 3, lin('#e9dccb'), (0, 0))]
 for s0, s1, nf, col, wt in HOUSES:
@@ -173,6 +166,8 @@ for s0, s1, nf, col, wt in HOUSES:
     for k in range(nf - 1): B.wall(b0, b1, yg + 3.9 + k * 3.4, yg + 3.9 + (k + 1) * 3.4 - 0.2, (0, 4), col, None, np.array([NW[0], 0, NW[1]]))
     B.flat(poly, top_, PLAIN, lin('#a8a6a0'))
     aw = [lin('#c9503f'), BLUE, GREEN, lin('#e0b04a')][int(s0) % 4]; B.quad([(*(f0 + SE * 1.5)[:1], yg + 2.9, (f0 + SE * 1.5)[1]), (*(f1 + SE * 1.5)[:1], yg + 2.9, (f1 + SE * 1.5)[1]), (f1[0], yg + 3.6, f1[1]), (f0[0], yg + 3.6, f0[1])][::-1], AWN, aw, UP)
+
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rearC.py')).read())
 
 # ================= 7. dọn mảng cỏ, mảng lát cũ còn sót dưới chân taluy và dưới gầm cầu; bồn nước trên nhà góc bùng binh =================
 RG = Polygon([(-15, -28), (-21, -88), (-10, -95), (12, -66), (16, -56), (19, -50), (9, -38), (-2, -28)])
