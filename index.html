@@ -1221,6 +1221,7 @@ function loadModel(){
     model = g.scene;
     model.traverse(o => {
       if (!o.isMesh) return; const m = o.material, nm = m.name || '';
+      if (/^background_/.test(nm)){ o.visible = false; return; }      /* ba tấm ảnh cây nền đen dựng đứng ở góc đông bắc của mô hình gốc: bỏ */
       if ('metalness' in m){ m.metalness = 0; m.roughness = Math.max(m.roughness, 0.8); m.envMapIntensity = /Glass|Water/.test(nm) ? 0.9 : 0.18; }
       if (m.map) m.map.anisotropy = ANISO;
       if (m.transparent){ m.depthWrite = false; o.renderOrder = 1; }
