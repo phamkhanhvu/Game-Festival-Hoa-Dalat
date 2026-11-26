@@ -415,7 +415,7 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'cf8206d0'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '320ab5ca'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
@@ -1196,6 +1196,25 @@ function upgradePlayerSkinned(sc, img){
   g.position.copy(playerMesh.position); g.rotation.y = playerMesh.rotation.y;
   scene.remove(playerMesh); playerMesh = g; scene.add(g); setAvatar();
 }
+/* Vế bậc thang dựng thêm (WORLD.steps): các vế bậc nâu ở bậc thềm trong mô hình gốc chỉ có vài bậc rồi đụng tường, nên dựng vế đủ cao phủ lên.
+   Mỗi vế: [x, z, góc, dài, sâu bậc, số bậc, cao độ nền dưới, cao độ tầng trên]; (x, z) là giữa mép sau, bậc mọc ra phía trước. Dùng lại vật liệu gỗ nâu của mô hình. */
+function buildSteps(model){
+  let mat = null; model.traverse(o => { if (!mat && o.isMesh && /^FUEGO/.test(o.material.name || '')) mat = o.material; }); if (!mat) mat = lamb('#9a4a34');
+  const pos = [], nor = [], uv = [], q = new THREE.Vector3(), nn = new THREE.Vector3(), m4 = new THREE.Matrix4(), K = 0.45;
+  WORLD.steps.forEach(([x, z, ang, len, dp, n, y0, y1]) => {
+    const r = (y1 - y0) / (n + 1), vx = Math.sin(ang), vz = Math.cos(ang);
+    for (let i = 0; i < n; i++){
+      const yt = y1 - (i + 1) * r, yb = y0 - 0.4, g = new THREE.BoxGeometry(len, yt - yb, dp).toNonIndexed(), d = (i + 0.5) * dp;
+      m4.makeRotationY(ang).setPosition(x - vx * d, (yt + yb) / 2, z - vz * d); const P = g.attributes.position, N = g.attributes.normal;
+      for (let k = 0; k < P.count; k++){ const lx = P.getX(k), ly = P.getY(k), lz = P.getZ(k), ny = N.getY(k), nz = N.getZ(k);
+        if (Math.abs(ny) > 0.5) uv.push(lx * K, (lz - d) * K); else if (Math.abs(nz) > 0.5) uv.push(lx * K, (ly + (yt + yb) / 2) * K); else uv.push((lz - d) * K, (ly + (yt + yb) / 2) * K);
+        q.set(lx, ly, lz).applyMatrix4(m4); pos.push(q.x, q.y, q.z); nn.set(N.getX(k), ny, nz).transformDirection(m4); nor.push(nn.x, nn.y, nn.z); }
+      g.dispose();
+    }
+  });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  const me = new THREE.Mesh(geo, mat); me.castShadow = true; me.receiveShadow = true; model.add(me);
+}
 function loadModel(){
   const el = $('loading'), pct = $('loadPct');
   loadBin(MAP === 'cho' ? 'market.glb' : 'model.glb', f => { pct.textContent = Math.min(99, Math.round(f * 100)) + '%'; }, MAP === 'cho' ? 5.8e6 : 4.7e6).then(parseGlb).then(g => {
@@ -1207,6 +1226,7 @@ function loadModel(){
       if (m.transparent){ m.depthWrite = false; o.renderOrder = 1; }
       o.castShadow = !m.transparent && !/Water|Grass|BASE|Concrete/.test(nm); o.receiveShadow = true;
     });
+    if (WORLD.steps) buildSteps(model);
     scene.add(model); buildFlags(); el.hidden = true; document.body.dataset.ready = '1';
     const bad = [];
     Promise.all([loadBin('character.glb').then(b => { CHAR_BUF = b; return parseGlb(b); }), loadImg('character4.jpg')]).then(([c, img]) => { CHAR_IMG = img; upgradePlayerSkinned(c.scene, img); }).catch(e => { console.warn('nv chính', e); bad.push('nhân vật chính'); })
