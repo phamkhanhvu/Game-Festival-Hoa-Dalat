@@ -57,3 +57,6 @@ Nguyên tắc của chủ dự án: không để đất dốc tràn ra đường
 - lưới đi lại: mặt bậc phẳng, cầu thang là dốc đều, kè cao hơn 0,52 m nên tự chặn.
 
 Khung làm việc của `common.py` nay là cả bản đồ.
+
+## festival.py — cây và hoa mùa Festival
+`python3 festival.py ../../world_cho.js ../../world_cho.js [ảnh_mặt_bằng.png]` điền `trees`, `pots`, `flowers` vào world_cho.js (thảm hoa ở sân rộng, mai anh đào và phượng tím dọc vỉa hè, chậu hoa, hoa trên các bậc cỏ). Chạy lại sau mỗi lần chạy `rear/rear.py`, vì rear.py dựng world_cho.js lại từ bản sao lưu. Sau đó nhớ đổi `BUILD_V` trong index.html.

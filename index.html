@@ -415,7 +415,7 @@ window.FB_READY = (function(){
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = '971f6d3d'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
+<script>/* chọn map: ?map=cho là Chợ Đà Lạt – Khu Hòa Bình, mặc định là Quảng trường Lâm Viên */ window.BUILD_V = 'c45e481b'; window.MAP_ID = /[?&]map=cho\b/.test(location.search) ? 'cho' : 'lv'; document.write('<script src="' + (window.MAP_ID === 'cho' ? 'world_cho.js' : 'world.js') + '?v=' + window.BUILD_V + '"><\/script>');</script>
 <script>
 (() => {
 'use strict';
@@ -2068,14 +2068,25 @@ for (let i = 0; i < 22; i++){ const p = makePerson('wander'); p.zone = i % 5 < 3
 /* Festival Hoa: chậu hoa rực rỡ quanh sân trên và cổng hoa ở đầu cầu thang lớn, chỉ có trong mùa festival */
 if (festOn()){
   const cols = [0xff6fa8, 0xffd23f, 0xb07cff, 0xff8a3d, 0x6fd3ff];
-  WORLD.pots.forEach((p, k) => {
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 0.6, 10), std('#8a5a3c', { roughness:0.8 }));
-    pot.position.set(p.x, p.y + 0.3, p.z); scene.add(pot);
-    for (let j = 0; j < 3; j++){
-      const f = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color:cols[(k + j) % cols.length], roughness:0.6 }));
-      f.position.set(p.x + (j - 1) * 0.35, p.y + 1.0 + (j % 2) * 0.25, p.z + (j === 1 ? 0.15 : -0.1)); scene.add(f);
-    }
-  });
+  /* chậu hoa: hai InstancedMesh cho cả bản đồ (chậu, và ba cụm hoa mỗi chậu) */
+  if (WORLD.pots.length){
+    const n = WORLD.pots.length, d = new THREE.Object3D(), col = new THREE.Color(), NF = 9;
+    const potM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.48, 0.34, 0.55, 10), std('#b5683f', { roughness:0.85 }), n);
+    const leafM = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.56, 1), new THREE.MeshStandardMaterial({ color:C('#3f8a3a'), roughness:0.9, flatShading:true }), n);
+    const flM = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.7, flatShading:true }), n * NF);
+    WORLD.pots.forEach((p, k) => {
+      const R = rng(700 + k * 13), c0 = Math.floor(R() * cols.length);
+      d.rotation.set(0, R() * 6.28, 0); d.scale.setScalar(1); d.position.set(p.x, p.y + 0.275, p.z); d.updateMatrix(); potM.setMatrixAt(k, d.matrix);
+      d.scale.set(1, 0.72, 1); d.position.set(p.x, p.y + 0.72, p.z); d.updateMatrix(); leafM.setMatrixAt(k, d.matrix);
+      for (let j = 0; j < NF; j++){
+        /* hoa nhỏ rải đều trên vòm lá, mỗi chậu hai màu chủ đạo */
+        const el = j === 0 ? 1.45 : 0.35 + R() * 0.75, az = j * 2.4 + R() * 0.5, rr = 0.55 * Math.cos(el);
+        d.scale.setScalar(0.8 + R() * 0.5); d.position.set(p.x + Math.cos(az) * rr, p.y + 0.72 + Math.sin(el) * 0.42, p.z + Math.sin(az) * rr); d.updateMatrix();
+        flM.setMatrixAt(k * NF + j, d.matrix); flM.setColorAt(k * NF + j, col.setHex(cols[(c0 + (j % 3 === 2 ? 1 : 0)) % cols.length]).convertSRGBToLinear());
+      }
+    });
+    [potM, leafM, flM].forEach(m => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.frustumCulled = false; m.castShadow = m !== flM; scene.add(m); });
+  }
   { const ax = WORLD.gate.x, az = WORLD.gate.z, y = WORLD.gate.y, pm2 = std('#f3efe6', { roughness:0.5 });
     [-2.6, 2.6].forEach(dx => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 4.2, 8), pm2); c.position.set(ax + dx, y + 2.1, az); scene.add(c); });
     for (let i = 0; i <= 10; i++){
