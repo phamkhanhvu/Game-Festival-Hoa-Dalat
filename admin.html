@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>DalatEvent · Kiểm duyệt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#f3f1ec;--card:#fff;--ink:#1f2328;--mute:#6b7178;--line:#e3dfd6;--red:#c2473a;--green:#2e7d5b;--blue:#2f6fc0;--amber:#b7791f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Be Vietnam Pro",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 40px}
+header{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 16px 0}
+h1{font-size:1.15rem;margin:0 0 2px}
+#who{color:var(--mute);font-size:.85rem;margin-bottom:10px;word-break:break-all}
+nav{display:flex;gap:6px;overflow-x:auto}
+nav button{border:0;background:none;padding:8px 12px;font:inherit;font-weight:600;color:var(--mute);border-bottom:3px solid transparent}
+nav button.on{color:var(--ink);border-color:var(--ink)}
+main{padding:12px 16px;max-width:760px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+.card h2{font-size:1rem;margin:0}
+.sub{color:var(--mute);font-size:.85rem}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tag{background:#f6eee3;border-radius:99px;padding:2px 10px;font-size:.8rem;font-weight:600}
+.warn{background:#fff4e0;border-radius:8px;padding:8px 10px;font-size:.85rem;margin:8px 0}
+.now{border-left:3px solid var(--line);padding-left:10px;margin:8px 0}
+.now b{font-size:1.05rem}
+details{margin:6px 0}
+summary{cursor:pointer;color:var(--blue);font-size:.9rem}
+ul{margin:6px 0;padding-left:18px}
+li{margin:3px 0;font-size:.9rem}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button.b{font:inherit;font-weight:600;border-radius:9px;border:1px solid var(--line);background:#fff;padding:8px 12px;cursor:pointer}
+button.b.red{background:var(--red);border-color:var(--red);color:#fff}
+button.b.green{background:var(--green);border-color:var(--green);color:#fff}
+button.b.ask{outline:3px solid #f2b8b0}
+button.b:disabled{opacity:.5}
+input.why{font:inherit;border:1px solid var(--line);border-radius:9px;padding:8px 10px;flex:1 1 200px}
+.empty{color:var(--mute);text-align:center;padding:30px 10px}
+#msg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2328;color:#fff;padding:10px 16px;border-radius:10px;font-size:.9rem;max-width:90vw;display:none}
+code{background:#f0ede6;border-radius:5px;padding:1px 5px;font-size:.85rem;word-break:break-all}
+</style>
+</head>
+<body>
+<header>
+  <h1>DalatEvent · Kiểm duyệt gian hàng</h1>
+  <div id="who">Đang kết nối…</div>
+  <nav id="tabs" hidden>
+    <button data-tab="rep" class="on">Báo cáo <span id="nRep"></span></button>
+    <button data-tab="ban">Đã khoá <span id="nBan"></span></button>
+    <button data-tab="log">Nhật ký</button>
+  </nav>
+</header>
+<main id="main"><p class="empty">Đang tải…</p></main>
+<div id="msg"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* Trang kiểm duyệt: đọc báo cáo người chơi gửi từ game (reports/{sự kiện}/{gian}/{người báo}),
+   rồi đặt lại tên gian, thu hồi gian, khoá tài khoản mua gian, hoặc bỏ qua. Mọi thao tác ghi vào modlog.
+   Quyền do Realtime Database Rules quyết định: chỉ tài khoản quản trị đọc được reports. */
+firebase.initializeApp({
+  apiKey: "AIzaSyD8DOLKoWWARoxtVmAh1tpkGcET8rCAngs",
+  authDomain: "quay-hang-da-lat.firebaseapp.com",
+  projectId: "quay-hang-da-lat",
+  databaseURL: "https://quay-hang-da-lat-default-rtdb.asia-southeast1.firebasedatabase.app",
+  appId: "1:844175137729:web:6ce0d932a26fe056d9ed40"
+});
+const auth = firebase.auth(), db = firebase.database(), TS = firebase.database.ServerValue.TIMESTAMP;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const when = t => t ? new Date(t).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' }) : '';
+const D = { reports:{}, booths:{}, bans:{}, log:[], tab:'rep', ask:null, me:null };
+const refs = [];
+function msg(t){ const m = $('msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(msg.h); msg.h = setTimeout(() => m.style.display = 'none', 3500); }
+
+/* tên gian từ mã: p1..p8 Quảng trường, pc1..pc8 Chợ Đà Lạt, pk1.. ki-ốt Hòa Bình (cùng cách đặt mã trong game) */
+function boothLabel(id){
+  let m = /^pk(\d+)$/.exec(id); if (m) return 'Ki-ốt Hòa Bình ' + m[1] + ' · Chợ Đà Lạt';
+  m = /^p(c?)(\d+)$/.exec(id); if (!m) return id;
+  const k = +m[2], t = k <= 2 ? 'Kim Cương' : k <= 6 ? 'Vàng' : 'Bạc';
+  return 'Gian ' + t + ' ' + k + ' · ' + (m[1] ? 'Chợ Đà Lạt' : 'Quảng trường');
+}
+function evLabel(ev){ return ev.replace(/^festival-(\d+)$/, 'Festival Hoa $1'); }
+
+auth.onAuthStateChanged(u => {
+  refs.splice(0).forEach(r => r.off());
+  D.me = u;
+  if (!u){
+    $('who').innerHTML = 'Chưa đăng nhập.';
+    $('tabs').hidden = true;
+    $('main').innerHTML = '<div class="card"><p>Đăng nhập bằng tài khoản Google quản trị của DalatEvent.</p><button class="b green" id="login">Đăng nhập bằng Google</button></div>';
+    $('login').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => { if (/popup/.test(e.code || '')) auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); else msg('Chưa đăng nhập được: ' + (e.code || e.message)); });
+    return;
+  }
+  $('who').innerHTML = esc(u.email || u.displayName || '') + ' · <a href="#" id="out">Đăng xuất</a>';
+  $('out').onclick = e => { e.preventDefault(); auth.signOut(); };
+  const r = db.ref('reports');
+  r.on('value', s => { D.reports = s.val() || {}; $('tabs').hidden = false; render(); }, e => {
+    $('tabs').hidden = true;
+    $('main').innerHTML = `<div class="card"><h2>Tài khoản này chưa có quyền quản trị</h2><p class="sub">Máy chủ trả lời: ${esc(e.code || e.message)}.</p><p>Để cấp quyền, thêm UID dưới đây vào nhánh <code>admins</code> của Realtime Database với giá trị <code>true</code>:</p><p><code>${esc(u.uid)}</code></p></div>`;
+  });
+  refs.push(r);
+  const b = db.ref('booths'); b.on('value', s => { D.booths = s.val() || {}; render(); }); refs.push(b);
+  const n = db.ref('bans'); n.on('value', s => { D.bans = s.val() || {}; render(); }, () => {}); refs.push(n);
+  const l = db.ref('modlog').limitToLast(60); l.on('value', s => { const a = []; s.forEach(c => { a.push(c.val()); }); D.log = a.reverse(); render(); }, () => {}); refs.push(l);
+});
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (!b) return; D.tab = b.dataset.tab; D.ask = null; [...$('tabs').children].forEach(x => x.classList.toggle('on', x === b)); render(); });
+
+function groups(){
+  const out = [];
+  for (const ev in D.reports) for (const id in D.reports[ev]){
+    const list = Object.entries(D.reports[ev][id] || {}).map(([by, v]) => Object.assign({ byUid:by }, v)).sort((a, b) => (b.t || 0) - (a.t || 0));
+    if (list.length) out.push({ ev, id, list, last:list[0].t || 0 });
+  }
+  return out.sort((a, b) => b.list.length - a.list.length || b.last - a.last);
+}
+function render(){
+  if (!D.me) return;
+  const G = groups();
+  $('nRep').textContent = G.length ? '(' + G.length + ')' : '';
+  $('nBan').textContent = Object.keys(D.bans).length ? '(' + Object.keys(D.bans).length + ')' : '';
+  let h = '';
+  if (D.tab === 'rep'){
+    if (!G.length) h = '<p class="empty">Không có báo cáo nào đang chờ xử lý.</p>';
+    G.forEach(g => {
+      const cur = (D.booths[g.ev] || {})[g.id], key = g.ev + '/' + g.id, why = {};
+      g.list.forEach(r => { why[r.why] = (why[r.why] || 0) + 1; });
+      const ouid = g.list[0].ouid, changed = cur && ouid && cur.uid !== ouid, banned = cur && D.bans[cur.uid];
+      h += `<div class="card"><h2>${esc(boothLabel(g.id))}</h2><div class="sub">${esc(evLabel(g.ev))} · ${g.list.length} báo cáo · gần nhất ${when(g.last)}</div>`;
+      h += '<div class="tags">' + Object.entries(why).map(([w, n]) => `<span class="tag">${esc(w)} ×${n}</span>`).join('') + '</div>';
+      h += cur ? `<div class="now">Hiện tại: <b>${esc(cur.brand)}</b><br><span class="sub">Chủ gian: ${esc(cur.owner || '')} · đã trả ${Number(cur.price || 0).toLocaleString('vi-VN')} xu${cur.mod ? ' · đã từng bị đặt lại tên' : ''}${banned ? ' · tài khoản đang bị khoá' : ''}</span></div>` : '<div class="warn">Gian này hiện không có chủ (đã bị thu hồi hoặc chưa ai mua).</div>';
+      if (changed) h += '<div class="warn">Gian đã đổi chủ sau khi bị báo cáo. Các nút bên dưới tác động lên chủ hiện tại.</div>';
+      h += `<details><summary>Xem từng báo cáo</summary><ul>${g.list.map(r => `<li><b>${esc(r.why)}</b> · tên lúc báo: “${esc(r.brand)}” (${esc(r.owner)}) · người báo: ${esc(r.by || r.byUid.slice(0, 6))} · ${when(r.t)}</li>`).join('')}</ul></details>`;
+      h += '<div class="acts">';
+      if (cur){
+        h += btn('reset', key, 'Đặt lại tên', '');
+        h += btn('revoke', key, 'Thu hồi gian', 'red');
+        if (!banned) h += btn('ban', key, 'Khoá mua gian', 'red');
+      }
+      h += btn('dismiss', key, 'Bỏ qua', '');
+      h += '</div>';
+      if (D.ask && D.ask.k === key && D.ask.a === 'ban') h += `<div class="acts"><input class="why" id="banWhy" maxlength="60" placeholder="Lý do (người chơi sẽ thấy)" value="Tên gian vi phạm quy định"></div>`;
+      h += '</div>';
+    });
+  } else if (D.tab === 'ban'){
+    const L = Object.entries(D.bans);
+    if (!L.length) h = '<p class="empty">Chưa khoá tài khoản nào.</p>';
+    L.sort((a, b) => (b[1].t || 0) - (a[1].t || 0)).forEach(([uid, v]) => {
+      h += `<div class="card"><h2>${esc(v.name || 'Người chơi')}</h2><div class="sub">Khoá lúc ${when(v.t)} · lý do: ${esc(v.why || '')}</div><div class="sub"><code>${esc(uid)}</code></div><div class="acts">${btn('unban', uid, 'Mở khoá', 'green')}</div></div>`;
+    });
+  } else {
+    const N = { reset:'Đặt lại tên', revoke:'Thu hồi gian', ban:'Khoá mua gian', unban:'Mở khoá', dismiss:'Bỏ qua báo cáo' };
+    if (!D.log.length) h = '<p class="empty">Chưa có thao tác nào.</p>';
+    else h = '<div class="card"><ul>' + D.log.map(l => `<li>${when(l.t)} · <b>${esc(N[l.act] || l.act)}</b> · ${esc(l.booth ? boothLabel(l.booth) : '')} ${l.brand ? '“' + esc(l.brand) + '”' : ''} ${l.owner ? '(' + esc(l.owner) + ')' : ''} ${l.why ? '· ' + esc(l.why) : ''} · ${esc(l.by || '')}</li>`).join('') + '</ul></div>';
+  }
+  const keep = $('banWhy') ? $('banWhy').value : null;
+  $('main').innerHTML = h;
+  if (keep != null && $('banWhy')) $('banWhy').value = keep;
+}
+const ASK = { revoke:1, ban:1, unban:1 };
+function btn(a, k, t, cls){
+  const asking = D.ask && D.ask.a === a && D.ask.k === k;
+  return `<button class="b ${cls}${asking ? ' ask' : ''}" data-a="${a}" data-k="${esc(k)}">${asking ? 'Bấm lần nữa để ' + t.toLowerCase() : esc(t)}</button>`;
+}
+$('main').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-a]'); if (!b || b.disabled) return;
+  const a = b.dataset.a, k = b.dataset.k;
+  if (ASK[a] && !(D.ask && D.ask.a === a && D.ask.k === k)){ D.ask = { a, k }; render(); return; }
+  const why = a === 'ban' && $('banWhy') ? $('banWhy').value.trim().slice(0, 60) : '';
+  D.ask = null; b.disabled = true;
+  try { await act(a, k, why); } catch(err){ console.warn(err); msg('Chưa thực hiện được: ' + (err.code || err.message)); }
+  render();
+});
+async function act(a, k, why){
+  const by = (D.me.email || D.me.uid).slice(0, 60);
+  const log = o => db.ref('modlog').push(Object.assign({ t:TS, act:a, by }, o));
+  if (a === 'unban'){
+    const v = D.bans[k] || {};
+    await db.ref('bans/' + k).remove(); await log({ ouid:k, owner:v.name || '' }); msg('Đã mở khoá ' + (v.name || 'người chơi') + '.'); return;
+  }
+  const [ev, id] = k.split('/'), cur = (D.booths[ev] || {})[id], info = { ev, booth:id, brand:cur ? cur.brand : '', owner:cur ? cur.owner : '', ouid:cur ? cur.uid : '' };
+  if (a === 'dismiss'){ await db.ref('reports/' + k).remove(); await log(info); msg('Đã bỏ qua báo cáo.'); return; }
+  if (!cur){ msg('Gian này không còn chủ.'); return; }
+  if (a === 'reset'){
+    await db.ref('booths/' + k).update({ brand:'Thương hiệu', owner:'Người chơi', mod:TS });
+    await db.ref('reports/' + k).remove(); await log(info); msg('Đã đặt lại tên gian. Chủ gian sẽ được nhắc đặt tên khác.');
+  } else if (a === 'revoke'){
+    await db.ref('booths/' + k).remove();
+    await db.ref('reports/' + k).remove(); await log(info); msg('Đã thu hồi gian. Gian trở lại trống, không hoàn xu.');
+  } else if (a === 'ban'){
+    await db.ref('bans/' + cur.uid).set({ t:TS, why:why || 'Vi phạm quy định', name:String(cur.owner || '').slice(0, 16), by });
+    await log(Object.assign({ why:why || 'Vi phạm quy định' }, info)); msg('Đã khoá mua và đặt tên gian của ' + (cur.owner || 'người chơi') + '.');
+  }
+}
+</script>
+</body>
+</html>

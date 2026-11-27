@@ -2397,13 +2397,17 @@ function boothsApply(data){
   BRANDS.forEach(b => {
     if (b.sponsor) return;
     const o = data && data[b.id] && typeof data[b.id] === 'object' ? data[b.id] : null, old = BOWN[b.id];
-    const same = (!o && !old) || (o && old && o.uid === old.uid && o.brand === old.brand && o.color === old.color && o.price === old.price && String(o.dc || '') === String(old.dc || ''));
-    if (o) BOWN[b.id] = { uid:String(o.uid || ''), owner:String(o.owner || ''), brand:String(o.brand || ''), color:String(o.color || ''), price:+o.price || b.T.price, dc:String(o.dc || '').slice(0, 80) }; else delete BOWN[b.id];
+    const same = (!o && !old) || (o && old && o.uid === old.uid && o.brand === old.brand && o.color === old.color && o.price === old.price && String(o.dc || '') === String(old.dc || '') && (+o.mod || 0) === (old.mod || 0));
+    if (o) BOWN[b.id] = { uid:String(o.uid || ''), owner:String(o.owner || ''), brand:String(o.brand || ''), color:String(o.color || ''), price:+o.price || b.T.price, dc:String(o.dc || '').slice(0, 80), mod:+o.mod || 0 }; else delete BOWN[b.id];
     if (!same) buildBooth(b);
   });
   const now2 = myBooth(); BO.mine = now2 ? now2.id : null;
   if (now2 && now2.id !== prevMine) buildBooth(now2);
   if (now2 && !BO.local && BO.dcOk !== false && bdMine().join(',') !== String(BOWN[now2.id].dc || '')) setTimeout(bdSync, 400);   /* gian mới mua hoặc máy khác: đưa đồ đang bày lên máy chủ */
+  const modMine = myOwned().find(b => BOWN[b.id].mod);
+  if (modMine && u && u !== 'local' && BO.modSeen !== modMine.id + ':' + BOWN[modMine.id].mod){ BO.modSeen = modMine.id + ':' + BOWN[modMine.id].mod; S.brand = ''; toast('Ban quản trị đã đặt lại tên gian của bạn vì bị báo cáo không phù hợp. Hãy đặt một tên thương hiệu khác.', 'bad'); }
+  if (prevMine && prevMine !== BO.mine && u && BO.seen){ const b = BRANDS.find(x => x.id === prevMine), o = b && BOWN[b.id]; if (b && !o) toast(`Ban quản trị đã thu hồi ${b.kiosk ? '' : 'Gian '}${b.T.name} ${b.k} của bạn vì vi phạm quy định.`, 'bad'); }
+  BO.seen = true;
   if (prevMine && prevMine !== BO.mine && u){ const b = BRANDS.find(x => x.id === prevMine), o = b && BOWN[b.id]; if (o && o.uid !== u) toast(`${o.owner || 'Một người chơi'} vừa mua lại ${'Gian ' + b.T.name + ' ' + b.k} của bạn. Bạn được hoàn tiền khi nhận thông báo.`, 'bad'); }
   ctxKey = '';
 }
@@ -2420,7 +2424,10 @@ function boothsStart(online){
 /* tiền hoàn khi bị người khác mua lại gian: người mua ghi vào payouts/{uid cũ}, người cũ nhận khi đăng nhập */
 function payoutsStart(user){
   if (BO.payRef){ BO.payRef.off(); BO.payRef = null; }
+  if (BO.banRef){ BO.banRef.off(); BO.banRef = null; } BO.ban = null;
   if (!user || typeof firebase === 'undefined' || !firebase.database) return;
+  BO.banRef = firebase.database().ref('bans/' + user.uid);
+  BO.banRef.on('value', s => { const v = s.val(); BO.ban = v ? { why:String((v && v.why) || '').slice(0, 60) } : null; ctxKey = ''; }, () => {});
   BO.payRef = firebase.database().ref('payouts/' + user.uid);
   BO.payRef.on('child_added', s => { const v = s.val() || {}, c = Math.max(0, Math.min(50000000, +v.coins || 0)); s.ref.remove().catch(() => {}); if (!c) return; give({ coins:c }); save(); updateHud(); toast(`${String(v.by || 'Một người chơi').slice(0, 16)} đã mua lại gian ${String(v.booth || '').slice(0, 24)}. Bạn được hoàn ${fmt(c)} xu.`, 'gold'); }, e => console.warn('payouts', e && e.code));
   if (BO.ref) BO.ref.once('value').then(s => boothsApply(s.val())).catch(() => {});
@@ -2430,6 +2437,7 @@ async function buyBooth(){
   const T = b.T, u = myUid(), cur = BOWN[b.id];
   if (!u){ toast('Đăng nhập để mua gian thương hiệu: mỗi gian là duy nhất, mọi người chơi đều thấy tên thương hiệu của bạn.', 'bad'); openModal('settings'); return; }
   if (cur && cur.uid === u) return;
+  if (BO.ban){ toast('Tài khoản của bạn đang bị ban quản trị tạm khoá mua và đặt tên gian' + (BO.ban.why ? ' (' + BO.ban.why + ')' : '') + '.', 'bad'); sfx('bad'); return; }
   if (S.level < T.lv){ toast(`Gian ${T.name} cần cấp ${T.lv}.`, 'bad'); sfx('bad'); return; }
   const mine = b.kiosk ? myKiosk() : myBooth(); if (mine){ toast(b.kiosk ? 'Mỗi người chỉ giữ một ki-ốt.' : 'Mỗi người chỉ giữ một gian thương hiệu trên mỗi bản đồ.', 'bad'); sfx('bad'); return; }
   const price = boothPrice(b); if (S.coins < price){ toast(`Cần ${fmt(price)} xu.`, 'bad'); sfx('bad'); return; }
@@ -2452,10 +2460,12 @@ async function buyBooth(){
 async function saveBrand(){
   const nm = (($('optBrand') || {}).value || '').trim().replace(/\s+/g, ' ').slice(0, 24), col = S.brandColor || BRAND_COLORS[0];
   if (nm.length < 2){ toast('Tên thương hiệu cần ít nhất 2 ký tự.', 'bad'); return; }
+  if (BO.ban){ toast('Tài khoản của bạn đang bị ban quản trị tạm khoá mua và đặt tên gian' + (BO.ban.why ? ' (' + BO.ban.why + ')' : '') + '.', 'bad'); return; }
+
   S.brand = nm; BO.draft = null;
   for (const b of myOwned()){           /* tên và màu thương hiệu dùng chung cho gian và ki-ốt của mình */
     if (BO.local){ S.bown[CUR_EVENT.key][b.id].brand = nm; S.bown[CUR_EVENT.key][b.id].color = col; }
-    else { try { await BO.ref.child(b.id).update({ brand:nm, color:col, owner:String(S.name).slice(0, 16) }); } catch(e){ toast('Chưa lưu được tên (' + ((e && e.code) || 'lỗi') + ').', 'bad'); return; } }
+    else { try { await BO.ref.child(b.id).update({ brand:nm, color:col, owner:String(S.name).slice(0, 16), mod:null }); } catch(e){ toast('Chưa lưu được tên (' + ((e && e.code) || 'lỗi') + ').', 'bad'); return; } }
   }
   if (BO.local && myOwned().length) boothsApply(S.bown[CUR_EVENT.key]);
   toast('Đã đặt tên thương hiệu: ' + nm, 'gold'); save(); closeModal();
