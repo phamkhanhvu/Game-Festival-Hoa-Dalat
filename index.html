@@ -537,7 +537,7 @@ const HAIRS = ['#1f1a17','#2b1d14','#3a2a1e','#141414'];
 
 function freshState(){
   const stalls = {}; STALLS_ALL.forEach(d => stalls[d.id] = { owned:!!d.cart, level:1, stock:d.cart ? 20 : 0 });
-  return { v:5, name:'Chủ Quầy', level:1, exp:0, coins:2000, gems:20, sold:0,
+  return { blocked:{}, reported:{}, v:5, name:'Chủ Quầy', level:1, exp:0, coins:2000, gems:20, sold:0,
     stats:{ earned:0, restocks:0, missed:0, jackpots:0, served:0, photos:0, bulk:0 },
     stalls, quest:0, flags:{}, brands:{}, stage:{}, achv:{}, outfit:'blue', outfits:['blue'], order:null, nextOrder:0, quiz:{},
     lastDaily:'', onlineAcc:0, eventEnd:0, eventReady:0, rushEnd:0, sound:true, gfx:'high',
@@ -547,7 +547,7 @@ function freshState(){
 function normalize(s){
   const m = Object.assign(freshState(), s);
   m.stats = Object.assign(freshState().stats, s.stats || {});
-  m.flags = m.flags || {}; m.brands = m.brands || {}; m.stage = m.stage || {}; m.achv = m.achv || {}; m.hunts = m.hunts || {}; m.quiz = m.quiz || {};
+  m.flags = m.flags || {}; m.brands = m.brands || {}; m.blocked = (m.blocked && typeof m.blocked === 'object') ? m.blocked : {}; m.reported = (m.reported && typeof m.reported === 'object') ? m.reported : {}; m.stage = m.stage || {}; m.achv = m.achv || {}; m.hunts = m.hunts || {}; m.quiz = m.quiz || {};
   m.inv = Object.assign(freshState().inv, s.inv || {}); m.found = Object.assign(freshState().found, s.found || {});
   m.stamps = Array.isArray(s.stamps) && s.stamps.length === 8 ? s.stamps : freshState().stamps;
   STALLS_ALL.forEach(d => { if (!m.stalls[d.id]) m.stalls[d.id] = { owned:!!d.cart, level:1, stock:d.cart ? 20 : 0 }; });
@@ -2167,7 +2167,8 @@ const BOWN = {};
 function boothView(b){
   if (b.sponsor) return b;
   const o = BOWN[b.id];
-  if (o){ b.name = String(o.brand || 'Thương hiệu').slice(0, 24); b.color = /^#[0-9a-f]{6}$/i.test(o.color || '') ? o.color : BRAND_COLORS[b.no % BRAND_COLORS.length]; b.tag = 'Chủ gian: ' + String(o.owner || 'Người chơi').slice(0, 16); }
+  if (o && boothHidden(b, o)){ b.name = (b.kiosk ? '' : 'Gian ') + b.T.name + ' ' + b.k; b.color = '#8d96a3'; b.tag = 'Đã có chủ · nội dung bị ẩn'; }
+  else if (o){ b.name = String(o.brand || 'Thương hiệu').slice(0, 24); b.color = /^#[0-9a-f]{6}$/i.test(o.color || '') ? o.color : BRAND_COLORS[b.no % BRAND_COLORS.length]; b.tag = 'Chủ gian: ' + String(o.owner || 'Người chơi').slice(0, 16); }
   else { b.name = (b.kiosk ? '' : 'Gian ') + b.T.name + ' ' + b.k; b.color = '#8d96a3'; b.tag = 'Còn trống · cần cấp ' + b.T.lv; }
   return b;
 }
@@ -2186,7 +2187,7 @@ const BD_BONUS_MAX = 6, BD_IDS = BD_ITEMS.map(x => x.id);
 function bdS(){ if (!S.bdc || typeof S.bdc !== 'object') S.bdc = { own:{}, on:{} }; if (!S.bdc.own) S.bdc.own = {}; if (!S.bdc.on) S.bdc.on = {}; return S.bdc; }
 const bdMine = () => BD_IDS.filter(k => bdS().on[k]);
 /* đồ đang bày ở một gian: gian của mình lấy theo máy mình, gian người khác lấy theo máy chủ */
-function boothDc(b){ const o = BOWN[b.id]; if (!o) return []; const u = myUid(); if (u && o.uid === u) return bdMine(); return String(o.dc || '').split(',').filter(k => BD_IDS.includes(k)); }
+function boothDc(b){ const o = BOWN[b.id]; if (!o || boothHidden(b, o)) return []; const u = myUid(); if (u && o.uid === u) return bdMine(); return String(o.dc || '').split(',').filter(k => BD_IDS.includes(k)); }
 const boothBonus = b => Math.min(BD_BONUS_MAX, boothDc(b).length) * 0.05;
 const boothIncomeOf = b => Math.round(b.T.income * (1 + boothBonus(b)));
 function bdBuild(b, g, put, cm, kiosk){
@@ -2334,6 +2335,63 @@ const myUid = () => (typeof fbAuth !== 'undefined' && fbAuth && fbAuth.currentUs
 const boothPrice = b => { const o = BOWN[b.id]; return o ? Math.ceil(o.price * BOOTH_BUYOUT / 10000) * 10000 : b.T.price; };
 const myOwned = () => { const u = myUid(); return u ? BRANDS.filter(b => BOWN[b.id] && BOWN[b.id].uid === u) : []; };
 const myBooth = () => myOwned().find(b => !b.kiosk) || null, myKiosk = () => myOwned().find(b => b.kiosk) || null;
+/* ===== Báo cáo gian hàng và chặn người chơi =====
+   Chặn: lưu trong tiến trình của mình (S.blocked), ẩn nhân vật, tên và gian của người đó trên máy mình.
+   Báo cáo: ghi vào reports/{sự kiện}/{gian}/{uid người báo} trên máy chủ cho ban quản trị xem, đồng thời ẩn tên và đồ trang trí của gian trên máy mình. */
+const REP_WHY = ['Tên phản cảm, xúc phạm', 'Quảng cáo rác, lừa đảo', 'Mạo danh thương hiệu khác', 'Lý do khác'];
+function isBlocked(uid){ return !!(uid && S.blocked && S.blocked[uid]); }
+function repKey(b, o){ return (CUR_EVENT ? CUR_EVENT.key : '') + '|' + b.id + '|' + o.uid; }
+function boothHidden(b, o){ const u = myUid(); if (!o || !o.uid || (u && o.uid === u)) return false; return isBlocked(o.uid) || !!(S.reported && S.reported[repKey(b, o)]); }
+function modRefresh(uid){ BRANDS.forEach(b => { const o = BOWN[b.id]; if (!b.sponsor && o && (!uid || o.uid === uid)) buildBooth(b); }); ctxKey = ''; }
+function blockPlayer(uid, name){
+  if (!uid || uid === myUid() || isBlocked(uid)) return;
+  if (Object.keys(S.blocked).length >= 200){ toast('Danh sách chặn đã đủ 200 người. Hãy bỏ chặn bớt.', 'bad'); return; }
+  S.blocked[uid] = String(name || 'Người chơi').slice(0, 16); onlineDrop(uid); modRefresh(uid); save();
+  toast('Đã chặn ' + S.blocked[uid] + '. Bạn sẽ không còn thấy nhân vật, tên và gian hàng của người này.');
+}
+function unblockPlayer(uid){
+  if (!isBlocked(uid)) return; const nm = S.blocked[uid]; delete S.blocked[uid]; modRefresh(uid); save();
+  if (ON.db && ON.me) ON.db.ref('presence/' + uid).once('value').then(onlineUpsert).catch(() => {});
+  toast('Đã bỏ chặn ' + nm + '.');
+}
+async function reportBooth(i){
+  const b = BRANDS.find(x => x.id === BO.modId), o = b && BOWN[b.id], u = myUid(), why = REP_WHY[i];
+  if (!b || !o || !why || !u || o.uid === u) return;
+  const k = repKey(b, o); if (S.reported[k]) return;
+  let sent = BO.local ? null : false, code = '';
+  if (!BO.local){
+    try { await firebase.database().ref('reports/' + CUR_EVENT.key + '/' + b.id + '/' + u).set({ t:firebase.database.ServerValue.TIMESTAMP, why, brand:String(o.brand || '').slice(0, 24), owner:String(o.owner || '').slice(0, 16), ouid:o.uid, dc:String(o.dc || '').slice(0, 80), by:String(S.name || '').slice(0, 16) }); sent = true; }
+    catch(e){ console.warn('báo cáo', e); code = (e && (e.code || e.message)) || 'lỗi'; }
+  }
+  S.reported[k] = { w:i, s:sent ? 1 : 0, t:now() }; modRefresh(o.uid); save();
+  toast(sent ? 'Đã gửi báo cáo tới ban quản trị. Gian này được ẩn tên và đồ trang trí trên máy bạn.' : sent === null ? 'Đã ẩn tên và đồ trang trí của gian này trên máy bạn.' : 'Đã ẩn gian này trên máy bạn, nhưng báo cáo chưa gửi được tới ban quản trị (' + code + ').', sent === false ? 'bad' : '');
+  if (!$('modal').hidden && modalType === 'mod') renderModal();
+}
+function modRender(){
+  const b = BRANDS.find(x => x.id === BO.modId), o = b && BOWN[b.id], u = myUid();
+  if (!b || !o || (u && o.uid === u)) return '<p>Gian này hiện không có chủ khác để báo cáo.</p>';
+  const r = S.reported[repKey(b, o)], blk = isBlocked(o.uid), who = escH(o.owner || 'Người chơi');
+  let h = `<p>${b.kiosk ? '' : 'Gian '}${escH(b.T.name)} ${escH(b.k)} · tên thương hiệu: <b>${escH(o.brand || 'Thương hiệu')}</b> · chủ gian: <b>${who}</b></p>`;
+  h += '<h3>Báo cáo gian hàng</h3>';
+  if (r) h += `<p>Bạn đã báo cáo gian này: ${escH(REP_WHY[r.w] || '')}.${r.s ? ' Báo cáo đã tới ban quản trị.' : BO.local ? '' : ' Báo cáo chưa gửi được tới ban quản trị.'} Tên và đồ trang trí của gian đang được ẩn trên máy bạn.</p><button class="gbtn" data-act="repundo">Hiện lại gian này</button>`;
+  else if (!u || u === 'local') h += '<p>Hãy đăng nhập để gửi báo cáo tới ban quản trị.</p>';
+  else h += '<p>Chọn lý do. Ban quản trị sẽ xem xét; trong lúc chờ, tên và đồ trang trí của gian được ẩn trên máy bạn.</p>' + REP_WHY.map((w, i) => `<button class="gbtn" style="display:block;width:100%;margin:.35rem 0" data-act="rep:${i}">${escH(w)}</button>`).join('');
+  h += '<h3>Chặn người chơi</h3>';
+  h += blk ? `<p>Bạn đang chặn <b>${who}</b>.</p><button class="gbtn blue" data-act="unblk:${escH(o.uid)}">Bỏ chặn</button>`
+    : `<p>Khi chặn, bạn không còn thấy nhân vật, tên và gian hàng của <b>${who}</b>. Người đó không được báo là đã bị chặn.</p><button class="gbtn" data-act="modblk">Chặn ${who}</button>`;
+  return h;
+}
+function playersRender(){
+  const others = [...ON.others.values()].filter(r => !r.stale), bl = Object.entries(S.blocked || {});
+  let h = '<h3>Đang ở đây</h3>';
+  if (!ON.me) h += '<p>Đăng nhập để gặp những người chơi khác.</p>';
+  else if (!others.length) h += '<p>Chưa có ai khác online. Rủ bạn bè đăng nhập để gặp nhau nhé!</p>';
+  else others.forEach(r => { h += row(escH(String(r.d.n || 'Người chơi').slice(0, 16)), r.d.lv ? 'Cấp ' + (+r.d.lv || 1) : '', `<button class="gbtn" data-act="blk:${escH(r.id)}">Chặn</button>`); });
+  h += '<h3>Đã chặn</h3>';
+  if (!bl.length) h += '<p>Bạn chưa chặn ai. Khi chặn, bạn không còn thấy nhân vật, tên và gian hàng của người đó.</p>';
+  else bl.forEach(([id, nm]) => { h += row(escH(nm), 'Đã chặn', `<button class="gbtn blue" data-act="unblk:${escH(id)}">Bỏ chặn</button>`); });
+  return h;
+}
 function boothsApply(data){
   const prevMine = BO.mine, u = myUid();
   BRANDS.forEach(b => {
@@ -2624,6 +2682,7 @@ function onlineMesh(r){
 function onlineTint(r){ const u = r.mesh.userData, c = r.d.o || ''; if (r.col === c) return; r.col = c; if (u.recolor) u.recolor(c || null); }
 function onlineUpsert(snap){
   const id = snap.key, d = snap.val(); if (!d || id === ON.uid || typeof d.x !== 'number' || typeof d.z !== 'number') return;
+  if (isBlocked(id)){ onlineDrop(id); return; }
   if ((d.mp || 'lv') !== MAP){ onlineDrop(id); return; }   /* người chơi ở map khác */
   if (hAt(d.x, d.z) < -50 && typeof d.u !== 'number') return;
   let r = ON.others.get(id);
@@ -2674,7 +2733,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) ON.me.remove().catch(() => {});
   else { ON.last = null; onlineSend(true); }
 });
-$('btnOnline').addEventListener('click', onlineList);
+$('btnOnline').addEventListener('click', () => openModal('players'));
 /* ===== Đố Vui Đà Lạt: thẻ giải đố phát sáng nằm rải rác khắp quảng trường; đi tới nhặt thẻ thì trả lời một câu hỏi về Đà Lạt =====
    Mỗi câu: [câu hỏi, đáp án đúng, ba đáp án nhiễu]. Câu đã trả lời đúng một lần được tính vào bộ sưu tập. */
 const DV_Q = [
@@ -3730,7 +3789,7 @@ function updateCtx(){
     /* gian trưng bày thương hiệu hoặc sân khấu chính */
     el.hidden = false;
     if (nearBooth){
-      const b = nearBooth, seen = !!S.brands[b.id], o = BOWN[b.id], u = myUid(), mine = !!(o && u && o.uid === u), key = 'booth:' + b.id + ':' + seen + ':' + (o ? o.uid + o.brand + o.price : '') + ':' + S.level + ':' + (S.coins >= (b.T ? boothPrice(b) : 0)) + ':' + !!u + ':' + (b.T ? boothDc(b).join('') : '');
+      const b = nearBooth, seen = !!S.brands[b.id], o = BOWN[b.id], u = myUid(), mine = !!(o && u && o.uid === u), key = 'booth:' + b.id + ':' + seen + ':' + (o ? o.uid + o.brand + o.price : '') + ':' + S.level + ':' + (S.coins >= (b.T ? boothPrice(b) : 0)) + ':' + !!u + ':' + (b.T ? boothDc(b).join('') : '') + ':' + (o && boothHidden(b, o) ? 'h' : '');
       if (ctxKey !== key){ ctxKey = key; $('cName').textContent = b.name;
         const visit = (seen || b.kiosk) ? '' : '<button class="gbtn" data-act="boothvisit">Tham quan<small>+200 xu · +10 EXP</small></button>';
         if (b.sponsor){ $('cLv').textContent = 'Nhà tài trợ · ' + CUR_EVENT.name; $('cStats').innerHTML = '<b>' + escH(b.tag) + '</b><br>' + escH(b.desc); $('cBtns').innerHTML = visit || '<button class="gbtn" disabled>Đã tham quan ✓<small>Cảm ơn bạn đã ghé</small></button>'; }
@@ -3738,12 +3797,12 @@ function updateCtx(){
           const T = b.T, price = boothPrice(b);
           $('cLv').textContent = (b.kiosk ? 'Quầy cố định' : 'Gian ' + T.name) + ' · ' + CUR_EVENT.name;
           $('cStats').innerHTML = mine ? `${b.kiosk ? 'Ki-ốt' : 'Gian'} của bạn · thu nhập <b>+${fmt(boothIncomeOf(b))} xu/phút</b> · trang trí ${boothDc(b).length}/${BD_ITEMS.length} món (+${Math.round(boothBonus(b) * 100)}%)<br>Người khác giành được với giá ${fmt(price)} xu (bạn được hoàn ${fmt(Math.round(o.price * BOOTH_REFUND))} xu)`
-            : o ? `Chủ gian: <b>${escH(o.owner || 'Người chơi')}</b> · đã trả ${fmt(o.price)} xu<br>Giành lại gian: <b>${fmt(price)} xu</b> · cần cấp ${T.lv}`
+            : o ? `Chủ gian: <b>${boothHidden(b, o) ? 'đã ẩn' : escH(o.owner || 'Người chơi')}</b> · đã trả ${fmt(o.price)} xu<br>Giành lại gian: <b>${fmt(price)} xu</b> · cần cấp ${T.lv}`
             : `Còn trống · cần <b>cấp ${T.lv}</b><br>Giá: <b>${fmt(price)} xu</b> · thu nhập +${fmt(T.income)} xu/phút trong sự kiện`;
           const ok = S.level >= T.lv && S.coins >= price;
           const buy = (mine && b.kiosk) ? '<button class="gbtn green" data-act="boothdeco">Trang trí ki-ốt<small>Mua đồ bày cho đẹp · +5% mỗi món</small></button><button class="gbtn blue" data-act="boothname">Đổi tên thương hiệu<small>Tên và màu trên biển ki-ốt</small></button>' : mine ? '<button class="gbtn green" data-act="boothdeco">Trang trí gian<small>Mua đồ bày cho đẹp · +5% mỗi món</small></button><button class="gbtn blue" data-act="boothname">Đổi tên thương hiệu<small>Tên và màu trên biển gian</small></button>'
             : `<button class="gbtn ${ok ? 'green' : 'poor'}" data-act="boothbuy">${b.kiosk ? (o ? 'Mua lại ki-ốt' : 'Đăng ký mua ki-ốt') : (o ? 'Giành gian' : 'Mua gian')}<small>${S.level < T.lv ? 'Cần cấp ' + T.lv : fmt(price) + ' xu'}</small></button>`;
-          $('cBtns').innerHTML = buy + visit;
+          $('cBtns').innerHTML = buy + visit + ((o && !mine && u && u !== 'local') ? '<button class="gbtn" data-act="boothmod">Báo cáo · Chặn<small>Tên hoặc trang trí không phù hợp</small></button>' : '');
         }
       }
     } else {
@@ -3797,7 +3856,7 @@ function updateCtx(){
 }
 $('cBtns').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return; const a = b.dataset.act;
-  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'boothdeco') openModal('bdeco'); else if (a === 'songs') openModal('songs'); else if (a === 'dance'){ danceStart(); return; } else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
+  if (!nearId){ if (a === 'lottobuy') lottoBuy(); else if (a === 'openveso') openModal('veso'); else if (a === 'boothvisit') visitBooth(); else if (a === 'boothbuy') buyBooth(); else if (a === 'boothname') openModal('brand'); else if (a === 'boothmod'){ BO.modId = nearBooth && nearBooth.id; openModal('mod'); } else if (a === 'boothdeco') openModal('bdeco'); else if (a === 'songs') openModal('songs'); else if (a === 'dance'){ danceStart(); return; } else if (a === 'cheer') cheerStage(); updateHud(); updateCtx(); return; }
   if (a === 'serve') serveNow(nearId); else if (a === 'restock') restock(nearId); else if (a === 'upgrade') upgrade(nearId); else if (a === 'buy') buyStall(nearId); else if (a === 'staff') hireStaff(nearId); else if (a === 'deco'){ decoId = nearId; dcDraft = null; openModal('deco'); }
   updateHud(); updateCtx();
 });
@@ -3812,7 +3871,7 @@ $('qGo').addEventListener('click', () => {
 
 /* ================= Hộp thoại ================= */
 let modalType = null, resetAsk = false;
-const TITLES = { songs:'Danh Sách Bài Hát', bdeco:'Trang Trí Gian Hàng', quay:'Quầy Hàng Của Tôi', deco:'Trang Trí Quầy', brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
+const TITLES = { mod:'Báo Cáo · Chặn', players:'Người Chơi', songs:'Danh Sách Bài Hát', bdeco:'Trang Trí Gian Hàng', quay:'Quầy Hàng Của Tôi', deco:'Trang Trí Quầy', brand:'Thương Hiệu Của Bạn', dovui:'Đố Vui Đà Lạt', veso:'Vé Số Đà Lạt', board:'Bảng Xếp Hạng', hunt:'Sổ Tay', achv:'Thành Tựu', welfare:'Phúc Lợi', shop:'Cửa Hàng', settings:'Cài Đặt', bag:'Túi Đồ', event:'Sự Kiện Hấp Dẫn', quiz:'Câu Đố Địa Danh', photo:'Ảnh Bưu Thiếp' };
 function openModal(type){ modalType = type; resetAsk = false; $('mTitle').textContent = TITLES[type]; $('modal').hidden = false; renderModal(); }
 function closeModal(){ $('modal').hidden = true; modalType = null; modalTick = null; quizRes = null; save(); if (pendingQuiz.length) setTimeout(() => { if (!modalType && pendingQuiz.length) openQuiz(pendingQuiz.shift()); }, 350); }
 function row(title, sub, btn, extra){ return `<div class="row">${extra || ''}<div class="rt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>${btn || ''}</div>`; }
@@ -3857,6 +3916,7 @@ function renderModal(){
     h += `<div class="field"><label for="optName"><b>Tên nhân vật</b></label><input id="optName" maxlength="16" value="${S.name.replace(/"/g, '&quot;')}"></div>`;
     if (fbAuth && fbAuth.currentUser) h += row('Tài khoản', CLOUD.status, `<button class="gbtn blue" data-act="glogout">Đăng xuất</button>`);
     else if (fbAuth) h += `<h3>Tài khoản</h3><p class="qtext">${CLOUD.status}</p><div class="field"><label for="optEmail"><b>Email</b></label><input id="optEmail" type="email" autocomplete="email"></div><div class="field"><label for="optPass"><b>Mật khẩu (ít nhất 6 ký tự)</b></label><input id="optPass" type="password" autocomplete="current-password"></div><div class="ctx-btns"><button class="gbtn green" data-act="emailsignup">Đăng ký</button><button class="gbtn" data-act="emaillogin">Đăng nhập</button><button class="gbtn blue" data-act="emailreset">Quên mật khẩu</button></div><div class="ctx-btns" style="margin-top:.5rem"><button class="gbtn" data-act="glogin">Đăng nhập bằng Google</button></div>`;
+    h += row('Người chơi', 'Xem ai đang online, chặn hoặc bỏ chặn · đang chặn ' + Object.keys(S.blocked || {}).length + ' người', `<button class="gbtn blue" data-act="players">Mở</button>`);
     h += row('Ban đêm', 'Cảnh nhìn: ' + SKY_NAME[S.sky === 'day' || S.sky === 'night' ? S.sky : 'auto'] + '. Quầy đêm và vé số vẫn theo giờ thật.', `<button class="gbtn blue" data-act="sky">${dayK() < 0.5 ? 'Tắt ban đêm' : 'Bật ban đêm'}</button>`);
     h += row('Âm thanh', S.sound ? 'Đang bật' : 'Đang tắt',`<button class="gbtn blue" data-act="sound">${S.sound ? 'Tắt' : 'Bật'}</button>`);
     h += row('Đồ họa', S.gfx !== 'low' ? 'Cao: có đổ bóng, nét hơn' : 'Thấp: mượt hơn trên máy yếu', `<button class="gbtn blue" data-act="gfx">${S.gfx !== 'low' ? 'Chuyển Thấp' : 'Chuyển Cao'}</button>`);
@@ -3900,6 +3960,10 @@ function renderModal(){
     h += dcRender();
   } else if (modalType === 'brand'){
     h += brandRender();
+  } else if (modalType === 'mod'){
+    h += modRender();
+  } else if (modalType === 'players'){
+    h += playersRender();
   } else if (modalType === 'dovui'){
     h += dvRender();
   } else if (modalType === 'quiz'){
@@ -3958,6 +4022,12 @@ $('mBody').addEventListener('click', e => {
   else if (a === 'bdname'){ openModal('brand'); return; }
   else if (a === 'bdopen'){ BO.draft = null; openModal('bdeco'); return; }
   else if (a === 'brandsave'){ saveBrand(); return; }
+  else if (a === 'rep'){ reportBooth(+id); return; }
+  else if (a === 'repundo'){ const mb = BRANDS.find(x => x.id === BO.modId), mo = mb && BOWN[mb.id]; if (mo){ delete S.reported[repKey(mb, mo)]; modRefresh(mo.uid); } }
+  else if (a === 'modblk'){ const mb = BRANDS.find(x => x.id === BO.modId), mo = mb && BOWN[mb.id]; if (mo) blockPlayer(mo.uid, mo.owner); }
+  else if (a === 'blk'){ const r = ON.others.get(id); if (r) blockPlayer(id, r.d.n); }
+  else if (a === 'unblk'){ unblockPlayer(id); }
+  else if (a === 'players'){ openModal('players'); return; }
   else if (a === 'brandcol'){ S.brandColor = '#' + id; BO.draft = ($('optBrand') || {}).value; }
   else if (a === 'dvans' || a === 'dvnext'){ dvAct(a, id); if (a === 'dvnext') return; }
   else if (a === 'qdone'){ closeModal(); }
@@ -4039,7 +4109,7 @@ P.y = P.h; resize(); setAvatar(); offlineEarnings(); initItems(); updateCamera(0
 if (S.quest === 0 && !S.flags.explored) setTimeout(() => toast('Chào mừng tới Quảng trường Lâm Viên! Làm theo bảng Nhiệm vụ chính bên trái.'), 400);
 $('buffs').addEventListener('click', e => { const od = e.target.closest('[data-open]'); if (od) openModal(od.dataset.open); });
 window.FB_READY.then(cloudInit);
-window.__game = { deckAt, DECKS, DPATH, cam:() => [camera.position.x, camera.position.y, camera.position.z], desiredCam, place:(x, z, u) => { P.x = x; P.z = z; P.goto = null; if (u !== undefined){ P.up = true; P.gy = u; P.h = u; P.sx = x; P.sz = z; } }, items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, myOwned, myKiosk, DANCE, danceStart, danceKey, danceHit, danceEnd, danceBeat, danceUpdate, skyToggle, dayK, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
+window.__game = { blockPlayer, unblockPlayer, reportBooth, boothsApply, onlineUpsert, ON, openModal, deckAt, DECKS, DPATH, cam:() => [camera.position.x, camera.position.y, camera.position.z], desiredCam, place:(x, z, u) => { P.x = x; P.z = z; P.goto = null; if (u !== undefined){ P.up = true; P.gy = u; P.h = u; P.sx = x; P.sz = z; } }, items, TPL, S:() => S, P, model:() => model, byId:(id)=>items.find(x=>x.id===id), ready:() => !!model, groundAt, hAt, topAt, NAV, PROPS, WORLD, stepOk, movePlayer, setGoto, STALLS, RT, st, buyStall, serveNow, restock, upgrade, lottoBuy, openModal, closeModal, update, items:() => items, give, save, hud:() => { updateHud(); updateCtx(); }, info:() => renderer.info.render, dist:v => { camDist = v; }, myOwned, myKiosk, DANCE, danceStart, danceKey, danceHit, danceEnd, danceBeat, danceUpdate, skyToggle, dayK, SQ, songState:() => ({ idx:songIdx, reqd:songReqd, plays:songPlays }), songNext, buildStall, ROUTE_VEH, ROUTES, cartSpotOk, BO, BOWN, buyBooth, CUR_EVENT, myBooth, dvCards, dvS, forceWx:k => { const was = WX.k; WX.k = k; RAIN.p.visible = k === 'rain'; if (k === 'rain' && was !== 'rain') rainScatter(); }, ON, onlineUpsert, onlineDrop, BRANDS, STAGE, visitBooth, cheerStage, near:() => ({ booth:nearBooth && nearBooth.id, stage:nearStage, stall:nearId }), music:() => ({ idx:songIdx, plays:songPlays, title:SONGS[songIdx].title, vol:bgmVol, gain:bgmGain ? bgmGain.gain.value : null, paused:BGM.paused, t:BGM.currentTime, src:BGM.src.split('/').slice(-2).join('/'), ac:AC && AC.state }), BGM, step:n => { for (let i = 0; i < n; i++) update(0.05); }, people:() => people, set:(o) => Object.assign(P, o), yaw:v => { yaw = v; }, pitch:v => { pitch = v; }, snap:() => updateCamera(0, true), setHour:h => { hourOverride = h; } };
 /* Mô hình 3D do bạn gửi: cây và người đứng (tải bất đồng bộ, lỗi thì bỏ qua) */
 const MIXERS = [];
 (function loadUserModels(){
