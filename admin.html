@@ -87,7 +87,7 @@ function evLabel(ev){ return ev.replace(/^festival-(\d+)$/, 'Festival Hoa $1'); 
 
 auth.onAuthStateChanged(u => {
   refs.splice(0).forEach(r => r.off());
-  D.me = u;
+  D.me = u; D.ok = false; D.denied = null;
   if (!u){
     $('who').innerHTML = 'Chưa đăng nhập.';
     $('tabs').hidden = true;
@@ -98,9 +98,10 @@ auth.onAuthStateChanged(u => {
   $('who').innerHTML = esc(u.email || u.displayName || '') + ' · <a href="#" id="out">Đăng xuất</a>';
   $('out').onclick = e => { e.preventDefault(); auth.signOut(); };
   const r = db.ref('reports');
-  r.on('value', s => { D.reports = s.val() || {}; $('tabs').hidden = false; render(); }, e => {
-    $('tabs').hidden = true;
-    $('main').innerHTML = `<div class="card"><h2>Tài khoản này chưa có quyền quản trị</h2><p class="sub">Máy chủ trả lời: ${esc(e.code || e.message)}.</p><p>Để cấp quyền, thêm UID dưới đây vào nhánh <code>admins</code> của Realtime Database với giá trị <code>true</code>:</p><p><code>${esc(u.uid)}</code></p></div>`;
+  D.denied = null;
+  r.on('value', s => { D.reports = s.val() || {}; D.ok = true; $('tabs').hidden = false; render(); }, e => {
+    $('tabs').hidden = true; refs.splice(0).forEach(x => x.off());
+    D.denied = 1; $('main').innerHTML = `<div class="card"><h2>Tài khoản này chưa có quyền quản trị</h2><p class="sub">Máy chủ trả lời: ${esc(e.code || e.message)}.</p><p>Để cấp quyền, thêm UID dưới đây vào nhánh <code>admins</code> của Realtime Database với giá trị <code>true</code>:</p><p><code>${esc(u.uid)}</code></p></div>`;
   });
   refs.push(r);
   const b = db.ref('booths'); b.on('value', s => { D.booths = s.val() || {}; render(); }); refs.push(b);
@@ -118,7 +119,7 @@ function groups(){
   return out.sort((a, b) => b.list.length - a.list.length || b.last - a.last);
 }
 function render(){
-  if (!D.me) return;
+  if (!D.me || D.denied || !D.ok) return;
   const G = groups();
   $('nRep').textContent = G.length ? '(' + G.length + ')' : '';
   $('nBan').textContent = Object.keys(D.bans).length ? '(' + Object.keys(D.bans).length + ')' : '';
