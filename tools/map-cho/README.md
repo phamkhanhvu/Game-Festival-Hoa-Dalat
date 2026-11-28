@@ -60,3 +60,6 @@ Khung làm việc của `common.py` nay là cả bản đồ.
 
 ## festival.py — cây và hoa mùa Festival
 `python3 festival.py ../../world_cho.js ../../world_cho.js [ảnh_mặt_bằng.png]` điền `trees`, `pots`, `flowers` vào world_cho.js (thảm hoa ở sân rộng, mai anh đào và phượng tím dọc vỉa hè, chậu hoa, hoa trên các bậc cỏ). Chạy lại sau mỗi lần chạy `rear/rear.py`, vì rear.py dựng world_cho.js lại từ bản sao lưu. Sau đó nhớ đổi `BUILD_V` trong index.html.
+
+## kerbs.py — bó vỉa cao 10 cm
+`python3 kerbs.py <market.glb vào> <world_cho.js vào> <market.glb ra> <world_cho.js ra>`: mọi lề và vỉa lát (gạch kem, lát xám) giáp mặt đường nhựa được đặt cao hơn mặt đường 10 cm ở mép, trở dần về cao độ cũ trong 1 đến 2,5 m; tấm lát gần đường được chia nhỏ khi cần để bám mặt đường; dựng mặt đứng bó vỉa từ mép lề xuống dưới mặt đường 8 cm; lưới đi lại `h` theo mặt lề mới. Chạy sau `curbs.py`, `rear/rear.py`, `festival.py` (nếu chạy lại festival.py sau bước này thì cây, chậu đặt theo `h` mới, không cần làm gì thêm). Nhớ đổi `BUILD_V`.
