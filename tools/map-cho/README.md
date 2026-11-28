@@ -61,5 +61,28 @@ Khung làm việc của `common.py` nay là cả bản đồ.
 ## festival.py — cây và hoa mùa Festival
 `python3 festival.py ../../world_cho.js ../../world_cho.js [ảnh_mặt_bằng.png]` điền `trees`, `pots`, `flowers` vào world_cho.js (thảm hoa ở sân rộng, mai anh đào và phượng tím dọc vỉa hè, chậu hoa, hoa trên các bậc cỏ). Chạy lại sau mỗi lần chạy `rear/rear.py`, vì rear.py dựng world_cho.js lại từ bản sao lưu. Sau đó nhớ đổi `BUILD_V` trong index.html.
 
-## kerbs.py — bó vỉa cao 10 cm
-`python3 kerbs.py <market.glb vào> <world_cho.js vào> <market.glb ra> <world_cho.js ra>`: mọi lề và vỉa lát (gạch kem, lát xám) giáp mặt đường nhựa được đặt cao hơn mặt đường 10 cm ở mép, trở dần về cao độ cũ trong 1 đến 2,5 m; tấm lát gần đường được chia nhỏ khi cần để bám mặt đường; dựng mặt đứng bó vỉa từ mép lề xuống dưới mặt đường 8 cm; lưới đi lại `h` theo mặt lề mới. Chạy sau `curbs.py`, `rear/rear.py`, `festival.py` (nếu chạy lại festival.py sau bước này thì cây, chậu đặt theo `h` mới, không cần làm gì thêm). Nhớ đổi `BUILD_V`.
+## Sửa cầu, dọn nền, bó vỉa (28.11.2026)
+
+Thứ tự chạy sau `rear/rear.py` và `festival.py`:
+
+    git show 29459f9:market.glb > /tmp/market_truoc_khu_sau_cho.glb      # bản trước khi dựng khu sau chợ
+    git show 11d1603:market.glb > market.glb; git show e2a5daf:world_cho.js > world_cho.js   # đầu vào: bản trước khi bó vỉa (không chạy chồng lên kết quả đã bó vỉa)
+    python3 bridgefix.py market.glb /tmp/market_truoc_khu_sau_cho.glb m1.glb
+    python3 groundfix.py m1.glb m2.glb
+    python3 kerbs.py m2.glb world_cho.js market.glb world_cho.js
+
+Sau đó đổi `BUILD_V` trong index.html.
+
+- `bridgefix.py`: các bước dựng khu sau chợ đã xoá nhầm một đoạn mặt cầu đi bộ (thủng thấy cả mặt dưới), toàn bộ lan can, bồn cây, cột đèn phía taluy, và để một bờ kè nhô ngang mặt cầu. Tệp này lấy lại đúng các phần đó từ bản cũ và hạ bờ kè xuống dưới mặt cầu.
+- `groundfix.py`: bỏ các mảng lát nhỏ nằm trơ trọi giữa sân nhựa (mép sàn của khối rạp Hòa Bình ló lên khỏi mặt nhựa 1 đến 3 cm) và đổi màu các đỉnh địa hình sáng lọt giữa vùng nhựa (nêm sáng trên sân, ví dụ ở đầu cầu).
+- `kerbs.py`: lề và vỉa lát nằm sát mặt đường nhựa có mép cao hơn mặt đường 10 cm và có mặt đứng bó vỉa. Chỉ nâng, không hạ: lề gạch quanh chân nhà vốn cao 14 đến 20 cm thì giữ nguyên, chỉ thêm mặt đứng. Vỉa lát quanh chợ vốn thấp hơn dải đường 13 đến 19 cm được kéo lên, rồi trở về cao độ cũ với độ dốc không quá 6%. Lưới đi lại `h` và cao độ các vật đặt trên nền (cây, chậu, hoa, gian, mốc check-in) đi theo.
+
+Bài học từ bản bó vỉa đầu tiên (đã gỡ): bản đó coi mọi tam giác màu xám nhạt là vỉa lát, nên các ô địa hình 2,5 m có màu pha giữa đất và nhựa, kể cả ô nằm chìm dưới mặt đường, bị nâng lên thành những tấm nổi giữa đường; ô nâng dở chừng trùng mặt với đường sinh sọc nhấp nháy. `kerbs.py` hiện tại vì thế:
+
+- chỉ nhận tấm lát thật: gạch kem (ô 2,2 của atlas) hoặc lát xám đều màu ở cả ba đỉnh;
+- cắt tấm lát đúng theo mép dải đường phủ lên nó (so hình học chính xác), không nâng phần nằm dưới đường;
+- không coi sân nhựa của dãy ki-ốt là mặt đường (sân đó có bờ riêng, vỉa quanh sân thấp hơn sân là đúng thiết kế);
+- vá mối nối chữ T và chia tấm theo cạnh (hai tam giác chung cạnh luôn chia giống nhau) để không hở khe; mọi cạnh biên bị nâng đều có mặt đứng che xuống vị trí cũ;
+- in ra số đo kiểm tra: phân bố độ cao mép lề, diện tích mặt đường bị lề trồi lên che, lỗ hổng sau khi chia.
+
+Cách kiểm tra đã dùng: so số ô đi tới được trước và sau (`rear` có `chk.py`), dựng ảnh mặt bằng lớp nền trước và sau, chụp dọc 8 tuyến đường trong game ở góc nhìn người chơi.
