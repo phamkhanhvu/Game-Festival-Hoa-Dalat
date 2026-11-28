@@ -58,12 +58,21 @@ Nguyên tắc của chủ dự án: không để đất dốc tràn ra đường
 
 Khung làm việc của `common.py` nay là cả bản đồ.
 
-## festival.py — cây và hoa mùa Festival
-`python3 festival.py ../../world_cho.js ../../world_cho.js [ảnh_mặt_bằng.png]` điền `trees`, `pots`, `flowers` vào world_cho.js (thảm hoa ở sân rộng, mai anh đào và phượng tím dọc vỉa hè, chậu hoa, hoa trên các bậc cỏ). Chạy lại sau mỗi lần chạy `rear/rear.py`, vì rear.py dựng world_cho.js lại từ bản sao lưu. Sau đó nhớ đổi `BUILD_V` trong index.html.
+## festival.py — cây, chậu và bồn hoa mùa Festival
+`python3 festival.py <world_cho.js vào> <world_cho.js ra> <market.glb> [ảnh_mặt_bằng.png]` ghi đè ba danh sách `trees`, `pots`, `flowers` của world_cho.js. Chạy SAU `kerbs.py` (cao độ lấy theo lưới `h` hiện có, mặt nhựa và chân công trình lấy từ market.glb qua `surface.py`). Sau đó đổi `BUILD_V` trong index.html.
+
+Quy tắc đặt (anh Vũ, 28.11.2026: cây và bồn hoa trang trí nằm sát công trình, không tràn ra đường):
+- cây không bao giờ đứng trên mặt nhựa: gốc trên nền lát rộng, cách tường 3 đến 3,8 m, cây cao 4,4 đến 5,2 m để tán không trùm ra đường;
+- luống hoa (dải bông hoa) nằm ngay chân tường; chậu hoa cách tường khoảng 1 m; bồn hoa lớn là nửa hình tròn tựa vào tường, sâu 2,3 m, chỉ ở quanh sân khấu, mặt tiền chợ và dọc các tuyến đường;
+- chậu và hoa chỉ được nằm trên mặt nhựa khi tựa chân tường và cách tim tuyến xe đủ xa (luống 4 m, chậu 5 m, bồn lớn 8,5 m);
+- riêng bờ hồ có một hàng cây trên dải đất ven nước; các bậc cỏ vẫn rải hoa thành đám;
+- tránh gian thương hiệu, sạp, ki-ốt, mốc check-in, sân khấu, cầu đi bộ; vật nào làm bít lối đi thì tự gỡ.
+
+Bản trước (26.11) đặt thảm hoa tròn ở giữa sân rộng và chậu, cây theo mép "đường" suy ra từ tuyến xe, nên phần lớn nằm giữa mặt nhựa: 204 trên 399 chậu, 67 trên 106 cây. Tệp in ra số đo kiểm tra sau mỗi lần chạy (số vật trên mặt nhựa, khoảng cách xa tường nhất, số ô đi tới được).
 
 ## Sửa cầu, dọn nền, bó vỉa (28.11.2026)
 
-Thứ tự chạy sau `rear/rear.py` và `festival.py`:
+Thứ tự chạy sau `rear/rear.py` (rồi chạy `festival.py` sau cùng):
 
     git show 29459f9:market.glb > /tmp/market_truoc_khu_sau_cho.glb      # bản trước khi dựng khu sau chợ
     git show 11d1603:market.glb > market.glb; git show e2a5daf:world_cho.js > world_cho.js   # đầu vào: bản trước khi bó vỉa (không chạy chồng lên kết quả đã bó vỉa)
